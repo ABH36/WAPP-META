@@ -1,5 +1,6 @@
 import { Test } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import {
   BadRequestException,
   ConflictException,
@@ -78,6 +79,7 @@ describe("TeamService", () => {
   let tokenService: jest.Mocked<TokenService>;
   let authService: jest.Mocked<AuthService>;
   let emailService: jest.Mocked<EmailService>;
+  let eventEmitter: jest.Mocked<EventEmitter2>;
 
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -119,6 +121,7 @@ describe("TeamService", () => {
           useValue: { reissueTokens: jest.fn(), revokeAllSessions: jest.fn() },
         },
         { provide: EmailService, useValue: { send: jest.fn() } },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         {
           provide: ConfigService,
           useValue: {
@@ -143,6 +146,7 @@ describe("TeamService", () => {
     tokenService = moduleRef.get(TokenService);
     authService = moduleRef.get(AuthService);
     emailService = moduleRef.get(EmailService);
+    eventEmitter = moduleRef.get(EventEmitter2);
 
     workspaceRepository.findById.mockResolvedValue(fakeWorkspace());
     tokenService.generateOpaqueToken.mockReturnValue("raw-token");
@@ -164,6 +168,10 @@ describe("TeamService", () => {
       );
       expect(emailService.send).toHaveBeenCalledWith(
         expect.objectContaining({ to: "invitee@example.com", category: "team-invitation" }),
+      );
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        "team.member_invited",
+        expect.objectContaining({ workspaceId: "workspace-1", email: "invitee@example.com" }),
       );
     });
 
@@ -260,6 +268,10 @@ describe("TeamService", () => {
       );
       expect(invitationRepository.markAccepted).toHaveBeenCalledWith("invitation-1");
       expect(result.tokens.accessToken).toBe("access-token");
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        "team.member_accepted",
+        expect.objectContaining({ workspaceId: "workspace-1", userId: "user-2" }),
+      );
     });
   });
 
@@ -277,21 +289,29 @@ describe("TeamService", () => {
       userRepository.findById.mockResolvedValue(
         fakeUser({ workspaceId: "workspace-1", role: TenantRole.OWNER }),
       );
-      await expect(service.suspendMember("workspace-1", "user-2")).rejects.toThrow(
+      await expect(service.suspendMember("workspace-1", "user-2", "user-1")).rejects.toThrow(
         ForbiddenException,
       );
     });
 
-    it("suspends a non-owner member and revokes their sessions", async () => {
+    it("suspends a non-owner member, revokes their sessions, and emits the event", async () => {
       userRepository.findById.mockResolvedValue(
         fakeUser({ workspaceId: "workspace-1", role: TenantRole.SALES_EXECUTIVE }),
       );
-      await service.suspendMember("workspace-1", "user-2");
+      await service.suspendMember("workspace-1", "user-2", "user-1");
       expect(userRepository.updateWorkspaceMemberStatus).toHaveBeenCalledWith(
         "user-2",
         WorkspaceMemberStatus.SUSPENDED,
       );
       expect(authService.revokeAllSessions).toHaveBeenCalledWith("user-2");
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        "team.member_suspended",
+        expect.objectContaining({
+          workspaceId: "workspace-1",
+          userId: "user-2",
+          actorId: "user-1",
+        }),
+      );
     });
 
     it("rejects reactivating a member who isn't currently suspended", async () => {
@@ -302,7 +322,7 @@ describe("TeamService", () => {
           workspaceMemberStatus: WorkspaceMemberStatus.ACTIVE,
         }),
       );
-      await expect(service.reactivateMember("workspace-1", "user-2")).rejects.toThrow(
+      await expect(service.reactivateMember("workspace-1", "user-2", "user-1")).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -318,7 +338,7 @@ describe("TeamService", () => {
 
     it("throws when the target isn't a member of this workspace", async () => {
       userRepository.findById.mockResolvedValue(fakeUser({ workspaceId: "different-workspace" }));
-      await expect(service.suspendMember("workspace-1", "user-2")).rejects.toThrow(
+      await expect(service.suspendMember("workspace-1", "user-2", "user-1")).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -376,6 +396,14 @@ describe("TeamService", () => {
       );
       expect(workspaceRepository.updateOwner).toHaveBeenCalledWith("workspace-1", "user-2");
       expect(result.accessToken).toBe("access-token");
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        "team.ownership_transferred",
+        expect.objectContaining({
+          workspaceId: "workspace-1",
+          previousOwnerId: "user-1",
+          newOwnerId: "user-2",
+        }),
+      );
     });
   });
 });

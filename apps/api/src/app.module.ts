@@ -9,6 +9,7 @@ import { HealthModule } from "./health/health.module.js";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter.js";
 import { ResponseInterceptor } from "./common/interceptors/response.interceptor.js";
 import { AppLoggingModule } from "./common/logging/logging.module.js";
+import { EventsModule } from "./common/events/events.module.js";
 import { InfrastructureModule } from "./infrastructure/infrastructure.module.js";
 import { IdentityModule } from "./modules/identity/identity.module.js";
 import { WorkspaceModule } from "./modules/workspace/workspace.module.js";
@@ -38,6 +39,7 @@ import { WorkspaceModule } from "./modules/workspace/workspace.module.js";
       envFilePath: [".env"],
     }),
     AppLoggingModule,
+    EventsModule,
     // SEC-009 — general authenticated API default. Auth-endpoint-specific
     // stricter tiers (5/min) are applied via @Throttle() on individual routes
     // once the Identity module exists.

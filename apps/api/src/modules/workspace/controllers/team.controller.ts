@@ -87,7 +87,7 @@ export class TeamController {
     @CurrentUser() user: AuthenticatedUser,
     @Param("userId") userId: string,
   ): Promise<{ message: string }> {
-    await this.teamService.suspendMember(user.workspaceId!, userId);
+    await this.teamService.suspendMember(user.workspaceId!, userId, user.userId);
     return { message: "Member suspended" };
   }
 
@@ -98,7 +98,7 @@ export class TeamController {
     @CurrentUser() user: AuthenticatedUser,
     @Param("userId") userId: string,
   ): Promise<{ message: string }> {
-    await this.teamService.reactivateMember(user.workspaceId!, userId);
+    await this.teamService.reactivateMember(user.workspaceId!, userId, user.userId);
     return { message: "Member reactivated" };
   }
 

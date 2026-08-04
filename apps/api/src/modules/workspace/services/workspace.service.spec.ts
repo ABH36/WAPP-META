@@ -1,5 +1,6 @@
 import { Test } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { TenantRole, WorkspaceMemberStatus, WorkspaceStatus } from "@wapp/shared-types";
 import { WorkspaceService } from "./workspace.service.js";
@@ -48,6 +49,7 @@ describe("WorkspaceService", () => {
   let workspaceRepository: jest.Mocked<WorkspaceRepository>;
   let userRepository: jest.Mocked<UserRepository>;
   let authService: jest.Mocked<AuthService>;
+  let eventEmitter: jest.Mocked<EventEmitter2>;
 
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -87,6 +89,7 @@ describe("WorkspaceService", () => {
             },
           },
         },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
@@ -94,6 +97,7 @@ describe("WorkspaceService", () => {
     workspaceRepository = moduleRef.get(WorkspaceRepository);
     userRepository = moduleRef.get(UserRepository);
     authService = moduleRef.get(AuthService);
+    eventEmitter = moduleRef.get(EventEmitter2);
 
     workspaceRepository.findById.mockResolvedValue(fakeWorkspace());
     authService.reissueTokens.mockResolvedValue({
@@ -124,6 +128,10 @@ describe("WorkspaceService", () => {
         WorkspaceMemberStatus.ACTIVE,
       );
       expect(result.tokens.accessToken).toBe("access-token");
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        "workspace.created",
+        expect.objectContaining({ workspaceId: "workspace-1", ownerId: "user-1" }),
+      );
     });
 
     it("rejects when the user doesn't exist", async () => {
@@ -152,23 +160,31 @@ describe("WorkspaceService", () => {
   describe("updateBusinessHours", () => {
     it("rejects a schedule with duplicate dayOfWeek entries", async () => {
       await expect(
-        service.updateBusinessHours("workspace-1", {
-          schedule: [
-            { dayOfWeek: 1, isOpen: true, openTime: "09:00", closeTime: "18:00" },
-            { dayOfWeek: 1, isOpen: true, openTime: "10:00", closeTime: "19:00" },
-          ],
-        }),
+        service.updateBusinessHours(
+          "workspace-1",
+          {
+            schedule: [
+              { dayOfWeek: 1, isOpen: true, openTime: "09:00", closeTime: "18:00" },
+              { dayOfWeek: 1, isOpen: true, openTime: "10:00", closeTime: "19:00" },
+            ],
+          },
+          "user-1",
+        ),
       ).rejects.toThrow(BadRequestException);
       expect(workspaceRepository.updateBusinessHours).not.toHaveBeenCalled();
     });
 
     it("accepts a schedule with unique dayOfWeek entries", async () => {
-      await service.updateBusinessHours("workspace-1", {
-        schedule: [
-          { dayOfWeek: 1, isOpen: true, openTime: "09:00", closeTime: "18:00" },
-          { dayOfWeek: 2, isOpen: true, openTime: "09:00", closeTime: "18:00" },
-        ],
-      });
+      await service.updateBusinessHours(
+        "workspace-1",
+        {
+          schedule: [
+            { dayOfWeek: 1, isOpen: true, openTime: "09:00", closeTime: "18:00" },
+            { dayOfWeek: 2, isOpen: true, openTime: "09:00", closeTime: "18:00" },
+          ],
+        },
+        "user-1",
+      );
       expect(workspaceRepository.updateBusinessHours).toHaveBeenCalled();
     });
   });

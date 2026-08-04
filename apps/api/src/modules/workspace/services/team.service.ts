@@ -6,9 +6,18 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { TenantRole, WorkspaceMemberStatus } from "@wapp/shared-types";
 import type { AppConfig } from "../../../config/configuration.js";
 import { EmailService } from "../../../infrastructure/email/email.service.js";
+import { DomainEvent } from "../../../common/events/domain-events.js";
+import type {
+  TeamMemberAcceptedPayload,
+  TeamMemberInvitedPayload,
+  TeamMemberReactivatedPayload,
+  TeamMemberSuspendedPayload,
+  TeamOwnershipTransferredPayload,
+} from "../../../common/events/domain-events.js";
 import { UserRepository } from "../../identity/repositories/user.repository.js";
 import { TokenService } from "../../identity/services/token.service.js";
 import { AuthService, type RequestMeta } from "../../identity/services/auth.service.js";
@@ -41,6 +50,7 @@ export class TeamService {
     private readonly authService: AuthService,
     private readonly emailService: EmailService,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async inviteMember(
@@ -97,6 +107,14 @@ export class TeamService {
       text,
       category: "team-invitation",
     });
+
+    this.eventEmitter.emit(DomainEvent.TEAM_MEMBER_INVITED, {
+      workspaceId,
+      email: dto.email,
+      role: dto.role,
+      invitedBy,
+      occurredAt: new Date().toISOString(),
+    } satisfies TeamMemberInvitedPayload);
   }
 
   async listInvitations(workspaceId: string): Promise<InvitationSummary[]> {
@@ -153,6 +171,13 @@ export class TeamService {
     );
     await this.invitationRepository.markAccepted(invitation._id.toString());
 
+    this.eventEmitter.emit(DomainEvent.TEAM_MEMBER_ACCEPTED, {
+      workspaceId: invitation.workspaceId.toString(),
+      userId: user._id.toString(),
+      role: invitation.role,
+      occurredAt: new Date().toISOString(),
+    } satisfies TeamMemberAcceptedPayload);
+
     const tokens = await this.authService.reissueTokens(user._id.toString(), meta);
 
     return { workspace: toWorkspaceProfile(workspace), tokens };
@@ -180,7 +205,7 @@ export class TeamService {
     return toMemberSummary(updated);
   }
 
-  async suspendMember(workspaceId: string, targetUserId: string): Promise<void> {
+  async suspendMember(workspaceId: string, targetUserId: string, actorId: string): Promise<void> {
     const target = await this.getMemberOrThrow(workspaceId, targetUserId);
     if (target.role === TenantRole.OWNER) {
       throw new ForbiddenException("The workspace Owner cannot be suspended");
@@ -192,9 +217,20 @@ export class TeamService {
     );
     // PRD-002 Part 3B — Suspended still consumes a seat; only login is blocked.
     await this.authService.revokeAllSessions(targetUserId);
+
+    this.eventEmitter.emit(DomainEvent.TEAM_MEMBER_SUSPENDED, {
+      workspaceId,
+      userId: targetUserId,
+      actorId,
+      occurredAt: new Date().toISOString(),
+    } satisfies TeamMemberSuspendedPayload);
   }
 
-  async reactivateMember(workspaceId: string, targetUserId: string): Promise<void> {
+  async reactivateMember(
+    workspaceId: string,
+    targetUserId: string,
+    actorId: string,
+  ): Promise<void> {
     const target = await this.getMemberOrThrow(workspaceId, targetUserId);
     if (target.workspaceMemberStatus !== WorkspaceMemberStatus.SUSPENDED) {
       throw new BadRequestException("Only a suspended member can be reactivated");
@@ -203,6 +239,13 @@ export class TeamService {
       targetUserId,
       WorkspaceMemberStatus.ACTIVE,
     );
+
+    this.eventEmitter.emit(DomainEvent.TEAM_MEMBER_REACTIVATED, {
+      workspaceId,
+      userId: targetUserId,
+      actorId,
+      occurredAt: new Date().toISOString(),
+    } satisfies TeamMemberReactivatedPayload);
   }
 
   async removeMember(workspaceId: string, targetUserId: string): Promise<void> {
@@ -245,6 +288,13 @@ export class TeamService {
     await this.userRepository.updateWorkspaceRole(newOwnerId, TenantRole.OWNER);
     await this.userRepository.updateWorkspaceRole(currentOwnerId, TenantRole.ADMINISTRATOR);
     await this.workspaceRepository.updateOwner(workspaceId, newOwnerId);
+
+    this.eventEmitter.emit(DomainEvent.TEAM_OWNERSHIP_TRANSFERRED, {
+      workspaceId,
+      previousOwnerId: currentOwnerId,
+      newOwnerId,
+      occurredAt: new Date().toISOString(),
+    } satisfies TeamOwnershipTransferredPayload);
 
     // Reissue for the acting (outgoing) user only — see reissueTokens' own
     // doc comment for why this isn't done for the other party too.

@@ -39,7 +39,7 @@ export class WorkspaceController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateBusinessProfileDto,
   ): Promise<WorkspaceProfile> {
-    return this.workspaceService.updateBusinessProfile(user.workspaceId!, dto);
+    return this.workspaceService.updateBusinessProfile(user.workspaceId!, dto, user.userId);
   }
 
   @RequirePermission(Permission.EDIT_WORKSPACE)
@@ -48,7 +48,7 @@ export class WorkspaceController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateBusinessHoursDto,
   ): Promise<WorkspaceProfile> {
-    return this.workspaceService.updateBusinessHours(user.workspaceId!, dto);
+    return this.workspaceService.updateBusinessHours(user.workspaceId!, dto, user.userId);
   }
 
   @RequirePermission(Permission.EDIT_WORKSPACE)
@@ -57,7 +57,7 @@ export class WorkspaceController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateNotificationSettingsDto,
   ): Promise<WorkspaceProfile> {
-    return this.workspaceService.updateNotificationSettings(user.workspaceId!, dto);
+    return this.workspaceService.updateNotificationSettings(user.workspaceId!, dto, user.userId);
   }
 
   private extractMeta(request: Request): { userAgent: string | null; ipAddress: string | null } {

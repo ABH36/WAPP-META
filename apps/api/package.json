@@ -27,6 +27,7 @@
     "@nestjs/mongoose": "^10.1.0",
     "@nestjs/throttler": "^6.2.1",
     "@nestjs/bullmq": "^10.2.1",
+    "@nestjs/event-emitter": "^2.1.1",
     "@nestjs/jwt": "^10.2.0",
     "bcrypt": "^5.1.1",
     "bullmq": "^5.21.2",

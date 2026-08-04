@@ -5,8 +5,14 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { TenantRole, WorkspaceMemberStatus } from "@wapp/shared-types";
 import type { AppConfig } from "../../../config/configuration.js";
+import { DomainEvent } from "../../../common/events/domain-events.js";
+import type {
+  WorkspaceCreatedPayload,
+  WorkspaceUpdatedPayload,
+} from "../../../common/events/domain-events.js";
 import { UserRepository } from "../../identity/repositories/user.repository.js";
 import { AuthService, type RequestMeta } from "../../identity/services/auth.service.js";
 import type { IssuedTokenPair } from "../../identity/identity.types.js";
@@ -32,6 +38,7 @@ export class WorkspaceService {
     private readonly userRepository: UserRepository,
     private readonly authService: AuthService,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(
@@ -56,13 +63,21 @@ export class WorkspaceService {
       ownerId: userId,
       trialEndsAt,
     });
+    const workspaceId = workspace._id.toString();
 
     await this.userRepository.assignWorkspaceMembership(
       userId,
-      workspace._id.toString(),
+      workspaceId,
       TenantRole.OWNER,
       WorkspaceMemberStatus.ACTIVE,
     );
+
+    this.eventEmitter.emit(DomainEvent.WORKSPACE_CREATED, {
+      workspaceId,
+      ownerId: userId,
+      name: workspace.name,
+      occurredAt: new Date().toISOString(),
+    } satisfies WorkspaceCreatedPayload);
 
     // The user's existing access token still has workspaceId/role = null —
     // reissue immediately so the client doesn't need a manual re-login to
@@ -80,15 +95,18 @@ export class WorkspaceService {
   async updateBusinessProfile(
     workspaceId: string,
     dto: UpdateBusinessProfileDto,
+    updatedBy: string,
   ): Promise<WorkspaceProfile> {
     await this.findOrThrow(workspaceId);
     await this.workspaceRepository.updateBusinessProfile(workspaceId, dto);
+    this.emitUpdated(workspaceId, "business_profile", updatedBy);
     return this.getById(workspaceId);
   }
 
   async updateBusinessHours(
     workspaceId: string,
     dto: UpdateBusinessHoursDto,
+    updatedBy: string,
   ): Promise<WorkspaceProfile> {
     await this.findOrThrow(workspaceId);
 
@@ -100,16 +118,32 @@ export class WorkspaceService {
     }
 
     await this.workspaceRepository.updateBusinessHours(workspaceId, dto);
+    this.emitUpdated(workspaceId, "business_hours", updatedBy);
     return this.getById(workspaceId);
   }
 
   async updateNotificationSettings(
     workspaceId: string,
     dto: UpdateNotificationSettingsDto,
+    updatedBy: string,
   ): Promise<WorkspaceProfile> {
     await this.findOrThrow(workspaceId);
     await this.workspaceRepository.updateNotificationSettings(workspaceId, dto);
+    this.emitUpdated(workspaceId, "notification_settings", updatedBy);
     return this.getById(workspaceId);
+  }
+
+  private emitUpdated(
+    workspaceId: string,
+    section: WorkspaceUpdatedPayload["section"],
+    updatedBy: string,
+  ): void {
+    this.eventEmitter.emit(DomainEvent.WORKSPACE_UPDATED, {
+      workspaceId,
+      section,
+      updatedBy,
+      occurredAt: new Date().toISOString(),
+    } satisfies WorkspaceUpdatedPayload);
   }
 
   private async findOrThrow(workspaceId: string) {
