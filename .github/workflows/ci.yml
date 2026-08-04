@@ -88,7 +88,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build ${{ matrix.app }}
-        run: pnpm --filter @wapp/${{ matrix.app }} build
+        # "..." pulls in this app's workspace dependencies (e.g. @wapp/shared-types)
+        # and builds them first, in topological order. Required now that
+        # @wapp/shared-types compiles to a real dist/ artifact rather than being
+        # consumed as raw TypeScript — dist/ is gitignored, so a fresh CI
+        # checkout has none until this step builds it.
+        run: pnpm --filter @wapp/${{ matrix.app }}... build
         env:
           # Build-time placeholders only — real secrets are never present in CI
           # (TAD-001 SEC-007). Sufficient for compilation; not used to run the app.

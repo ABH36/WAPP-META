@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // apps/api (a plain CommonJS Node runtime) requires an actual compiled,
+    // requirable artifact — it cannot execute this package's raw ESM/Bundler-
+    // resolution TypeScript source the way Next.js's bundler can. Caught by
+    // actually running `node dist/main.js`, not by `tsc --noEmit`/`nest build`
+    // (both only type-check against source; neither executes it).
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "declaration": true,
+    "noEmit": false,
+    "outDir": "./dist"
+  },
+  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
+}

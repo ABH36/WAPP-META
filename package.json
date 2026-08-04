@@ -20,7 +20,8 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "clean": "pnpm -r clean && rimraf node_modules",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "pnpm --filter @wapp/shared-types build"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.5.0",

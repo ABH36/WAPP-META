@@ -3,6 +3,7 @@ packages:
   - "packages/*"
 allowBuilds:
   "@nestjs/core": true
+  bcrypt: true
   msgpackr-extract: true
   sharp: true
   unrs-resolver: true

@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
-import { ValidationPipe, VersioningType } from "@nestjs/common";
+import { VersioningType } from "@nestjs/common";
 import { Logger } from "nestjs-pino";
 import helmet from "helmet";
 import compression from "compression";
@@ -57,15 +57,12 @@ async function bootstrap(): Promise<void> {
   // direct-upload, per TAD-001 v1.2 PATCH rationale).
   app.use(compression());
 
-  // API-005 — every incoming request validated via DTOs before reaching services.
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true, // strips unknown properties — first line of output sanitization
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
+  // API-005 — every incoming request validated via DTOs before reaching
+  // services. Registered as an APP_PIPE provider in AppModule (not here) so
+  // it's active identically whether the app is bootstrapped via main.ts or
+  // via Nest's TestingModule (e2e tests import AppModule directly and never
+  // run this function) — a pipe registered only here would silently not run
+  // in tests, letting invalid input reach the service layer unvalidated.
 
   // API-003 — URI versioning (/api/v1/...). Health check opts out via
   // VERSION_NEUTRAL (see HealthController) since infra probes need one stable path.

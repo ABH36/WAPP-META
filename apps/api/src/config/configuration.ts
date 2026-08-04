@@ -10,6 +10,21 @@ export interface AppConfig {
     accessTtl: string;
     refreshTtl: string;
   };
+  auth: {
+    bcryptSaltRounds: number;
+    // Minutes — TAD-001 §11 AUTH-004 (email verification), AUTH-005 (password reset).
+    emailVerificationTokenTtlMinutes: number;
+    passwordResetTokenTtlMinutes: number;
+    // Brute-force protection (Engineering Standards §Security baseline), not yet
+    // pinned by a specific TAD-001 clause — a defensible default, documented as
+    // such in the Phase-2 completion report.
+    maxFailedLoginAttempts: number;
+    accountLockoutMinutes: number;
+  };
+  urls: {
+    web: string;
+    admin: string;
+  };
   resend: {
     apiKey: string;
     fromAddress: string;
@@ -37,6 +52,20 @@ export default (): AppConfig => ({
     // Access tokens short-lived per TAD-001 AUTH-002; refresh tokens longer-lived per AUTH-003.
     accessTtl: process.env.JWT_ACCESS_TTL ?? "15m",
     refreshTtl: process.env.JWT_REFRESH_TTL ?? "30d",
+  },
+  auth: {
+    bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS ?? "12", 10),
+    emailVerificationTokenTtlMinutes: parseInt(
+      process.env.EMAIL_VERIFICATION_TOKEN_TTL ?? "60",
+      10,
+    ),
+    passwordResetTokenTtlMinutes: parseInt(process.env.PASSWORD_RESET_TOKEN_TTL ?? "30", 10),
+    maxFailedLoginAttempts: parseInt(process.env.MAX_FAILED_LOGIN_ATTEMPTS ?? "5", 10),
+    accountLockoutMinutes: parseInt(process.env.ACCOUNT_LOCKOUT_MINUTES ?? "15", 10),
+  },
+  urls: {
+    web: process.env.WEB_APP_URL ?? "",
+    admin: process.env.ADMIN_APP_URL ?? "",
   },
   resend: {
     apiKey: process.env.RESEND_API_KEY ?? "",
