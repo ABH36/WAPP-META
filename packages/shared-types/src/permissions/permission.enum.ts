@@ -1,0 +1,50 @@
+/**
+ * Traces to: PRD-000C v1.1 §Section C (Official Role Permission Matrix).
+ * This is the exhaustive list of tenant-side permissions. Do not add a permission
+ * here without an approved Business Decision — this is the same discipline as
+ * SAD-002 PATCH-007's "no undocumented collections" rule, applied to permissions.
+ */
+export enum Permission {
+  VIEW_WORKSPACE = "VIEW_WORKSPACE",
+  EDIT_WORKSPACE = "EDIT_WORKSPACE",
+  INVITE_USER = "INVITE_USER",
+  REMOVE_USER = "REMOVE_USER",
+  MANAGE_ROLES = "MANAGE_ROLES",
+  CONNECT_WHATSAPP = "CONNECT_WHATSAPP",
+  DISCONNECT_WHATSAPP = "DISCONNECT_WHATSAPP",
+  VIEW_CUSTOMERS = "VIEW_CUSTOMERS",
+  CREATE_CUSTOMER = "CREATE_CUSTOMER",
+  EDIT_CUSTOMER = "EDIT_CUSTOMER",
+  VIEW_LEADS = "VIEW_LEADS",
+  CREATE_LEADS = "CREATE_LEADS",
+  UPDATE_LEAD_STAGE = "UPDATE_LEAD_STAGE",
+  CONVERT_LEADS = "CONVERT_LEADS",
+  VIEW_DEALS = "VIEW_DEALS",
+  CREATE_DEALS = "CREATE_DEALS",
+  CLOSE_DEALS = "CLOSE_DEALS",
+  ASSIGN_CONVERSATIONS = "ASSIGN_CONVERSATIONS",
+  REPLY_CONVERSATIONS = "REPLY_CONVERSATIONS",
+  ADD_INTERNAL_NOTES = "ADD_INTERNAL_NOTES",
+  VIEW_TEMPLATES = "VIEW_TEMPLATES",
+  CREATE_TEMPLATES = "CREATE_TEMPLATES",
+  MANAGE_TEMPLATES = "MANAGE_TEMPLATES",
+  VIEW_BROADCASTS = "VIEW_BROADCASTS",
+  CREATE_BROADCAST = "CREATE_BROADCAST",
+  SEND_BROADCAST = "SEND_BROADCAST",
+  VIEW_REPORTS = "VIEW_REPORTS",
+  BILLING_ACCESS = "BILLING_ACCESS",
+}
+
+/**
+ * FULL = create/edit/execute. VIEW_ONLY = read access only. NONE = no access.
+ * *_SCOPED variants apply only to VIEW_REPORTS, where visibility is scoped rather
+ * than binary (PRD-000C v1.1 §Section C).
+ */
+export enum PermissionLevel {
+  NONE = "NONE",
+  VIEW_ONLY = "VIEW_ONLY",
+  FULL = "FULL",
+  TEAM_SCOPED = "TEAM_SCOPED",
+  OWN_SCOPED = "OWN_SCOPED",
+  CAMPAIGN_SCOPED = "CAMPAIGN_SCOPED",
+}

@@ -1,0 +1,15 @@
+{
+  "extends": "@wapp/config/tsconfig/nestjs.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    // Relative paths inherited via `extends` resolve against the base config's
+    // own directory (packages/config/typescript/), not this file's directory —
+    // outDir/baseUrl MUST be restated here or output silently lands in the
+    // wrong package. Caught by actually running `node dist/main.js`, not by
+    // `tsc --noEmit` or a silent `nest build` success.
+    "outDir": "./dist",
+    "baseUrl": "./"
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

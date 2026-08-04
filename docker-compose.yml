@@ -1,0 +1,29 @@
+# Local development services only. Apps (api/web/admin) run via `pnpm dev:*`
+# directly on the host for fast hot-reload — only the stateful backing services
+# run in Docker locally. Production uses docker-compose.prod.yml plus real
+# MongoDB Atlas (TAD-001 technology decision — this local `mongo` container is
+# a dev-only convenience, never used in staging/production).
+name: wapp-dev
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: wapp_dev
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  mongo_data:
+  redis_data:

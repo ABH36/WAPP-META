@@ -1,0 +1,105 @@
+name: CI
+
+# TAD-001 GIT-004/005 — every change enters via a Pull Request; this workflow is
+# the automated half of "every PR shall undergo code review" (§21, Code Review
+# Standards) — lint/typecheck/build/test are the automatable checks, human
+# review covers architecture/business-rule alignment.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "9"
+
+jobs:
+  lint-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint-typecheck
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: lint-typecheck
+    strategy:
+      matrix:
+        app: [api, web, admin]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build ${{ matrix.app }}
+        run: pnpm --filter @wapp/${{ matrix.app }} build
+        env:
+          # Build-time placeholders only — real secrets are never present in CI
+          # (TAD-001 SEC-007). Sufficient for compilation; not used to run the app.
+          MONGODB_URI: mongodb://localhost:27017/ci
+          REDIS_URL: redis://localhost:6379
+          JWT_ACCESS_SECRET: ci-placeholder
+          JWT_REFRESH_SECRET: ci-placeholder
+          RESEND_API_KEY: ci-placeholder
+          RESEND_FROM_ADDRESS: no-reply@wapp.example
+          CLOUDINARY_CLOUD_NAME: ci-placeholder
+          CLOUDINARY_API_KEY: ci-placeholder
+          CLOUDINARY_API_SECRET: ci-placeholder
+          WEB_APP_URL: http://localhost:3000
+          ADMIN_APP_URL: http://localhost:3001
