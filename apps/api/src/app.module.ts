@@ -11,6 +11,7 @@ import { ResponseInterceptor } from "./common/interceptors/response.interceptor.
 import { AppLoggingModule } from "./common/logging/logging.module.js";
 import { InfrastructureModule } from "./infrastructure/infrastructure.module.js";
 import { IdentityModule } from "./modules/identity/identity.module.js";
+import { WorkspaceModule } from "./modules/workspace/workspace.module.js";
 
 /**
  * Root module — Modular Monolith composition root (SAD-001 Volume-1 §4).
@@ -51,6 +52,7 @@ import { IdentityModule } from "./modules/identity/identity.module.js";
     InfrastructureModule,
     HealthModule,
     IdentityModule,
+    WorkspaceModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

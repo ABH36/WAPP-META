@@ -1,10 +1,11 @@
-import type { TenantRole } from "@wapp/shared-types";
+import type { TenantRole, WorkspaceMemberStatus } from "@wapp/shared-types";
 
 /** Access token payload (TokenService.signAccessToken / verifyAccessToken). */
 export interface AccessTokenPayload {
   sub: string;
   workspaceId: string | null;
   role: TenantRole | null;
+  workspaceMemberStatus: WorkspaceMemberStatus | null;
   emailVerified: boolean;
   type: "access";
 }
@@ -25,6 +26,7 @@ export interface AuthenticatedUser {
   userId: string;
   workspaceId: string | null;
   role: TenantRole | null;
+  workspaceMemberStatus: WorkspaceMemberStatus | null;
   emailVerified: boolean;
 }
 
@@ -42,6 +44,7 @@ export interface UserProfile {
   mobileNumber: string;
   workspaceId: string | null;
   role: TenantRole | null;
+  workspaceMemberStatus: WorkspaceMemberStatus | null;
   isEmailVerified: boolean;
   createdAt: string;
 }

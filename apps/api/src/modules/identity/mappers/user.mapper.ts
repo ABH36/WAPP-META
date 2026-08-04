@@ -11,6 +11,7 @@ export function toUserProfile(user: UserDocument): UserProfile {
     mobileNumber: user.mobileNumber,
     workspaceId: user.workspaceId,
     role: user.role,
+    workspaceMemberStatus: user.workspaceMemberStatus,
     isEmailVerified: user.isEmailVerified,
     createdAt: user.createdAt.toISOString(),
   };

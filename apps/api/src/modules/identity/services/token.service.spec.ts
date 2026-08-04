@@ -36,6 +36,7 @@ describe("TokenService", () => {
         sub: "user-1",
         workspaceId: "workspace-1",
         role: null,
+        workspaceMemberStatus: null,
         emailVerified: true,
       });
 

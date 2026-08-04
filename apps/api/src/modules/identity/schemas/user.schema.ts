@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { HydratedDocument } from "mongoose";
-import { TenantRole } from "@wapp/shared-types";
+import { TenantRole, WorkspaceMemberStatus } from "@wapp/shared-types";
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -8,14 +8,16 @@ export type UserDocument = HydratedDocument<User>;
  * Traces to: PRD-002 v1.1 (Registration/Login), REG-BR-002 (unique email),
  * REG-BR-003 (unique mobile), LOGIN-BR-001 (only verified accounts may login).
  *
- * `workspaceId` / `role` are nullable by design — a User exists the moment
- * registration completes, before any Workspace does (the approved onboarding
- * order is Register → Verify Email → Create Workspace, not atomic). The
- * Workspace module is responsible for populating both fields once the user
- * either creates a Workspace (becomes OWNER) or accepts a Team Invitation
- * (becomes the invited role). Phase-1 is strictly one User → one Workspace
- * (PRD-002 v1.1), so a single nullable field is correct — do not model this
- * as an array/membership collection without a new Business Decision.
+ * `workspaceId` / `role` / `workspaceMemberStatus` are nullable by design — a
+ * User exists the moment registration completes, before any Workspace does
+ * (the approved onboarding order is Register → Verify Email → Create
+ * Workspace, not atomic). The Workspace module (via `UserRepository`,
+ * exported by IdentityModule — Workspace never touches the `users` collection
+ * directly, per SAD-002 DB-001) populates all three once the user either
+ * creates a Workspace (becomes OWNER/ACTIVE) or accepts a Team Invitation
+ * (becomes the invited role/ACTIVE). Phase-1 is strictly one User → one
+ * Workspace (PRD-002 v1.1), so flat nullable fields are correct — do not
+ * model this as an array/membership collection without a new Business Decision.
  *
  * This collection is intentionally NOT a TenantOwnedEntity (no `workspaceId`
  * requirement at write time) — identity is platform-global; the workspace
@@ -45,13 +47,19 @@ export class User {
   @Prop({ type: String, enum: TenantRole, default: null })
   role!: TenantRole | null;
 
+  // Resolved 2026-08-04 (Phase-3): 4-state model only (Pending/Active/
+  // Suspended/Removed) — "Inactive" was considered and explicitly rejected
+  // (no defined trigger, flagged across 3 documents, never resolved). Null
+  // until the user has a workspace, same lifecycle as workspaceId/role.
+  @Prop({ type: String, enum: WorkspaceMemberStatus, default: null })
+  workspaceMemberStatus!: WorkspaceMemberStatus | null;
+
   @Prop({ default: false })
   isEmailVerified!: boolean;
 
   // Identity-level account kill switch (platform-level disable, e.g. fraud
-  // response) — distinct from the still-undefined Workspace-Member status
-  // lifecycle (Pending/Active/Suspended/Removed/Inactive), which belongs to
-  // the future Workspace/Team module per the PRD-002 review's open item #12.
+  // response) — distinct from workspaceMemberStatus above, which governs
+  // access to one specific workspace, not the platform account itself.
   @Prop({ default: true })
   isActive!: boolean;
 

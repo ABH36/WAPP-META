@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { AppConfig } from "../../../config/configuration.js";
+import { WorkspaceMemberStatus } from "@wapp/shared-types";
 import { EmailService } from "../../../infrastructure/email/email.service.js";
 import { UserRepository } from "../repositories/user.repository.js";
 import { AuthTokenRepository } from "../repositories/auth-token.repository.js";
@@ -154,6 +155,18 @@ export class AuthService {
       throw new ForbiddenException("Please verify your email address before logging in");
     }
 
+    // PRD-002 Part 3B — a suspended/removed workspace member cannot log in.
+    // Belt-and-suspenders: TeamService also revokes all of their sessions on
+    // suspend/remove, but this is the direct gate for a *new* login attempt.
+    if (user.workspaceMemberStatus === WorkspaceMemberStatus.SUSPENDED) {
+      throw new ForbiddenException(
+        "Your access to this workspace has been suspended. Please contact your workspace administrator.",
+      );
+    }
+    if (user.workspaceMemberStatus === WorkspaceMemberStatus.REMOVED) {
+      throw new ForbiddenException("Your access to this workspace has been removed.");
+    }
+
     await this.userRepository.recordSuccessfulLogin(user._id.toString());
     const tokens = await this.issueTokenPair(user, meta);
     return { tokens, user: toUserProfile(user) };
@@ -186,6 +199,12 @@ export class AuthService {
     if (!user || !user.isActive) {
       throw new UnauthorizedException("Invalid refresh token");
     }
+    if (
+      user.workspaceMemberStatus === WorkspaceMemberStatus.SUSPENDED ||
+      user.workspaceMemberStatus === WorkspaceMemberStatus.REMOVED
+    ) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
 
     const rotated = await this.createSession(user._id.toString(), meta);
     await this.sessionRepository.revokeByJti(payload.jti, rotated.jti);
@@ -194,10 +213,38 @@ export class AuthService {
       sub: user._id.toString(),
       workspaceId: user.workspaceId,
       role: user.role,
+      workspaceMemberStatus: user.workspaceMemberStatus,
       emailVerified: user.isEmailVerified,
     });
 
     return { accessToken, refreshToken: rotated.token, expiresIn };
+  }
+
+  /**
+   * Mints a fresh token pair for a user whose workspace membership just
+   * changed (created a Workspace, accepted an invitation) — called by the
+   * Workspace module (via IdentityModule's exported AuthService) so the
+   * acting user doesn't have to manually log out/in to pick up their new
+   * `workspaceId`/`role`. Not used for actions an admin takes on *another*
+   * user (role change, suspend, remove) — those rely on the existing
+   * short access-token TTL / session revocation instead (see
+   * docs/SEC-THREAT-MODEL-authentication.md §2–3).
+   */
+  async reissueTokens(userId: string, meta: RequestMeta): Promise<IssuedTokenPair> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException("User not found");
+    }
+    return this.issueTokenPair(user, meta);
+  }
+
+  /**
+   * Force-logout everywhere — called by the Workspace module when a member
+   * is suspended/removed. Kept here (not a raw SessionRepository export) so
+   * the `sessions` collection stays exclusively Identity's, per SAD-002 DB-001.
+   */
+  async revokeAllSessions(userId: string): Promise<void> {
+    await this.sessionRepository.revokeAllForUser(userId);
   }
 
   async logout(rawRefreshToken: string): Promise<void> {
@@ -322,6 +369,7 @@ export class AuthService {
       sub: user._id.toString(),
       workspaceId: user.workspaceId,
       role: user.role,
+      workspaceMemberStatus: user.workspaceMemberStatus,
       emailVerified: user.isEmailVerified,
     });
     return { accessToken, refreshToken: session.token, expiresIn };

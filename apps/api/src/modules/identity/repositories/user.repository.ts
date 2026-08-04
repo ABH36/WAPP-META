@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
+import { WorkspaceMemberStatus, type TenantRole } from "@wapp/shared-types";
 import { User, UserDocument } from "../schemas/user.schema.js";
 
 export interface CreateUserInput {
@@ -91,5 +92,45 @@ export class UserRepository {
     }
 
     return updated?.failedLoginAttempts ?? 0;
+  }
+
+  // --- Consumed by the Workspace module via IdentityModule's exported
+  // UserRepository (SAD-002 DB-001 — Workspace never gets its own handle on
+  // the `users` collection). ---
+
+  /** Used for both "create a Workspace → become OWNER" and "accept an invitation → become the invited role". */
+  async assignWorkspaceMembership(
+    userId: string,
+    workspaceId: string,
+    role: TenantRole,
+    status: WorkspaceMemberStatus,
+  ): Promise<void> {
+    await this.userModel
+      .updateOne({ _id: userId }, { $set: { workspaceId, role, workspaceMemberStatus: status } })
+      .exec();
+  }
+
+  async updateWorkspaceRole(userId: string, role: TenantRole): Promise<void> {
+    await this.userModel.updateOne({ _id: userId }, { $set: { role } }).exec();
+  }
+
+  async updateWorkspaceMemberStatus(userId: string, status: WorkspaceMemberStatus): Promise<void> {
+    await this.userModel
+      .updateOne({ _id: userId }, { $set: { workspaceMemberStatus: status } })
+      .exec();
+  }
+
+  async findWorkspaceMembers(workspaceId: string): Promise<UserDocument[]> {
+    return this.userModel.find({ workspaceId, isDeleted: false }).sort({ createdAt: 1 }).exec();
+  }
+
+  async countActiveWorkspaceMembers(workspaceId: string): Promise<number> {
+    return this.userModel
+      .countDocuments({
+        workspaceId,
+        isDeleted: false,
+        workspaceMemberStatus: WorkspaceMemberStatus.ACTIVE,
+      })
+      .exec();
   }
 }

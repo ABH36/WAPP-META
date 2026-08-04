@@ -53,6 +53,9 @@ import { PermissionsGuard } from "./guards/permissions.guard.js";
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
-  exports: [TokenService, UserRepository],
+  // AuthService exported for reissueTokens() — the Workspace module calls it
+  // after workspace creation / invitation acceptance so the acting user gets
+  // an immediately-accurate token without a manual re-login.
+  exports: [TokenService, UserRepository, AuthService],
 })
 export class IdentityModule {}

@@ -1,5 +1,6 @@
 import { Test } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
+import { WorkspaceMemberStatus } from "@wapp/shared-types";
 import {
   BadRequestException,
   ConflictException,
@@ -25,6 +26,7 @@ function fakeUser(overrides: Partial<Record<string, unknown>> = {}): UserDocumen
     passwordHash: "hashed-password",
     workspaceId: null,
     role: null,
+    workspaceMemberStatus: null,
     isEmailVerified: true,
     isActive: true,
     failedLoginAttempts: 0,
@@ -300,6 +302,40 @@ describe("AuthService", () => {
         ),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    it("blocks login for a suspended workspace member", async () => {
+      userRepository.findByEmail.mockResolvedValue(
+        fakeUser({ workspaceMemberStatus: WorkspaceMemberStatus.SUSPENDED }),
+      );
+      passwordService.compare.mockResolvedValue(true);
+
+      await expect(
+        service.login(
+          { email: "jane@example.com", password: "Passw0rd" },
+          {
+            userAgent: null,
+            ipAddress: null,
+          },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it("blocks login for a removed workspace member", async () => {
+      userRepository.findByEmail.mockResolvedValue(
+        fakeUser({ workspaceMemberStatus: WorkspaceMemberStatus.REMOVED }),
+      );
+      passwordService.compare.mockResolvedValue(true);
+
+      await expect(
+        service.login(
+          { email: "jane@example.com", password: "Passw0rd" },
+          {
+            userAgent: null,
+            ipAddress: null,
+          },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 
   describe("verifyEmail", () => {
@@ -369,6 +405,40 @@ describe("AuthService", () => {
       await expect(service.refresh("token", { userAgent: null, ipAddress: null })).rejects.toThrow(
         UnauthorizedException,
       );
+    });
+
+    it("rejects refresh for a suspended workspace member", async () => {
+      tokenService.verifyRefreshToken.mockReturnValue({
+        sub: "user-1",
+        jti: "some-jti",
+        type: "refresh",
+      });
+      sessionRepository.findByJti.mockResolvedValue(fakeSession({ jti: "some-jti" }));
+      userRepository.findById.mockResolvedValue(
+        fakeUser({ workspaceMemberStatus: WorkspaceMemberStatus.SUSPENDED }),
+      );
+
+      await expect(service.refresh("token", { userAgent: null, ipAddress: null })).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+  });
+
+  describe("reissueTokens", () => {
+    it("issues a fresh token pair for the given user", async () => {
+      userRepository.findById.mockResolvedValue(fakeUser());
+
+      const result = await service.reissueTokens("user-1", { userAgent: null, ipAddress: null });
+
+      expect(result.accessToken).toBe("access-token");
+      expect(sessionRepository.create).toHaveBeenCalled();
+    });
+
+    it("throws when the user no longer exists", async () => {
+      userRepository.findById.mockResolvedValue(null);
+      await expect(
+        service.reissueTokens("ghost", { userAgent: null, ipAddress: null }),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 

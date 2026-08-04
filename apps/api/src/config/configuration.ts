@@ -21,6 +21,13 @@ export interface AppConfig {
     maxFailedLoginAttempts: number;
     accountLockoutMinutes: number;
   };
+  workspace: {
+    trialDurationDays: number;
+    // Team invitation link expiry — not pinned by any approved ADR; a
+    // defensible default (typical B2B SaaS invite lifetime), documented in
+    // the Phase-3 completion report.
+    invitationTokenTtlDays: number;
+  };
   urls: {
     web: string;
     admin: string;
@@ -62,6 +69,10 @@ export default (): AppConfig => ({
     passwordResetTokenTtlMinutes: parseInt(process.env.PASSWORD_RESET_TOKEN_TTL ?? "30", 10),
     maxFailedLoginAttempts: parseInt(process.env.MAX_FAILED_LOGIN_ATTEMPTS ?? "5", 10),
     accountLockoutMinutes: parseInt(process.env.ACCOUNT_LOCKOUT_MINUTES ?? "15", 10),
+  },
+  workspace: {
+    trialDurationDays: parseInt(process.env.TRIAL_DURATION_DAYS ?? "14", 10),
+    invitationTokenTtlDays: parseInt(process.env.TEAM_INVITATION_TOKEN_TTL_DAYS ?? "7", 10),
   },
   urls: {
     web: process.env.WEB_APP_URL ?? "",
