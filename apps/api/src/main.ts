@@ -13,6 +13,14 @@ async function bootstrap(): Promise<void> {
     // Buffer logs until the Pino logger (registered via AppLoggingModule) takes
     // over below — nothing logs through Nest's default console logger.
     bufferLogs: true,
+    // Preserves the exact raw request bytes on `request.rawBody` alongside
+    // normal JSON parsing (PRD-003 Part 1) — Meta's webhook signature
+    // (X-Hub-Signature-256) is computed over the raw payload bytes; verifying
+    // against a re-serialized JSON object can mismatch on key order/
+    // whitespace. Must be passed identically to `createNestApplication()` in
+    // every e2e test too (same "silently doesn't apply in tests" class of
+    // bug as the ValidationPipe fix above) — not just here.
+    rawBody: true,
   });
 
   // Centralized structured logging (Architecture Review engineering

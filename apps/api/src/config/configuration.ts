@@ -51,6 +51,7 @@ export interface AppConfig {
     webhookVerifyToken: string;
     graphApiVersion: string;
   };
+  tokenEncryptionKey: string;
   corsAllowedOrigins: string[];
 }
 
@@ -105,6 +106,7 @@ export default (): AppConfig => ({
     webhookVerifyToken: process.env.META_WEBHOOK_VERIFY_TOKEN ?? "",
     graphApiVersion: process.env.META_GRAPH_API_VERSION ?? "v26.0",
   },
+  tokenEncryptionKey: process.env.TOKEN_ENCRYPTION_KEY ?? "",
   // SEC-010 — explicit allow-list, never a wildcard in production.
   corsAllowedOrigins: [process.env.WEB_APP_URL, process.env.ADMIN_APP_URL].filter(
     (origin): origin is string => Boolean(origin),

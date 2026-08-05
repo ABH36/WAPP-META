@@ -1,5 +1,13 @@
 import { plainToInstance, Type } from "class-transformer";
-import { IsEnum, IsNotEmpty, IsNumber, IsString, IsUrl, validateSync } from "class-validator";
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  IsUrl,
+  Matches,
+  validateSync,
+} from "class-validator";
 
 enum Environment {
   Development = "development",
@@ -80,6 +88,12 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   META_WEBHOOK_VERIFY_TOKEN!: string;
+
+  @IsString()
+  @Matches(/^[0-9a-f]{64}$/i, {
+    message: "TOKEN_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)",
+  })
+  TOKEN_ENCRYPTION_KEY!: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

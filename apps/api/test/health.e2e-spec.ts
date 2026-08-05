@@ -19,7 +19,7 @@ describe("Health (e2e)", () => {
       imports: [AppModule],
     }).compile();
 
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication({ rawBody: true });
     app.setGlobalPrefix("api");
     await app.init();
   });

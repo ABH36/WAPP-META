@@ -55,6 +55,21 @@ export class DomainEventLoggerListener {
     this.log(DomainEvent.TEAM_OWNERSHIP_TRANSFERRED, payload);
   }
 
+  @OnEvent(DomainEvent.WHATSAPP_CONNECTED)
+  onWhatsAppConnected(payload: unknown): void {
+    this.log(DomainEvent.WHATSAPP_CONNECTED, payload);
+  }
+
+  @OnEvent(DomainEvent.MESSAGE_RECEIVED)
+  onMessageReceived(payload: unknown): void {
+    this.log(DomainEvent.MESSAGE_RECEIVED, payload);
+  }
+
+  @OnEvent(DomainEvent.MESSAGE_SENT)
+  onMessageSent(payload: unknown): void {
+    this.log(DomainEvent.MESSAGE_SENT, payload);
+  }
+
   private log(event: string, payload: unknown): void {
     this.logger.log(`domain event published: ${event} ${JSON.stringify(payload)}`);
   }

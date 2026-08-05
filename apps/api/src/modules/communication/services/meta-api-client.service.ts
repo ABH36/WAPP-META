@@ -1,0 +1,149 @@
+import { Injectable, InternalServerErrorException, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import type { AppConfig } from "../../../config/configuration.js";
+
+export interface MetaPhoneNumberDetails {
+  displayPhoneNumber: string;
+  verifiedName: string | null;
+  qualityRating: string;
+  messagingLimitTier: string | null;
+}
+
+interface MetaErrorBody {
+  error?: { message?: string; type?: string; code?: number };
+}
+
+/**
+ * The only place `fetch` is called against Meta's Graph API — every other
+ * class talks to Meta through this client, never directly (same "one owner
+ * of the external integration surface" pattern as Identity's TokenService
+ * owning all JWT operations). Uses Node's built-in `fetch` (Node >=20,
+ * per package.json engines) — no HTTP client dependency needed for plain
+ * JSON REST calls.
+ *
+ * NOT verified against the live Graph API as of this writing — doing so
+ * requires a completed Embedded Signup (frontend UI not yet built) to
+ * obtain a real authorization code/WABA. Covered by unit tests with
+ * `fetch` mocked; flagged explicitly in the Phase-4 Part-1 completion
+ * report as the one thing that still needs a live check once the frontend
+ * exists.
+ */
+@Injectable()
+export class MetaApiClient {
+  private readonly logger = new Logger(MetaApiClient.name);
+
+  constructor(private readonly config: ConfigService<AppConfig, true>) {}
+
+  /** Embedded Signup step 2 — exchanges the short-lived authorization code the frontend received for a System User access token scoped to the customer's WABA. */
+  async exchangeCodeForToken(code: string): Promise<string> {
+    const { appId, appSecret } = this.config.get("meta", { infer: true });
+    const url = new URL(`${this.baseUrl()}/oauth/access_token`);
+    url.searchParams.set("client_id", appId);
+    url.searchParams.set("client_secret", appSecret);
+    url.searchParams.set("code", code);
+
+    const body = await this.request<{ access_token: string }>(url, { method: "GET" });
+    return body.access_token;
+  }
+
+  /** Subscribes WAPP's app to receive webhooks for this WABA — required once per connection, per Meta's docs. */
+  async subscribeToWebhooks(wabaId: string, accessToken: string): Promise<void> {
+    const url = new URL(`${this.baseUrl()}/${wabaId}/subscribed_apps`);
+    await this.request(url, { method: "POST", accessToken });
+  }
+
+  async getWabaName(wabaId: string, accessToken: string): Promise<string | null> {
+    const url = new URL(`${this.baseUrl()}/${wabaId}`);
+    url.searchParams.set("fields", "name");
+    const body = await this.request<{ name?: string }>(url, { method: "GET", accessToken });
+    return body.name ?? null;
+  }
+
+  async getPhoneNumberDetails(
+    phoneNumberId: string,
+    accessToken: string,
+  ): Promise<MetaPhoneNumberDetails> {
+    const url = new URL(`${this.baseUrl()}/${phoneNumberId}`);
+    url.searchParams.set(
+      "fields",
+      "display_phone_number,verified_name,quality_rating,messaging_limit_tier",
+    );
+    const body = await this.request<{
+      display_phone_number: string;
+      verified_name?: string;
+      quality_rating?: string;
+      messaging_limit_tier?: string;
+    }>(url, { method: "GET", accessToken });
+
+    return {
+      displayPhoneNumber: body.display_phone_number,
+      verifiedName: body.verified_name ?? null,
+      qualityRating: body.quality_rating ?? "UNKNOWN",
+      messagingLimitTier: body.messaging_limit_tier ?? null,
+    };
+  }
+
+  /** Sends a free-form text message — Part-1 scope; template messages belong to PRD-003 Part 3. */
+  async sendTextMessage(
+    phoneNumberId: string,
+    accessToken: string,
+    to: string,
+    text: string,
+  ): Promise<string> {
+    const url = new URL(`${this.baseUrl()}/${phoneNumberId}/messages`);
+    const body = await this.request<{ messages: Array<{ id: string }> }>(url, {
+      method: "POST",
+      accessToken,
+      jsonBody: {
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: { body: text },
+      },
+    });
+
+    const messageId = body.messages[0]?.id;
+    if (!messageId) {
+      throw new InternalServerErrorException("Meta did not return a message id");
+    }
+    return messageId;
+  }
+
+  private baseUrl(): string {
+    const { graphApiVersion } = this.config.get("meta", { infer: true });
+    return `https://graph.facebook.com/${graphApiVersion}`;
+  }
+
+  private async request<T>(
+    url: URL,
+    opts: { method: "GET" | "POST"; accessToken?: string; jsonBody?: unknown },
+  ): Promise<T> {
+    const headers: Record<string, string> = {};
+    if (opts.accessToken) {
+      headers.Authorization = `Bearer ${opts.accessToken}`;
+    }
+    if (opts.jsonBody) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    const response = await fetch(url, {
+      method: opts.method,
+      headers,
+      body: opts.jsonBody ? JSON.stringify(opts.jsonBody) : undefined,
+    });
+
+    if (!response.ok) {
+      const errorBody = (await response.json().catch(() => ({}))) as MetaErrorBody;
+      // Never leak the App Secret (part of the request URL for the token
+      // exchange call) into logs — log the path only, not the full URL.
+      this.logger.error(
+        `Meta Graph API request failed: ${opts.method} ${url.pathname} -> ${response.status} ${errorBody.error?.message ?? "unknown error"}`,
+      );
+      throw new InternalServerErrorException(
+        `WhatsApp platform request failed: ${errorBody.error?.message ?? response.statusText}`,
+      );
+    }
+
+    return response.json() as Promise<T>;
+  }
+}

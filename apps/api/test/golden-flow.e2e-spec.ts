@@ -49,7 +49,7 @@ describe("Golden Flow (e2e)", () => {
       })
       .compile();
 
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication({ rawBody: true });
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
     app.setGlobalPrefix("api");
     await app.init();

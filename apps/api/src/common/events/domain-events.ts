@@ -20,6 +20,9 @@ export const DomainEvent = {
   TEAM_MEMBER_SUSPENDED: "team.member_suspended",
   TEAM_MEMBER_REACTIVATED: "team.member_reactivated",
   TEAM_OWNERSHIP_TRANSFERRED: "team.ownership_transferred",
+  WHATSAPP_CONNECTED: "communication.whatsapp_connected",
+  MESSAGE_RECEIVED: "communication.message_received",
+  MESSAGE_SENT: "communication.message_sent",
 } as const;
 
 interface BaseEventPayload {
@@ -61,4 +64,22 @@ export interface TeamMemberReactivatedPayload extends BaseEventPayload {
 export interface TeamOwnershipTransferredPayload extends BaseEventPayload {
   previousOwnerId: string;
   newOwnerId: string;
+}
+
+export interface WhatsAppConnectedPayload extends BaseEventPayload {
+  wabaId: string;
+  connectedBy: string;
+}
+
+export interface MessageReceivedPayload extends BaseEventPayload {
+  contactId: string;
+  phoneNumberId: string;
+  waMessageId: string;
+}
+
+export interface MessageSentPayload extends BaseEventPayload {
+  contactId: string;
+  phoneNumberId: string;
+  waMessageId: string;
+  sentBy: string;
 }
