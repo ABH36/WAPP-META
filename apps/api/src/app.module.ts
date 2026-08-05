@@ -17,13 +17,21 @@ import { WorkspaceModule } from "./modules/workspace/workspace.module.js";
 /**
  * Root module — Modular Monolith composition root (SAD-001 Volume-1 §4).
  *
- * Domain modules (Identity, Workspace, Collaboration, Communication, CRM,
- * Billing, Settings, Platform) are added one at a time as each is built, per
- * the approved Module Development Order (SDP-001 §6) and the "one module
+ * Domain modules (Identity, Workspace, Communication, CRM, Billing,
+ * Settings, Platform Administration) are added one at a time as each is
+ * built, per the approved Module Development Order and the "one module
  * fully reviewed and approved before the next begins" rule. This module
  * wires the cross-cutting infrastructure every domain module depends on:
  * config, logging, database, external integrations (Redis/Queue/Email/
  * Storage), rate limiting, and the standard error/response envelope.
+ *
+ * "Collaboration" is deliberately absent from this list (Architecture
+ * Review, 2026-08-04) — it isn't a standalone module. Internal Notes,
+ * @mentions, and shared-team-collaboration capabilities are owned by
+ * whichever business module holds the underlying data (Communication,
+ * CRM), the same pattern as EventsModule above: reusable components,
+ * business ownership stays in the originating module, no separate
+ * Collaboration service.
  *
  * Identity (Phase-2) is the first domain module — it also registers the
  * global JwtAuthGuard/PermissionsGuard (see IdentityModule), so every route
