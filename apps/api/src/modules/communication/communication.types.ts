@@ -7,6 +7,8 @@ import type {
   TemplateComponent,
   TemplateStatus,
 } from "./schemas/template.schema.js";
+import type { BroadcastStatus } from "./schemas/broadcast.schema.js";
+import type { BroadcastRecipientStatus } from "./schemas/broadcast-recipient.schema.js";
 
 export interface ConnectionSummary {
   id: string;
@@ -68,4 +70,27 @@ export interface TemplateSummary {
   metaTemplateId: string | null;
   rejectionReason: string | null;
   createdAt: string;
+}
+
+export interface BroadcastSummary {
+  id: string;
+  name: string;
+  templateId: string;
+  phoneNumberId: string;
+  bodyParameters: string[];
+  status: BroadcastStatus;
+  scheduledAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  failureReason: string | null;
+  createdAt: string;
+}
+
+export interface BroadcastRecipientSummary {
+  id: string;
+  contactId: string;
+  status: BroadcastRecipientStatus;
+  messageId: string | null;
+  errorDetail: string | null;
+  sentAt: string | null;
 }

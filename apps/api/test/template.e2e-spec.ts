@@ -131,7 +131,7 @@ describe("Template lifecycle & Compliance Engine (e2e)", () => {
       wabaId: `waba-tpl-${runId}`,
       businessName: "Template Test Co",
       accessTokenEncrypted: tokenEncryption.encrypt("fake-access-token"),
-      connectedBy: "seed",
+      connectedBy: new Types.ObjectId().toString(),
     });
   });
 

@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument, Types } from "mongoose";
+import { HydratedDocument, SchemaTypes, Types } from "mongoose";
 
 export type PhoneNumberDocument = HydratedDocument<PhoneNumber>;
 
@@ -25,7 +25,7 @@ export class PhoneNumber {
   @Prop({ type: String, required: true, index: true })
   workspaceId!: string;
 
-  @Prop({ type: Types.ObjectId, ref: "WhatsAppConnection", required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "WhatsAppConnection", required: true, index: true })
   whatsappConnectionId!: Types.ObjectId;
 
   @Prop({ required: true, unique: true, index: true })

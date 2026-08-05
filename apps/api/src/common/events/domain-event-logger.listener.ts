@@ -95,6 +95,16 @@ export class DomainEventLoggerListener {
     this.log(DomainEvent.TEMPLATE_STATUS_CHANGED, payload);
   }
 
+  @OnEvent(DomainEvent.BROADCAST_STARTED)
+  onBroadcastStarted(payload: unknown): void {
+    this.log(DomainEvent.BROADCAST_STARTED, payload);
+  }
+
+  @OnEvent(DomainEvent.BROADCAST_COMPLETED)
+  onBroadcastCompleted(payload: unknown): void {
+    this.log(DomainEvent.BROADCAST_COMPLETED, payload);
+  }
+
   private log(event: string, payload: unknown): void {
     this.logger.log(`domain event published: ${event} ${JSON.stringify(payload)}`);
   }

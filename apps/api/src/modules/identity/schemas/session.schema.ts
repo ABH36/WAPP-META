@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument, Types } from "mongoose";
+import { HydratedDocument, SchemaTypes, Types } from "mongoose";
 
 export type SessionDocument = HydratedDocument<Session>;
 
@@ -21,7 +21,7 @@ export type SessionDocument = HydratedDocument<Session>;
  */
 @Schema({ timestamps: { createdAt: true, updatedAt: false }, collection: "sessions" })
 export class Session {
-  @Prop({ type: Types.ObjectId, ref: "User", required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "User", required: true, index: true })
   userId!: Types.ObjectId;
 
   @Prop({ required: true, unique: true, index: true })

@@ -14,6 +14,7 @@ export interface CreateMessageInput {
   conversationId: string;
   phoneNumberId: string;
   contactId: string;
+  broadcastId?: string | null;
   direction: MessageDirection;
   type: MessageType;
   text: string | null;

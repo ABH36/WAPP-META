@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument, Types } from "mongoose";
+import { HydratedDocument, SchemaTypes, Types } from "mongoose";
 import { WorkspaceStatus } from "@wapp/shared-types";
 
 export type WorkspaceDocument = HydratedDocument<Workspace>;
@@ -110,7 +110,7 @@ export class Workspace {
   @Prop({ required: true, trim: true })
   name!: string;
 
-  @Prop({ type: Types.ObjectId, ref: "User", required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "User", required: true, index: true })
   ownerId!: Types.ObjectId;
 
   @Prop({ type: BusinessProfileSchema, default: () => ({}) })

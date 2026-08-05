@@ -29,4 +29,9 @@ export class ContactRepository {
   async findByIdForWorkspace(workspaceId: string, id: string): Promise<ContactDocument | null> {
     return this.contactModel.findOne({ _id: id, workspaceId, isDeleted: false }).exec();
   }
+
+  /** Validates a Broadcast's target list — every id must belong to this workspace and not be soft-deleted. */
+  async findByIdsForWorkspace(workspaceId: string, ids: string[]): Promise<ContactDocument[]> {
+    return this.contactModel.find({ _id: { $in: ids }, workspaceId, isDeleted: false }).exec();
+  }
 }

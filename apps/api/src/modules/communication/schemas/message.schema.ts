@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument, Types } from "mongoose";
+import { HydratedDocument, SchemaTypes, Types } from "mongoose";
 
 export type MessageDocument = HydratedDocument<Message>;
 
@@ -68,14 +68,21 @@ export class Message {
   @Prop({ type: String, required: true, index: true })
   workspaceId!: string;
 
-  @Prop({ type: Types.ObjectId, ref: "Conversation", required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "Conversation", required: true, index: true })
   conversationId!: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: "PhoneNumber", required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "PhoneNumber", required: true, index: true })
   phoneNumberId!: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: "Contact", required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "Contact", required: true, index: true })
   contactId!: Types.ObjectId;
+
+  // Set only for a Broadcast-originated outbound send (Part 3b) — null for
+  // every other Message. Lets BroadcastRecipient link back to a real
+  // Message without duplicating delivery/read status locally (see
+  // broadcast-recipient.schema.ts).
+  @Prop({ type: SchemaTypes.ObjectId, ref: "Broadcast", default: null, index: true })
+  broadcastId!: Types.ObjectId | null;
 
   @Prop({ type: String, enum: MessageDirection, required: true })
   direction!: MessageDirection;

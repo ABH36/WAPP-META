@@ -28,6 +28,8 @@ export const DomainEvent = {
   CONVERSATION_NOTE_ADDED: "communication.conversation_note_added",
   TEMPLATE_SUBMITTED: "communication.template_submitted",
   TEMPLATE_STATUS_CHANGED: "communication.template_status_changed",
+  BROADCAST_STARTED: "communication.broadcast_started",
+  BROADCAST_COMPLETED: "communication.broadcast_completed",
 } as const;
 
 interface BaseEventPayload {
@@ -123,4 +125,15 @@ export interface TemplateStatusChangedPayload extends BaseEventPayload {
   templateId: string;
   previousStatus: string;
   newStatus: string;
+}
+
+export interface BroadcastStartedPayload extends BaseEventPayload {
+  broadcastId: string;
+  startedBy: string;
+}
+
+export interface BroadcastCompletedPayload extends BaseEventPayload {
+  broadcastId: string;
+  sentCount: number;
+  failedCount: number;
 }

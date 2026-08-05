@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument, Types } from "mongoose";
+import { HydratedDocument, SchemaTypes, Types } from "mongoose";
 import { TenantRole } from "@wapp/shared-types";
 
 export type WorkspaceInvitationDocument = HydratedDocument<WorkspaceInvitation>;
@@ -23,7 +23,7 @@ export enum PersistedInvitationStatus {
  */
 @Schema({ timestamps: true, collection: "workspace_invitations" })
 export class WorkspaceInvitation {
-  @Prop({ type: Types.ObjectId, ref: "Workspace", required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "Workspace", required: true, index: true })
   workspaceId!: Types.ObjectId;
 
   @Prop({ required: true, trim: true, lowercase: true, index: true })
@@ -32,7 +32,7 @@ export class WorkspaceInvitation {
   @Prop({ type: String, enum: TenantRole, required: true })
   role!: TenantRole;
 
-  @Prop({ type: Types.ObjectId, ref: "User", required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "User", required: true })
   invitedBy!: Types.ObjectId;
 
   // Same pattern as Identity's AuthToken — raw token only ever emailed,

@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument, Types } from "mongoose";
+import { HydratedDocument, SchemaTypes, Types } from "mongoose";
 
 export type WhatsAppConnectionDocument = HydratedDocument<WhatsAppConnection>;
 
@@ -42,7 +42,7 @@ export class WhatsAppConnection {
   })
   status!: WhatsAppConnectionStatus;
 
-  @Prop({ type: Types.ObjectId, ref: "User", required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "User", required: true })
   connectedBy!: Types.ObjectId;
 
   @Prop({ type: Date, default: null })

@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument, Types } from "mongoose";
+import { HydratedDocument, SchemaTypes, Types } from "mongoose";
 
 export type AuthTokenDocument = HydratedDocument<AuthToken>;
 
@@ -20,7 +20,7 @@ export enum AuthTokenType {
  */
 @Schema({ timestamps: { createdAt: true, updatedAt: false }, collection: "auth_tokens" })
 export class AuthToken {
-  @Prop({ type: Types.ObjectId, ref: "User", required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "User", required: true, index: true })
   userId!: Types.ObjectId;
 
   @Prop({ type: String, enum: AuthTokenType, required: true })

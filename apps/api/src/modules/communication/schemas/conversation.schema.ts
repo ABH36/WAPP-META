@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument, Types } from "mongoose";
+import { HydratedDocument, SchemaTypes, Types } from "mongoose";
 
 export type ConversationDocument = HydratedDocument<Conversation>;
 
@@ -40,12 +40,12 @@ export class Conversation {
   @Prop({ type: String, required: true, index: true })
   workspaceId!: string;
 
-  @Prop({ type: Types.ObjectId, ref: "Contact", required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "Contact", required: true, index: true })
   contactId!: Types.ObjectId;
 
   // The WABA phone number this conversation is anchored to — needed to send
   // a reply without asking the caller to re-specify it every time.
-  @Prop({ type: Types.ObjectId, ref: "PhoneNumber", required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "PhoneNumber", required: true })
   phoneNumberId!: Types.ObjectId;
 
   @Prop({ type: String, enum: ConversationStatus, required: true, index: true })

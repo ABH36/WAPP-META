@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument, Types } from "mongoose";
+import { HydratedDocument, SchemaTypes, Types } from "mongoose";
 
 export type ConversationNoteDocument = HydratedDocument<ConversationNote>;
 
@@ -17,7 +17,7 @@ export class ConversationNote {
   @Prop({ type: String, required: true, index: true })
   workspaceId!: string;
 
-  @Prop({ type: Types.ObjectId, ref: "Conversation", required: true, index: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: "Conversation", required: true, index: true })
   conversationId!: Types.ObjectId;
 
   @Prop({ type: String, required: true })

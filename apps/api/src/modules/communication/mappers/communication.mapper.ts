@@ -6,7 +6,11 @@ import type { ContactDocument } from "../schemas/contact.schema.js";
 import type { ConversationDocument } from "../schemas/conversation.schema.js";
 import type { ConversationNoteDocument } from "../schemas/conversation-note.schema.js";
 import type { TemplateDocument } from "../schemas/template.schema.js";
+import type { BroadcastDocument } from "../schemas/broadcast.schema.js";
+import type { BroadcastRecipientDocument } from "../schemas/broadcast-recipient.schema.js";
 import type {
+  BroadcastRecipientSummary,
+  BroadcastSummary,
   ConnectionSummary,
   ConversationNoteSummary,
   ConversationSummary,
@@ -94,5 +98,34 @@ export function toTemplateSummary(template: TemplateDocument): TemplateSummary {
     metaTemplateId: template.metaTemplateId,
     rejectionReason: template.rejectionReason,
     createdAt: template.createdAt.toISOString(),
+  };
+}
+
+export function toBroadcastSummary(broadcast: BroadcastDocument): BroadcastSummary {
+  return {
+    id: broadcast._id.toString(),
+    name: broadcast.name,
+    templateId: broadcast.templateId.toString(),
+    phoneNumberId: broadcast.phoneNumberId.toString(),
+    bodyParameters: broadcast.bodyParameters,
+    status: broadcast.status,
+    scheduledAt: broadcast.scheduledAt ? broadcast.scheduledAt.toISOString() : null,
+    startedAt: broadcast.startedAt ? broadcast.startedAt.toISOString() : null,
+    completedAt: broadcast.completedAt ? broadcast.completedAt.toISOString() : null,
+    failureReason: broadcast.failureReason,
+    createdAt: broadcast.createdAt.toISOString(),
+  };
+}
+
+export function toBroadcastRecipientSummary(
+  recipient: BroadcastRecipientDocument,
+): BroadcastRecipientSummary {
+  return {
+    id: recipient._id.toString(),
+    contactId: recipient.contactId.toString(),
+    status: recipient.status,
+    messageId: recipient.messageId ? recipient.messageId.toString() : null,
+    errorDetail: recipient.errorDetail,
+    sentAt: recipient.sentAt ? recipient.sentAt.toISOString() : null,
   };
 }

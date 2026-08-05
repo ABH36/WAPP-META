@@ -140,6 +140,7 @@ export class MessageService {
     phoneNumberDbId: string,
     sentBy: string,
     dto: SendTemplateMessageDto,
+    broadcastId?: string,
   ): Promise<MessageSummary> {
     const phoneNumber = await this.phoneNumberRepository.findByIdForWorkspace(
       workspaceId,
@@ -203,6 +204,7 @@ export class MessageService {
       conversationId: conversation._id.toString(),
       phoneNumberId: phoneNumber._id.toString(),
       contactId: contact._id.toString(),
+      broadcastId: broadcastId ?? null,
       direction: MessageDirection.OUTBOUND,
       type: MessageType.TEMPLATE,
       text: previewText,
