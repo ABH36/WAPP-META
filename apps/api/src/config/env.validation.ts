@@ -66,6 +66,20 @@ class EnvironmentVariables {
 
   @IsUrl({ require_tld: false })
   ADMIN_APP_URL!: string;
+
+  // PRD-003 Part 1 — WAPP's own Tech Provider app (D004); customers connect
+  // their own WABA through it via Embedded Signup.
+  @IsString()
+  @IsNotEmpty()
+  META_APP_ID!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  META_APP_SECRET!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  META_WEBHOOK_VERIFY_TOKEN!: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

@@ -45,6 +45,12 @@ export interface AppConfig {
     apiKey: string;
     apiSecret: string;
   };
+  meta: {
+    appId: string;
+    appSecret: string;
+    webhookVerifyToken: string;
+    graphApiVersion: string;
+  };
   corsAllowedOrigins: string[];
 }
 
@@ -92,6 +98,12 @@ export default (): AppConfig => ({
     cloudName: process.env.CLOUDINARY_CLOUD_NAME ?? "",
     apiKey: process.env.CLOUDINARY_API_KEY ?? "",
     apiSecret: process.env.CLOUDINARY_API_SECRET ?? "",
+  },
+  meta: {
+    appId: process.env.META_APP_ID ?? "",
+    appSecret: process.env.META_APP_SECRET ?? "",
+    webhookVerifyToken: process.env.META_WEBHOOK_VERIFY_TOKEN ?? "",
+    graphApiVersion: process.env.META_GRAPH_API_VERSION ?? "v26.0",
   },
   // SEC-010 — explicit allow-list, never a wildcard in production.
   corsAllowedOrigins: [process.env.WEB_APP_URL, process.env.ADMIN_APP_URL].filter(
