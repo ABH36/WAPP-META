@@ -70,6 +70,21 @@ export class DomainEventLoggerListener {
     this.log(DomainEvent.MESSAGE_SENT, payload);
   }
 
+  @OnEvent(DomainEvent.CONVERSATION_ASSIGNED)
+  onConversationAssigned(payload: unknown): void {
+    this.log(DomainEvent.CONVERSATION_ASSIGNED, payload);
+  }
+
+  @OnEvent(DomainEvent.CONVERSATION_STATUS_CHANGED)
+  onConversationStatusChanged(payload: unknown): void {
+    this.log(DomainEvent.CONVERSATION_STATUS_CHANGED, payload);
+  }
+
+  @OnEvent(DomainEvent.CONVERSATION_NOTE_ADDED)
+  onConversationNoteAdded(payload: unknown): void {
+    this.log(DomainEvent.CONVERSATION_NOTE_ADDED, payload);
+  }
+
   private log(event: string, payload: unknown): void {
     this.logger.log(`domain event published: ${event} ${JSON.stringify(payload)}`);
   }

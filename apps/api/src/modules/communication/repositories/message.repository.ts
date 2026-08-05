@@ -11,6 +11,7 @@ import {
 
 export interface CreateMessageInput {
   workspaceId: string;
+  conversationId: string;
   phoneNumberId: string;
   contactId: string;
   direction: MessageDirection;
@@ -53,6 +54,18 @@ export class MessageRepository {
   ): Promise<MessageDocument[]> {
     return this.messageModel
       .find({ workspaceId, contactId })
+      .sort({ occurredAt: -1 })
+      .limit(limit)
+      .exec();
+  }
+
+  async findByConversation(
+    workspaceId: string,
+    conversationId: string,
+    limit: number,
+  ): Promise<MessageDocument[]> {
+    return this.messageModel
+      .find({ workspaceId, conversationId })
       .sort({ occurredAt: -1 })
       .limit(limit)
       .exec();

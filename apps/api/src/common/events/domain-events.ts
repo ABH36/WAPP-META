@@ -23,6 +23,9 @@ export const DomainEvent = {
   WHATSAPP_CONNECTED: "communication.whatsapp_connected",
   MESSAGE_RECEIVED: "communication.message_received",
   MESSAGE_SENT: "communication.message_sent",
+  CONVERSATION_ASSIGNED: "communication.conversation_assigned",
+  CONVERSATION_STATUS_CHANGED: "communication.conversation_status_changed",
+  CONVERSATION_NOTE_ADDED: "communication.conversation_note_added",
 } as const;
 
 interface BaseEventPayload {
@@ -72,14 +75,38 @@ export interface WhatsAppConnectedPayload extends BaseEventPayload {
 }
 
 export interface MessageReceivedPayload extends BaseEventPayload {
+  conversationId: string;
   contactId: string;
   phoneNumberId: string;
   waMessageId: string;
 }
 
 export interface MessageSentPayload extends BaseEventPayload {
+  conversationId: string;
   contactId: string;
   phoneNumberId: string;
   waMessageId: string;
   sentBy: string;
+}
+
+export interface ConversationAssignedPayload extends BaseEventPayload {
+  conversationId: string;
+  contactId: string;
+  assignedToUserId: string | null;
+  actorId: string;
+}
+
+export interface ConversationStatusChangedPayload extends BaseEventPayload {
+  conversationId: string;
+  contactId: string;
+  previousStatus: string;
+  newStatus: string;
+  /** "SYSTEM" for the auto-close sweep, otherwise the acting user's id. */
+  actorId: string;
+}
+
+export interface ConversationNoteAddedPayload extends BaseEventPayload {
+  conversationId: string;
+  contactId: string;
+  authorUserId: string;
 }

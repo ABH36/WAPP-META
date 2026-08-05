@@ -6,6 +6,7 @@ import { WebhookService } from "./webhook.service.js";
 import { ContactRepository } from "../repositories/contact.repository.js";
 import { MessageRepository } from "../repositories/message.repository.js";
 import { PhoneNumberRepository } from "../repositories/phone-number.repository.js";
+import { ConversationRepository } from "../repositories/conversation.repository.js";
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
 
 const APP_SECRET = "test-app-secret";
@@ -22,6 +23,7 @@ describe("WebhookService", () => {
   let phoneNumberRepository: jest.Mocked<PhoneNumberRepository>;
   let contactRepository: jest.Mocked<ContactRepository>;
   let messageRepository: jest.Mocked<MessageRepository>;
+  let conversationRepository: jest.Mocked<ConversationRepository>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
 
   beforeEach(async () => {
@@ -55,6 +57,7 @@ describe("WebhookService", () => {
             updateStatusByWaMessageId: jest.fn(),
           },
         },
+        { provide: ConversationRepository, useValue: { recordActivity: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
@@ -63,6 +66,7 @@ describe("WebhookService", () => {
     phoneNumberRepository = moduleRef.get(PhoneNumberRepository);
     contactRepository = moduleRef.get(ContactRepository);
     messageRepository = moduleRef.get(MessageRepository);
+    conversationRepository = moduleRef.get(ConversationRepository);
     eventEmitter = moduleRef.get(EventEmitter2);
   });
 
@@ -118,6 +122,9 @@ describe("WebhookService", () => {
       contactRepository.findOrCreate.mockResolvedValue({
         _id: { toString: () => "contact-1" },
       } as never);
+      conversationRepository.recordActivity.mockResolvedValue({
+        _id: { toString: () => "conversation-1" },
+      } as never);
 
       await service.processEvent({
         object: "whatsapp_business_account",
@@ -154,12 +161,13 @@ describe("WebhookService", () => {
       expect(messageRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           workspaceId: "workspace-1",
+          conversationId: "conversation-1",
           contactId: "contact-1",
           direction: MessageDirection.INBOUND,
           type: MessageType.TEXT,
           text: "Hello there",
           waMessageId: "wamid.ABC123",
-          status: MessageStatus.RECEIVED,
+          status: MessageStatus.VISIBLE,
         }),
       );
       expect(eventEmitter.emit).toHaveBeenCalledWith(

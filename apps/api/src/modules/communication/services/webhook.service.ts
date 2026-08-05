@@ -8,6 +8,7 @@ import type { MessageReceivedPayload } from "../../../common/events/domain-event
 import { ContactRepository } from "../repositories/contact.repository.js";
 import { MessageRepository } from "../repositories/message.repository.js";
 import { PhoneNumberRepository } from "../repositories/phone-number.repository.js";
+import { ConversationRepository } from "../repositories/conversation.repository.js";
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
 
 interface MetaWebhookMessage {
@@ -74,6 +75,7 @@ export class WebhookService {
     private readonly phoneNumberRepository: PhoneNumberRepository,
     private readonly contactRepository: ContactRepository,
     private readonly messageRepository: MessageRepository,
+    private readonly conversationRepository: ConversationRepository,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -168,8 +170,18 @@ export class WebhookService {
       profileName,
     );
 
+    const occurredAt = new Date(Number(message.timestamp) * 1000);
+    const conversation = await this.conversationRepository.recordActivity(
+      phoneNumber.workspaceId,
+      contact._id.toString(),
+      phoneNumber._id.toString(),
+      MessageDirection.INBOUND,
+      occurredAt,
+    );
+
     await this.messageRepository.create({
       workspaceId: phoneNumber.workspaceId,
+      conversationId: conversation._id.toString(),
       phoneNumberId: phoneNumber._id.toString(),
       contactId: contact._id.toString(),
       direction: MessageDirection.INBOUND,
@@ -177,12 +189,16 @@ export class WebhookService {
       text: message.text?.body ?? null,
       rawPayload: message,
       waMessageId: message.id,
-      status: MessageStatus.RECEIVED,
-      occurredAt: new Date(Number(message.timestamp) * 1000),
+      // VISIBLE, not RECEIVED — the Conversation/Shared Inbox this state was
+      // reserved for now exists, and there's no gating step between receipt
+      // and inbox visibility yet (see message.schema.ts's 2026-08-05 note).
+      status: MessageStatus.VISIBLE,
+      occurredAt,
     });
 
     this.eventEmitter.emit(DomainEvent.MESSAGE_RECEIVED, {
       workspaceId: phoneNumber.workspaceId,
+      conversationId: conversation._id.toString(),
       contactId: contact._id.toString(),
       phoneNumberId: phoneNumber._id.toString(),
       waMessageId: message.id,

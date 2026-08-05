@@ -1,0 +1,159 @@
+import { Injectable } from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { FilterQuery, Model } from "mongoose";
+import {
+  Conversation,
+  ConversationDocument,
+  ConversationStatus,
+} from "../schemas/conversation.schema.js";
+import { MessageDirection } from "../schemas/message.schema.js";
+import { nextStatusOnActivity } from "../conversation-state-machine.js";
+
+export interface ListConversationsFilter {
+  status?: ConversationStatus;
+  assignedToUserId?: string;
+}
+
+export interface ListConversationsResult {
+  items: ConversationDocument[];
+  total: number;
+}
+
+@Injectable()
+export class ConversationRepository {
+  constructor(
+    @InjectModel(Conversation.name) private readonly conversationModel: Model<ConversationDocument>,
+  ) {}
+
+  async findById(workspaceId: string, id: string): Promise<ConversationDocument | null> {
+    return this.conversationModel.findOne({ _id: id, workspaceId }).exec();
+  }
+
+  async findByContact(
+    workspaceId: string,
+    contactId: string,
+  ): Promise<ConversationDocument | null> {
+    return this.conversationModel.findOne({ workspaceId, contactId }).exec();
+  }
+
+  async list(
+    workspaceId: string,
+    filter: ListConversationsFilter,
+    page: number,
+    limit: number,
+  ): Promise<ListConversationsResult> {
+    const query: FilterQuery<ConversationDocument> = { workspaceId };
+    if (filter.status) {
+      query.status = filter.status;
+    }
+    if (filter.assignedToUserId) {
+      query.assignedToUserId = filter.assignedToUserId;
+    }
+
+    const [items, total] = await Promise.all([
+      this.conversationModel
+        .find(query)
+        .sort({ lastMessageAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate("contactId")
+        .exec(),
+      this.conversationModel.countDocuments(query).exec(),
+    ]);
+
+    return { items, total };
+  }
+
+  async updateStatus(
+    workspaceId: string,
+    id: string,
+    status: ConversationStatus,
+  ): Promise<ConversationDocument | null> {
+    const set: Record<string, unknown> = { status };
+    set.resolvedAt = status === ConversationStatus.RESOLVED ? new Date() : null;
+    set.closedAt = status === ConversationStatus.CLOSED ? new Date() : null;
+
+    return this.conversationModel
+      .findOneAndUpdate({ _id: id, workspaceId }, { $set: set }, { new: true })
+      .exec();
+  }
+
+  async assign(
+    workspaceId: string,
+    id: string,
+    assignedToUserId: string | null,
+    nextStatus: ConversationStatus | null,
+  ): Promise<ConversationDocument | null> {
+    const set: Record<string, unknown> = { assignedToUserId };
+    if (nextStatus) {
+      set.status = nextStatus;
+    }
+    return this.conversationModel
+      .findOneAndUpdate({ _id: id, workspaceId }, { $set: set }, { new: true })
+      .exec();
+  }
+
+  /**
+   * Get-or-create plus the automatic status nudge every new Message (either
+   * direction) applies to its Conversation. Lives on the Repository (not
+   * ConversationService) purely to avoid a circular DI dependency —
+   * MessageService/WebhookService need this, and ConversationService
+   * separately depends on MessageService for reply()); see
+   * conversation-state-machine.ts for the actual decision logic, which is a
+   * pure function, not embedded here.
+   */
+  async recordActivity(
+    workspaceId: string,
+    contactId: string,
+    phoneNumberId: string,
+    direction: MessageDirection,
+    occurredAt: Date,
+  ): Promise<ConversationDocument> {
+    const existing = await this.conversationModel.findOne({ workspaceId, contactId }).exec();
+
+    if (!existing) {
+      return this.conversationModel.create({
+        workspaceId,
+        contactId,
+        phoneNumberId,
+        status:
+          direction === MessageDirection.INBOUND ? ConversationStatus.NEW : ConversationStatus.OPEN,
+        assignedToUserId: null,
+        lastMessageAt: occurredAt,
+        lastCustomerMessageAt: direction === MessageDirection.INBOUND ? occurredAt : null,
+        resolvedAt: null,
+        closedAt: null,
+      });
+    }
+
+    const set: Record<string, unknown> = { lastMessageAt: occurredAt };
+    if (direction === MessageDirection.INBOUND) {
+      set.lastCustomerMessageAt = occurredAt;
+    }
+
+    const nextStatus = nextStatusOnActivity(
+      existing.status,
+      existing.assignedToUserId !== null,
+      direction,
+    );
+    if (nextStatus && nextStatus !== existing.status) {
+      set.status = nextStatus;
+      set.resolvedAt = null;
+      set.closedAt = null;
+    }
+
+    const updated = await this.conversationModel
+      .findOneAndUpdate({ _id: existing._id }, { $set: set }, { new: true })
+      .exec();
+    // existing was just read successfully; the doc cannot vanish between the
+    // two calls in this single-process flow.
+    return updated!;
+  }
+
+  /** Auto-close sweep target set — Resolved conversations past the inactivity threshold. */
+  async findResolvedBefore(cutoff: Date): Promise<ConversationDocument[]> {
+    return this.conversationModel
+      .find({ status: ConversationStatus.RESOLVED, resolvedAt: { $lte: cutoff } })
+      .exec();
+  }
+}

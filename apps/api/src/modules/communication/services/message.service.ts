@@ -8,6 +8,7 @@ import { WhatsAppConnectionRepository } from "../repositories/whatsapp-connectio
 import { PhoneNumberRepository } from "../repositories/phone-number.repository.js";
 import { ContactRepository } from "../repositories/contact.repository.js";
 import { MessageRepository } from "../repositories/message.repository.js";
+import { ConversationRepository } from "../repositories/conversation.repository.js";
 import { toMessageSummary } from "../mappers/communication.mapper.js";
 import type { MessageSummary } from "../communication.types.js";
 import type { SendMessageDto } from "../dto/send-message.dto.js";
@@ -28,6 +29,7 @@ export class MessageService {
     private readonly phoneNumberRepository: PhoneNumberRepository,
     private readonly contactRepository: ContactRepository,
     private readonly messageRepository: MessageRepository,
+    private readonly conversationRepository: ConversationRepository,
     private readonly metaApiClient: MetaApiClient,
     private readonly tokenEncryption: TokenEncryptionService,
     private readonly eventEmitter: EventEmitter2,
@@ -72,9 +74,18 @@ export class MessageService {
     }
 
     const contact = await this.contactRepository.findOrCreate(workspaceId, dto.to, null);
+    const occurredAt = new Date();
+    const conversation = await this.conversationRepository.recordActivity(
+      workspaceId,
+      contact._id.toString(),
+      phoneNumber._id.toString(),
+      MessageDirection.OUTBOUND,
+      occurredAt,
+    );
 
     const message = await this.messageRepository.create({
       workspaceId,
+      conversationId: conversation._id.toString(),
       phoneNumberId: phoneNumber._id.toString(),
       contactId: contact._id.toString(),
       direction: MessageDirection.OUTBOUND,
@@ -83,16 +94,17 @@ export class MessageService {
       rawPayload: { to: dto.to, text: dto.text },
       waMessageId,
       status: MessageStatus.SENT,
-      occurredAt: new Date(),
+      occurredAt,
     });
 
     this.eventEmitter.emit(DomainEvent.MESSAGE_SENT, {
       workspaceId,
+      conversationId: conversation._id.toString(),
       contactId: contact._id.toString(),
       phoneNumberId: phoneNumber._id.toString(),
       waMessageId,
       sentBy,
-      occurredAt: new Date().toISOString(),
+      occurredAt: occurredAt.toISOString(),
     } satisfies MessageSentPayload);
 
     return toMessageSummary(message);

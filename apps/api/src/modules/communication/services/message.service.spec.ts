@@ -6,6 +6,7 @@ import { WhatsAppConnectionRepository } from "../repositories/whatsapp-connectio
 import { PhoneNumberRepository } from "../repositories/phone-number.repository.js";
 import { ContactRepository } from "../repositories/contact.repository.js";
 import { MessageRepository } from "../repositories/message.repository.js";
+import { ConversationRepository } from "../repositories/conversation.repository.js";
 import { MetaApiClient } from "./meta-api-client.service.js";
 import { TokenEncryptionService } from "../../../common/security/token-encryption.service.js";
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
@@ -17,6 +18,7 @@ describe("MessageService", () => {
   let phoneNumberRepository: jest.Mocked<PhoneNumberRepository>;
   let contactRepository: jest.Mocked<ContactRepository>;
   let messageRepository: jest.Mocked<MessageRepository>;
+  let conversationRepository: jest.Mocked<ConversationRepository>;
   let metaApiClient: jest.Mocked<MetaApiClient>;
   let tokenEncryption: jest.Mocked<TokenEncryptionService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
@@ -33,8 +35,9 @@ describe("MessageService", () => {
         { provide: ContactRepository, useValue: { findOrCreate: jest.fn() } },
         {
           provide: MessageRepository,
-          useValue: { create: jest.fn(), findByContact: jest.fn() },
+          useValue: { create: jest.fn(), findByContact: jest.fn(), findByConversation: jest.fn() },
         },
+        { provide: ConversationRepository, useValue: { recordActivity: jest.fn() } },
         { provide: MetaApiClient, useValue: { sendTextMessage: jest.fn() } },
         { provide: TokenEncryptionService, useValue: { decrypt: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
@@ -46,6 +49,7 @@ describe("MessageService", () => {
     phoneNumberRepository = moduleRef.get(PhoneNumberRepository);
     contactRepository = moduleRef.get(ContactRepository);
     messageRepository = moduleRef.get(MessageRepository);
+    conversationRepository = moduleRef.get(ConversationRepository);
     metaApiClient = moduleRef.get(MetaApiClient);
     tokenEncryption = moduleRef.get(TokenEncryptionService);
     eventEmitter = moduleRef.get(EventEmitter2);
@@ -64,8 +68,12 @@ describe("MessageService", () => {
     contactRepository.findOrCreate.mockResolvedValue({
       _id: { toString: () => "contact-1" },
     } as never);
+    conversationRepository.recordActivity.mockResolvedValue({
+      _id: { toString: () => "conversation-1" },
+    } as never);
     messageRepository.create.mockResolvedValue({
       _id: { toString: () => "message-1" },
+      conversationId: { toString: () => "conversation-1" },
       contactId: { toString: () => "contact-1" },
       direction: MessageDirection.OUTBOUND,
       type: MessageType.TEXT,

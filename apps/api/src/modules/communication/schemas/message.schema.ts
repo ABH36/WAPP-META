@@ -27,13 +27,13 @@ export enum MessageType {
  * — Outbound: QUEUED -> SENT -> DELIVERED -> READ (or -> FAILED at any
  * point before DELIVERED). Inbound: RECEIVED -> PROCESSED -> VISIBLE.
  *
- * PROCESSED and VISIBLE are reserved by Part-1, not yet transitioned to —
- * every inbound message currently stops at RECEIVED (see WebhookService).
- * PROCESSED depends on business rules (dedup/automation) that don't exist
- * until Part 4; VISIBLE depends on the Shared Inbox/Conversation entity
- * that doesn't exist until Part 2. Defining the values now, before their
- * producers exist, is the same pattern already used for the domain event
- * catalog — the state machine is the contract Part 2/4 build against.
+ * Updated 2026-08-05 (Part 2): the Conversation entity now exists, so every
+ * inbound message goes straight to VISIBLE at creation (see
+ * WebhookService.handleInboundMessage) — RECEIVED and VISIBLE happen
+ * atomically in one write since there is still no gating step between them
+ * (that's what PROCESSED is reserved for). PROCESSED remains reserved,
+ * genuinely not yet transitioned to — it depends on the Part 4 automation
+ * engine (dedup/business-rule processing), which still doesn't exist.
  */
 export enum MessageStatus {
   QUEUED = "QUEUED",
@@ -47,12 +47,11 @@ export enum MessageStatus {
 }
 
 /**
- * Traces to: PRD-003 Part 1 (Core Messaging Engine). Deliberately scoped to
- * message send/receive/status only — no Conversation lifecycle entity
- * (status, assignment, SLA) here; that's Shared Team Inbox (PRD-003 Part
- * 2), a later, separate slice. A "conversation" for Part-1's purposes is
- * just "every Message for one Contact on one PhoneNumber," queryable
- * without a dedicated grouping record.
+ * Traces to: PRD-003 Part 1 (Core Messaging Engine) + Part 2 (Shared Team
+ * Inbox, 2026-08-05 — added `conversationId`). Every Message now belongs to
+ * exactly one Conversation (the grouping/lifecycle entity Part-1 explicitly
+ * deferred), resolved/created via ConversationRepository.recordActivity at
+ * the point of send/receive — see conversation-state-machine.ts.
  *
  * Only TEXT messages are fully modeled in `content` for Part-1 (the only
  * outbound type this slice sends). Other inbound types are recorded with
@@ -64,6 +63,9 @@ export enum MessageStatus {
 export class Message {
   @Prop({ type: String, required: true, index: true })
   workspaceId!: string;
+
+  @Prop({ type: Types.ObjectId, ref: "Conversation", required: true, index: true })
+  conversationId!: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: "PhoneNumber", required: true, index: true })
   phoneNumberId!: Types.ObjectId;
