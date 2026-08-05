@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import {
+  AssignmentStrategy,
   AutomationSettings,
   AutomationSettingsDocument,
 } from "../schemas/automation-settings.schema.js";
@@ -11,16 +12,24 @@ export interface UpdateAutomationSettingsInput {
   welcomeMessageText?: string | null;
   awayMessageEnabled?: boolean;
   awayMessageText?: string | null;
+  assignmentStrategy?: AssignmentStrategy;
 }
 
 const DEFAULTS: Pick<
   AutomationSettings,
-  "welcomeMessageEnabled" | "welcomeMessageText" | "awayMessageEnabled" | "awayMessageText"
+  | "welcomeMessageEnabled"
+  | "welcomeMessageText"
+  | "awayMessageEnabled"
+  | "awayMessageText"
+  | "assignmentStrategy"
+  | "roundRobinLastAssignedUserId"
 > = {
   welcomeMessageEnabled: false,
   welcomeMessageText: null,
   awayMessageEnabled: false,
   awayMessageText: null,
+  assignmentStrategy: AssignmentStrategy.NONE,
+  roundRobinLastAssignedUserId: null,
 };
 
 @Injectable()
@@ -57,6 +66,13 @@ export class AutomationSettingsRepository {
         { $set: { ...input, updatedBy } },
         { new: true, upsert: true, setDefaultsOnInsert: true },
       )
+      .exec();
+  }
+
+  /** Written only by AutoAssignmentService after a Round Robin pick — see roundRobinLastAssignedUserId's own doc comment. */
+  async recordRoundRobinAssignment(workspaceId: string, userId: string): Promise<void> {
+    await this.automationSettingsModel
+      .updateOne({ workspaceId }, { $set: { roundRobinLastAssignedUserId: userId } })
       .exec();
   }
 }

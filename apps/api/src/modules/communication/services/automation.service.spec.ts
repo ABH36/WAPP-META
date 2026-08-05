@@ -5,6 +5,7 @@ import { AutomationSettingsRepository } from "../repositories/automation-setting
 import { ConversationRepository } from "../repositories/conversation.repository.js";
 import { MessageService } from "./message.service.js";
 import { ConversationStatus } from "../schemas/conversation.schema.js";
+import { AssignmentStrategy } from "../schemas/automation-settings.schema.js";
 import type { BusinessHours } from "../../workspace/schemas/workspace.schema.js";
 
 describe("AutomationService", () => {
@@ -72,6 +73,8 @@ describe("AutomationService", () => {
         welcomeMessageText: "Hi! Thanks for reaching out.",
         awayMessageEnabled: false,
         awayMessageText: null,
+        assignmentStrategy: AssignmentStrategy.NONE,
+        roundRobinLastAssignedUserId: null,
       });
 
       await service.maybeSendAutoReply(
@@ -100,6 +103,8 @@ describe("AutomationService", () => {
         welcomeMessageText: "Hi!",
         awayMessageEnabled: false,
         awayMessageText: null,
+        assignmentStrategy: AssignmentStrategy.NONE,
+        roundRobinLastAssignedUserId: null,
       });
 
       await service.maybeSendAutoReply(
@@ -119,6 +124,8 @@ describe("AutomationService", () => {
         welcomeMessageText: null,
         awayMessageEnabled: false,
         awayMessageText: null,
+        assignmentStrategy: AssignmentStrategy.NONE,
+        roundRobinLastAssignedUserId: null,
       });
 
       await service.maybeSendAutoReply(
@@ -140,6 +147,8 @@ describe("AutomationService", () => {
         welcomeMessageText: null,
         awayMessageEnabled: true,
         awayMessageText: "We're away right now.",
+        assignmentStrategy: AssignmentStrategy.NONE,
+        roundRobinLastAssignedUserId: null,
       });
       workspaceRepository.findById.mockResolvedValue({
         businessHours: {
@@ -173,6 +182,8 @@ describe("AutomationService", () => {
         welcomeMessageText: null,
         awayMessageEnabled: true,
         awayMessageText: "We're away right now.",
+        assignmentStrategy: AssignmentStrategy.NONE,
+        roundRobinLastAssignedUserId: null,
       });
       workspaceRepository.findById.mockResolvedValue({
         businessHours: alwaysOpenBusinessHours,
@@ -195,6 +206,8 @@ describe("AutomationService", () => {
         welcomeMessageText: null,
         awayMessageEnabled: false,
         awayMessageText: null,
+        assignmentStrategy: AssignmentStrategy.NONE,
+        roundRobinLastAssignedUserId: null,
       });
 
       await service.maybeSendAutoReply(
@@ -255,6 +268,8 @@ describe("AutomationService", () => {
         welcomeMessageText: "Hi!",
         awayMessageEnabled: true,
         awayMessageText: "We're away right now.",
+        assignmentStrategy: AssignmentStrategy.NONE,
+        roundRobinLastAssignedUserId: null,
       });
       workspaceRepository.findById.mockResolvedValue({
         businessHours: { timezone: "UTC", schedule: [], publicHolidays: [] },
@@ -286,6 +301,8 @@ describe("AutomationService", () => {
         welcomeMessageText: "Hi!",
         awayMessageEnabled: false,
         awayMessageText: null,
+        assignmentStrategy: AssignmentStrategy.NONE,
+        roundRobinLastAssignedUserId: null,
       });
       messageService.sendText.mockRejectedValue(new Error("Meta rejected the send"));
 
@@ -308,6 +325,8 @@ describe("AutomationService", () => {
         welcomeMessageText: null,
         awayMessageEnabled: false,
         awayMessageText: null,
+        assignmentStrategy: AssignmentStrategy.NONE,
+        roundRobinLastAssignedUserId: null,
       });
 
       const result = await service.getSettings("workspace-1");
@@ -316,6 +335,7 @@ describe("AutomationService", () => {
         welcomeMessageText: null,
         awayMessageEnabled: false,
         awayMessageText: null,
+        assignmentStrategy: AssignmentStrategy.NONE,
         updatedAt: null,
       });
     });

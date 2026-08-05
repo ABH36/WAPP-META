@@ -14,6 +14,14 @@ export interface ListConversationsFilter {
   assignedToUserId?: string;
 }
 
+/** A Conversation still counts toward an agent's load until it leaves these statuses — mirrors the terminal set conversation-state-machine.ts treats as agent-decided/finished. */
+const TERMINAL_CONVERSATION_STATUSES = [
+  ConversationStatus.RESOLVED,
+  ConversationStatus.CLOSED,
+  ConversationStatus.SPAM,
+  ConversationStatus.ARCHIVED,
+];
+
 export interface ListConversationsResult {
   items: ConversationDocument[];
   total: number;
@@ -154,6 +162,17 @@ export class ConversationRepository {
   async findResolvedBefore(cutoff: Date): Promise<ConversationDocument[]> {
     return this.conversationModel
       .find({ status: ConversationStatus.RESOLVED, resolvedAt: { $lte: cutoff } })
+      .exec();
+  }
+
+  /** Part 4b (Auto Assignment) — Least Active Agent strategy's per-agent load signal. */
+  async countActiveAssignedToUser(workspaceId: string, userId: string): Promise<number> {
+    return this.conversationModel
+      .countDocuments({
+        workspaceId,
+        assignedToUserId: userId,
+        status: { $nin: TERMINAL_CONVERSATION_STATUSES },
+      })
       .exec();
   }
 

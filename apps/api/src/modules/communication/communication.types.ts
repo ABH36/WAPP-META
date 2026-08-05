@@ -10,6 +10,7 @@ import type {
 import type { BroadcastStatus } from "./schemas/broadcast.schema.js";
 import type { BroadcastRecipientStatus } from "./schemas/broadcast-recipient.schema.js";
 import type { CampaignStatus } from "./schemas/campaign.schema.js";
+import type { AssignmentStrategy } from "./schemas/automation-settings.schema.js";
 
 export interface ConnectionSummary {
   id: string;
@@ -120,5 +121,6 @@ export interface AutomationSettingsSummary {
   welcomeMessageText: string | null;
   awayMessageEnabled: boolean;
   awayMessageText: string | null;
+  assignmentStrategy: AssignmentStrategy;
   updatedAt: string | null;
 }

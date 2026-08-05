@@ -8,6 +8,7 @@ import { MessageRepository } from "../repositories/message.repository.js";
 import { PhoneNumberRepository } from "../repositories/phone-number.repository.js";
 import { ConversationRepository } from "../repositories/conversation.repository.js";
 import { AutomationService } from "./automation.service.js";
+import { AutoAssignmentService } from "./auto-assignment.service.js";
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
 
 const APP_SECRET = "test-app-secret";
@@ -26,6 +27,7 @@ describe("WebhookService", () => {
   let messageRepository: jest.Mocked<MessageRepository>;
   let conversationRepository: jest.Mocked<ConversationRepository>;
   let automationService: jest.Mocked<AutomationService>;
+  let autoAssignmentService: jest.Mocked<AutoAssignmentService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
 
   beforeEach(async () => {
@@ -61,6 +63,7 @@ describe("WebhookService", () => {
         },
         { provide: ConversationRepository, useValue: { recordActivity: jest.fn() } },
         { provide: AutomationService, useValue: { maybeSendAutoReply: jest.fn() } },
+        { provide: AutoAssignmentService, useValue: { maybeAssign: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
@@ -71,6 +74,7 @@ describe("WebhookService", () => {
     messageRepository = moduleRef.get(MessageRepository);
     conversationRepository = moduleRef.get(ConversationRepository);
     automationService = moduleRef.get(AutomationService);
+    autoAssignmentService = moduleRef.get(AutoAssignmentService);
     eventEmitter = moduleRef.get(EventEmitter2);
   });
 
@@ -183,6 +187,9 @@ describe("WebhookService", () => {
       expect(autoReplyCall[0]).toBe("workspace-1");
       expect(autoReplyCall[2]).toBe("phone-1");
       expect(autoReplyCall[3]).toBe("+919876543210");
+
+      const autoAssignCall = autoAssignmentService.maybeAssign.mock.calls[0]!;
+      expect(autoAssignCall[0]).toBe("workspace-1");
     });
 
     it("skips a redelivered message it has already recorded (idempotency)", async () => {

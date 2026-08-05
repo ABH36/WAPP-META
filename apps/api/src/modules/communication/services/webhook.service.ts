@@ -10,6 +10,7 @@ import { MessageRepository } from "../repositories/message.repository.js";
 import { PhoneNumberRepository } from "../repositories/phone-number.repository.js";
 import { ConversationRepository } from "../repositories/conversation.repository.js";
 import { AutomationService } from "./automation.service.js";
+import { AutoAssignmentService } from "./auto-assignment.service.js";
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
 
 interface MetaWebhookMessage {
@@ -78,6 +79,7 @@ export class WebhookService {
     private readonly messageRepository: MessageRepository,
     private readonly conversationRepository: ConversationRepository,
     private readonly automationService: AutomationService,
+    private readonly autoAssignmentService: AutoAssignmentService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -216,6 +218,10 @@ export class WebhookService {
       phoneNumber._id.toString(),
       contact.phoneNumber,
     );
+
+    // Part 4b — Auto Assignment, evaluated after Welcome/Away (canonical
+    // inbound-message automation order, ADR-COMM-011). Also never throws.
+    await this.autoAssignmentService.maybeAssign(phoneNumber.workspaceId, conversation);
   }
 
   private async handleStatusUpdate(status: MetaWebhookStatus): Promise<void> {

@@ -133,4 +133,25 @@ export class UserRepository {
       })
       .exec();
   }
+
+  /**
+   * Consumed by Communication's AutoAssignmentService (Part 4b) — the
+   * eligible-agent pool for automatic Conversation assignment. Sorted by
+   * `createdAt` ascending (same stable ordering `findWorkspaceMembers`
+   * already uses) so Round Robin cycling is deterministic across calls.
+   */
+  async findByWorkspaceRolesActive(
+    workspaceId: string,
+    roles: readonly TenantRole[],
+  ): Promise<UserDocument[]> {
+    return this.userModel
+      .find({
+        workspaceId,
+        isDeleted: false,
+        workspaceMemberStatus: WorkspaceMemberStatus.ACTIVE,
+        role: { $in: roles },
+      })
+      .sort({ createdAt: 1 })
+      .exec();
+  }
 }

@@ -210,6 +210,7 @@ describe("Automation Engine - Business Hours + Welcome/Away (e2e)", () => {
       welcomeMessageText: null,
       awayMessageEnabled: false,
       awayMessageText: null,
+      assignmentStrategy: "NONE",
       updatedAt: null,
     });
 

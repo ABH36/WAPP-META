@@ -1,4 +1,5 @@
-import { IsBoolean, IsOptional, IsString, MaxLength, ValidateIf } from "class-validator";
+import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength, ValidateIf } from "class-validator";
+import { AssignmentStrategy } from "../schemas/automation-settings.schema.js";
 
 export class UpdateAutomationSettingsDto {
   @IsOptional()
@@ -21,4 +22,10 @@ export class UpdateAutomationSettingsDto {
   @IsString()
   @MaxLength(4096)
   awayMessageText?: string | null;
+
+  // roundRobinLastAssignedUserId is deliberately not settable here — it's
+  // AutoAssignmentService's own internal rotation state, not a user setting.
+  @IsOptional()
+  @IsEnum(AssignmentStrategy)
+  assignmentStrategy?: AssignmentStrategy;
 }

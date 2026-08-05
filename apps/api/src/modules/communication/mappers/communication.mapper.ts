@@ -9,6 +9,7 @@ import type { TemplateDocument } from "../schemas/template.schema.js";
 import type { BroadcastDocument } from "../schemas/broadcast.schema.js";
 import type { BroadcastRecipientDocument } from "../schemas/broadcast-recipient.schema.js";
 import type { CampaignDocument } from "../schemas/campaign.schema.js";
+import type { AssignmentStrategy } from "../schemas/automation-settings.schema.js";
 import type {
   AutomationSettingsSummary,
   BroadcastRecipientSummary,
@@ -152,6 +153,7 @@ export function toAutomationSettingsSummary(settings: {
   welcomeMessageText: string | null;
   awayMessageEnabled: boolean;
   awayMessageText: string | null;
+  assignmentStrategy: AssignmentStrategy;
   updatedAt?: Date;
 }): AutomationSettingsSummary {
   return {
@@ -159,6 +161,7 @@ export function toAutomationSettingsSummary(settings: {
     welcomeMessageText: settings.welcomeMessageText,
     awayMessageEnabled: settings.awayMessageEnabled,
     awayMessageText: settings.awayMessageText,
+    assignmentStrategy: settings.assignmentStrategy,
     updatedAt: settings.updatedAt ? settings.updatedAt.toISOString() : null,
   };
 }

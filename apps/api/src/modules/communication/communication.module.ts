@@ -44,6 +44,7 @@ import { ComplianceEngineService } from "./services/compliance-engine.service.js
 import { BroadcastService } from "./services/broadcast.service.js";
 import { CampaignService } from "./services/campaign.service.js";
 import { AutomationService } from "./services/automation.service.js";
+import { AutoAssignmentService } from "./services/auto-assignment.service.js";
 import { WEBHOOK_PROCESSING_QUEUE } from "./queue/webhook-processing.constants.js";
 import { WebhookProcessingProcessor } from "./queue/webhook-processing.processor.js";
 import { CONVERSATION_AUTO_CLOSE_QUEUE } from "./communication.constants.js";
@@ -76,9 +77,12 @@ import { AutomationSettingsController } from "./controllers/automation-settings.
  * docs/COMM-CAMPAIGN-LIFECYCLE.md). Part 4a (Automation Engine — Business
  * Hours + Welcome/Away Messages, 2026-08-05) adds `automation_settings` and
  * consumes Workspace.businessHours (Phase-3) as-is (see
- * docs/COMM-AUTOMATION-BUSINESS-HOURS.md). Auto Assignment (Part 4b) and SLA
- * Monitoring + Escalation Rules (Part 4c) remain later scope, reviewed and
- * approved as their own slices, as does Analytics (Part 5).
+ * docs/COMM-AUTOMATION-BUSINESS-HOURS.md). Part 4b (Auto Assignment,
+ * 2026-08-05) extends that same `automation_settings` document with an
+ * assignment strategy (Round Robin / Least Active Agent) and adds no new
+ * collection of its own (see docs/COMM-AUTO-ASSIGNMENT.md). SLA Monitoring +
+ * Escalation Rules (Part 4c) remain later scope, reviewed and approved as
+ * its own slice, as does Analytics (Part 5).
  *
  * Imports IdentityModule for UserRepository (Part 2's assignment feature)
  * and WorkspaceModule for WorkspaceRepository (Part 4a's Business Hours
@@ -139,6 +143,7 @@ import { AutomationSettingsController } from "./controllers/automation-settings.
     BroadcastService,
     CampaignService,
     AutomationService,
+    AutoAssignmentService,
     WebhookProcessingProcessor,
     ConversationAutoCloseProcessor,
     BroadcastExecutionProcessor,
