@@ -114,3 +114,11 @@ export interface CampaignStatsSummary {
   failed: number;
   total: number;
 }
+
+export interface AutomationSettingsSummary {
+  welcomeMessageEnabled: boolean;
+  welcomeMessageText: string | null;
+  awayMessageEnabled: boolean;
+  awayMessageText: string | null;
+  updatedAt: string | null;
+}

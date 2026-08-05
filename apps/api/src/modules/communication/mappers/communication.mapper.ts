@@ -10,6 +10,7 @@ import type { BroadcastDocument } from "../schemas/broadcast.schema.js";
 import type { BroadcastRecipientDocument } from "../schemas/broadcast-recipient.schema.js";
 import type { CampaignDocument } from "../schemas/campaign.schema.js";
 import type {
+  AutomationSettingsSummary,
   BroadcastRecipientSummary,
   BroadcastSummary,
   CampaignSummary,
@@ -142,5 +143,22 @@ export function toCampaignSummary(campaign: CampaignDocument): CampaignSummary {
     status: campaign.status,
     completedAt: campaign.completedAt ? campaign.completedAt.toISOString() : null,
     createdAt: campaign.createdAt.toISOString(),
+  };
+}
+
+/** Accepts either a real AutomationSettings document or AutomationSettingsRepository.findOrDefault()'s plain-object fallback — both share the same field names, only the document has createdAt/updatedAt. */
+export function toAutomationSettingsSummary(settings: {
+  welcomeMessageEnabled: boolean;
+  welcomeMessageText: string | null;
+  awayMessageEnabled: boolean;
+  awayMessageText: string | null;
+  updatedAt?: Date;
+}): AutomationSettingsSummary {
+  return {
+    welcomeMessageEnabled: settings.welcomeMessageEnabled,
+    welcomeMessageText: settings.welcomeMessageText,
+    awayMessageEnabled: settings.awayMessageEnabled,
+    awayMessageText: settings.awayMessageText,
+    updatedAt: settings.updatedAt ? settings.updatedAt.toISOString() : null,
   };
 }

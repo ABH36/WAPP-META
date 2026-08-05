@@ -33,5 +33,10 @@ import { TeamController } from "./controllers/team.controller.js";
   ],
   controllers: [WorkspaceController, TeamController],
   providers: [WorkspaceRepository, WorkspaceInvitationRepository, WorkspaceService, TeamService],
+  // WorkspaceRepository exported for Communication's Automation Engine
+  // (Part 4a) — reads Workspace.businessHours to gate Welcome/Away
+  // messages, the same cross-module dependency pattern Communication
+  // already uses for Identity's UserRepository.
+  exports: [WorkspaceRepository],
 })
 export class WorkspaceModule {}

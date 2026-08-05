@@ -11,3 +11,12 @@ export const CONVERSATION_AUTO_CLOSE_HOURS = 24;
 export const CONVERSATION_AUTO_CLOSE_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 
 export const CONVERSATION_AUTO_CLOSE_QUEUE = "conversation-auto-close";
+
+/**
+ * Part 4a (Automation Engine) — minimum gap between two auto-replies
+ * (Welcome or Away, either counts) on the same Conversation. Fixed
+ * platform-wide, not yet per-workspace configurable — same known
+ * simplification pattern as CONVERSATION_AUTO_CLOSE_HOURS above (see
+ * docs/TECH-DEBT.md).
+ */
+export const AUTO_REPLY_COOLDOWN_HOURS = 12;

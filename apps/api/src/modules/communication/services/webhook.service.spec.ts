@@ -7,6 +7,7 @@ import { ContactRepository } from "../repositories/contact.repository.js";
 import { MessageRepository } from "../repositories/message.repository.js";
 import { PhoneNumberRepository } from "../repositories/phone-number.repository.js";
 import { ConversationRepository } from "../repositories/conversation.repository.js";
+import { AutomationService } from "./automation.service.js";
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
 
 const APP_SECRET = "test-app-secret";
@@ -24,6 +25,7 @@ describe("WebhookService", () => {
   let contactRepository: jest.Mocked<ContactRepository>;
   let messageRepository: jest.Mocked<MessageRepository>;
   let conversationRepository: jest.Mocked<ConversationRepository>;
+  let automationService: jest.Mocked<AutomationService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
 
   beforeEach(async () => {
@@ -58,6 +60,7 @@ describe("WebhookService", () => {
           },
         },
         { provide: ConversationRepository, useValue: { recordActivity: jest.fn() } },
+        { provide: AutomationService, useValue: { maybeSendAutoReply: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
@@ -67,6 +70,7 @@ describe("WebhookService", () => {
     contactRepository = moduleRef.get(ContactRepository);
     messageRepository = moduleRef.get(MessageRepository);
     conversationRepository = moduleRef.get(ConversationRepository);
+    automationService = moduleRef.get(AutomationService);
     eventEmitter = moduleRef.get(EventEmitter2);
   });
 
@@ -121,6 +125,7 @@ describe("WebhookService", () => {
       messageRepository.findByWaMessageId.mockResolvedValue(null);
       contactRepository.findOrCreate.mockResolvedValue({
         _id: { toString: () => "contact-1" },
+        phoneNumber: "+919876543210",
       } as never);
       conversationRepository.recordActivity.mockResolvedValue({
         _id: { toString: () => "conversation-1" },
@@ -174,6 +179,10 @@ describe("WebhookService", () => {
         "communication.message_received",
         expect.objectContaining({ workspaceId: "workspace-1", waMessageId: "wamid.ABC123" }),
       );
+      const autoReplyCall = automationService.maybeSendAutoReply.mock.calls[0]!;
+      expect(autoReplyCall[0]).toBe("workspace-1");
+      expect(autoReplyCall[2]).toBe("phone-1");
+      expect(autoReplyCall[3]).toBe("+919876543210");
     });
 
     it("skips a redelivered message it has already recorded (idempotency)", async () => {

@@ -9,6 +9,7 @@ import { ContactRepository } from "../repositories/contact.repository.js";
 import { MessageRepository } from "../repositories/message.repository.js";
 import { PhoneNumberRepository } from "../repositories/phone-number.repository.js";
 import { ConversationRepository } from "../repositories/conversation.repository.js";
+import { AutomationService } from "./automation.service.js";
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
 
 interface MetaWebhookMessage {
@@ -76,6 +77,7 @@ export class WebhookService {
     private readonly contactRepository: ContactRepository,
     private readonly messageRepository: MessageRepository,
     private readonly conversationRepository: ConversationRepository,
+    private readonly automationService: AutomationService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -204,6 +206,16 @@ export class WebhookService {
       waMessageId: message.id,
       occurredAt: new Date().toISOString(),
     } satisfies MessageReceivedPayload);
+
+    // Part 4a — Welcome/Away auto-reply, evaluated after the inbound
+    // message is fully persisted. Never throws (see AutomationService's
+    // own doc comment) so a Welcome/Away failure can't fail this webhook.
+    await this.automationService.maybeSendAutoReply(
+      phoneNumber.workspaceId,
+      conversation,
+      phoneNumber._id.toString(),
+      contact.phoneNumber,
+    );
   }
 
   private async handleStatusUpdate(status: MetaWebhookStatus): Promise<void> {

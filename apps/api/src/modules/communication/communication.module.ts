@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { MongooseModule } from "@nestjs/mongoose";
 import { BullModule } from "@nestjs/bullmq";
 import { IdentityModule } from "../identity/identity.module.js";
+import { WorkspaceModule } from "../workspace/workspace.module.js";
 import {
   WhatsAppConnection,
   WhatsAppConnectionSchema,
@@ -18,6 +19,10 @@ import {
   BroadcastRecipientSchema,
 } from "./schemas/broadcast-recipient.schema.js";
 import { Campaign, CampaignSchema } from "./schemas/campaign.schema.js";
+import {
+  AutomationSettings,
+  AutomationSettingsSchema,
+} from "./schemas/automation-settings.schema.js";
 import { WhatsAppConnectionRepository } from "./repositories/whatsapp-connection.repository.js";
 import { PhoneNumberRepository } from "./repositories/phone-number.repository.js";
 import { ContactRepository } from "./repositories/contact.repository.js";
@@ -28,6 +33,7 @@ import { TemplateRepository } from "./repositories/template.repository.js";
 import { BroadcastRepository } from "./repositories/broadcast.repository.js";
 import { BroadcastRecipientRepository } from "./repositories/broadcast-recipient.repository.js";
 import { CampaignRepository } from "./repositories/campaign.repository.js";
+import { AutomationSettingsRepository } from "./repositories/automation-settings.repository.js";
 import { MetaApiClient } from "./services/meta-api-client.service.js";
 import { WhatsAppConnectionService } from "./services/whatsapp-connection.service.js";
 import { WebhookService } from "./services/webhook.service.js";
@@ -37,6 +43,7 @@ import { TemplateService } from "./services/template.service.js";
 import { ComplianceEngineService } from "./services/compliance-engine.service.js";
 import { BroadcastService } from "./services/broadcast.service.js";
 import { CampaignService } from "./services/campaign.service.js";
+import { AutomationService } from "./services/automation.service.js";
 import { WEBHOOK_PROCESSING_QUEUE } from "./queue/webhook-processing.constants.js";
 import { WebhookProcessingProcessor } from "./queue/webhook-processing.processor.js";
 import { CONVERSATION_AUTO_CLOSE_QUEUE } from "./communication.constants.js";
@@ -50,6 +57,7 @@ import { ConversationController } from "./controllers/conversation.controller.js
 import { TemplateController } from "./controllers/template.controller.js";
 import { BroadcastController } from "./controllers/broadcast.controller.js";
 import { CampaignController } from "./controllers/campaign.controller.js";
+import { AutomationSettingsController } from "./controllers/automation-settings.controller.js";
 
 /**
  * Communication (Phase-4). Part 1 (PRD-003 Part 1 — Core Messaging Engine &
@@ -65,18 +73,21 @@ import { CampaignController } from "./controllers/campaign.controller.js";
  * scoping decision). Part 3b-ii (Campaign Management, 2026-08-05) adds
  * `campaigns` — a container orchestrating multiple Broadcasts ("waves") over
  * a timeline, owning no send mechanics of its own (see
- * docs/COMM-CAMPAIGN-LIFECYCLE.md). Rule-Based Automation (Part 4) and
- * Analytics (Part 5) remain later scope, reviewed and approved as their own
- * slices.
+ * docs/COMM-CAMPAIGN-LIFECYCLE.md). Part 4a (Automation Engine — Business
+ * Hours + Welcome/Away Messages, 2026-08-05) adds `automation_settings` and
+ * consumes Workspace.businessHours (Phase-3) as-is (see
+ * docs/COMM-AUTOMATION-BUSINESS-HOURS.md). Auto Assignment (Part 4b) and SLA
+ * Monitoring + Escalation Rules (Part 4c) remain later scope, reviewed and
+ * approved as their own slices, as does Analytics (Part 5).
  *
- * Imports IdentityModule for UserRepository — Part 2's assignment feature
- * needs to validate an assignee is an active workspace member with Shared
- * Inbox access (same cross-module dependency pattern WorkspaceModule
- * already established).
+ * Imports IdentityModule for UserRepository (Part 2's assignment feature)
+ * and WorkspaceModule for WorkspaceRepository (Part 4a's Business Hours
+ * read) — the same cross-module dependency pattern in both directions.
  */
 @Module({
   imports: [
     IdentityModule,
+    WorkspaceModule,
     MongooseModule.forFeature([
       { name: WhatsAppConnection.name, schema: WhatsAppConnectionSchema },
       { name: PhoneNumber.name, schema: PhoneNumberSchema },
@@ -88,6 +99,7 @@ import { CampaignController } from "./controllers/campaign.controller.js";
       { name: Broadcast.name, schema: BroadcastSchema },
       { name: BroadcastRecipient.name, schema: BroadcastRecipientSchema },
       { name: Campaign.name, schema: CampaignSchema },
+      { name: AutomationSettings.name, schema: AutomationSettingsSchema },
     ]),
     BullModule.registerQueue(
       { name: WEBHOOK_PROCESSING_QUEUE },
@@ -103,6 +115,7 @@ import { CampaignController } from "./controllers/campaign.controller.js";
     TemplateController,
     BroadcastController,
     CampaignController,
+    AutomationSettingsController,
   ],
   providers: [
     WhatsAppConnectionRepository,
@@ -115,6 +128,7 @@ import { CampaignController } from "./controllers/campaign.controller.js";
     BroadcastRepository,
     BroadcastRecipientRepository,
     CampaignRepository,
+    AutomationSettingsRepository,
     MetaApiClient,
     WhatsAppConnectionService,
     WebhookService,
@@ -124,6 +138,7 @@ import { CampaignController } from "./controllers/campaign.controller.js";
     ComplianceEngineService,
     BroadcastService,
     CampaignService,
+    AutomationService,
     WebhookProcessingProcessor,
     ConversationAutoCloseProcessor,
     BroadcastExecutionProcessor,

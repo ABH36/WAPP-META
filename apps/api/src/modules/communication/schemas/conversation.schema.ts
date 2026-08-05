@@ -70,6 +70,19 @@ export class Conversation {
   @Prop({ type: Date, default: null })
   closedAt!: Date | null;
 
+  // Part 4a (Automation Engine) — last time each auto-reply type was sent
+  // on this Conversation. Kept separate (rather than one shared timestamp)
+  // because Welcome and Away are independent triggers: firing one must not
+  // block the other from firing later within the same cooldown window.
+  // Each still throttles repeats of its own type — a customer sending
+  // several messages in a row outside business hours doesn't get the Away
+  // message repeated for every one of them.
+  @Prop({ type: Date, default: null })
+  welcomeLastSentAt!: Date | null;
+
+  @Prop({ type: Date, default: null })
+  awayLastSentAt!: Date | null;
+
   createdAt!: Date;
   updatedAt!: Date;
 }

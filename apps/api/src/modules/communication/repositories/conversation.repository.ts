@@ -156,4 +156,12 @@ export class ConversationRepository {
       .find({ status: ConversationStatus.RESOLVED, resolvedAt: { $lte: cutoff } })
       .exec();
   }
+
+  async updateWelcomeLastSentAt(id: string, at: Date): Promise<void> {
+    await this.conversationModel.updateOne({ _id: id }, { $set: { welcomeLastSentAt: at } }).exec();
+  }
+
+  async updateAwayLastSentAt(id: string, at: Date): Promise<void> {
+    await this.conversationModel.updateOne({ _id: id }, { $set: { awayLastSentAt: at } }).exec();
+  }
 }
