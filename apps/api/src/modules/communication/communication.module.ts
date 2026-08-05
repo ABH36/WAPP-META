@@ -11,17 +11,21 @@ import { Contact, ContactSchema } from "./schemas/contact.schema.js";
 import { Message, MessageSchema } from "./schemas/message.schema.js";
 import { Conversation, ConversationSchema } from "./schemas/conversation.schema.js";
 import { ConversationNote, ConversationNoteSchema } from "./schemas/conversation-note.schema.js";
+import { Template, TemplateSchema } from "./schemas/template.schema.js";
 import { WhatsAppConnectionRepository } from "./repositories/whatsapp-connection.repository.js";
 import { PhoneNumberRepository } from "./repositories/phone-number.repository.js";
 import { ContactRepository } from "./repositories/contact.repository.js";
 import { MessageRepository } from "./repositories/message.repository.js";
 import { ConversationRepository } from "./repositories/conversation.repository.js";
 import { ConversationNoteRepository } from "./repositories/conversation-note.repository.js";
+import { TemplateRepository } from "./repositories/template.repository.js";
 import { MetaApiClient } from "./services/meta-api-client.service.js";
 import { WhatsAppConnectionService } from "./services/whatsapp-connection.service.js";
 import { WebhookService } from "./services/webhook.service.js";
 import { MessageService } from "./services/message.service.js";
 import { ConversationService } from "./services/conversation.service.js";
+import { TemplateService } from "./services/template.service.js";
+import { ComplianceEngineService } from "./services/compliance-engine.service.js";
 import { WEBHOOK_PROCESSING_QUEUE } from "./queue/webhook-processing.constants.js";
 import { WebhookProcessingProcessor } from "./queue/webhook-processing.processor.js";
 import { CONVERSATION_AUTO_CLOSE_QUEUE } from "./communication.constants.js";
@@ -30,16 +34,18 @@ import { WhatsAppConnectionController } from "./controllers/whatsapp-connection.
 import { WebhookController } from "./controllers/webhook.controller.js";
 import { MessageController } from "./controllers/message.controller.js";
 import { ConversationController } from "./controllers/conversation.controller.js";
+import { TemplateController } from "./controllers/template.controller.js";
 
 /**
  * Communication (Phase-4). Part 1 (PRD-003 Part 1 — Core Messaging Engine &
  * Meta Integration) owns `whatsapp_connections`, `phone_numbers`,
  * `contacts`, `messages`. Part 2 (PRD-003 Part 2 — Shared Team Inbox &
  * Conversation Management, 2026-08-05) adds `conversations` and
- * `conversation_notes`. Scope still deliberately excludes Broadcast/
- * Campaign/Templates (Part 3), Rule-Based Automation (Part 4), and
- * Analytics (Part 5) — each is later scope, reviewed and approved as its
- * own slice, same discipline as every module so far.
+ * `conversation_notes`. Part 3a (PRD-003 Part 3 — Templates & Meta
+ * Compliance Engine, 2026-08-05) adds `templates` and enforces the 24-hour
+ * customer-service-window rule (BDC-008) on every free-text send. Broadcast/
+ * Campaign (Part 3b), Rule-Based Automation (Part 4), and Analytics (Part 5)
+ * remain later scope, reviewed and approved as their own slices.
  *
  * Imports IdentityModule for UserRepository — Part 2's assignment feature
  * needs to validate an assignee is an active workspace member with Shared
@@ -56,6 +62,7 @@ import { ConversationController } from "./controllers/conversation.controller.js
       { name: Message.name, schema: MessageSchema },
       { name: Conversation.name, schema: ConversationSchema },
       { name: ConversationNote.name, schema: ConversationNoteSchema },
+      { name: Template.name, schema: TemplateSchema },
     ]),
     BullModule.registerQueue(
       { name: WEBHOOK_PROCESSING_QUEUE },
@@ -67,6 +74,7 @@ import { ConversationController } from "./controllers/conversation.controller.js
     WebhookController,
     MessageController,
     ConversationController,
+    TemplateController,
   ],
   providers: [
     WhatsAppConnectionRepository,
@@ -75,11 +83,14 @@ import { ConversationController } from "./controllers/conversation.controller.js
     MessageRepository,
     ConversationRepository,
     ConversationNoteRepository,
+    TemplateRepository,
     MetaApiClient,
     WhatsAppConnectionService,
     WebhookService,
     MessageService,
     ConversationService,
+    TemplateService,
+    ComplianceEngineService,
     WebhookProcessingProcessor,
     ConversationAutoCloseProcessor,
   ],

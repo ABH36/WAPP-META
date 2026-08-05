@@ -5,6 +5,7 @@ import { RequirePermission } from "../../identity/decorators/require-permission.
 import type { AuthenticatedUser } from "../../identity/identity.types.js";
 import { ConversationService } from "../services/conversation.service.js";
 import { ReplyConversationDto } from "../dto/reply-conversation.dto.js";
+import { ReplyConversationTemplateDto } from "../dto/reply-conversation-template.dto.js";
 import { AssignConversationDto } from "../dto/assign-conversation.dto.js";
 import { UpdateConversationStatusDto } from "../dto/update-conversation-status.dto.js";
 import { CreateConversationNoteDto } from "../dto/create-conversation-note.dto.js";
@@ -73,6 +74,25 @@ export class ConversationController {
     @Body() dto: ReplyConversationDto,
   ): Promise<MessageSummary> {
     return this.conversationService.reply(user.workspaceId!, id, user.userId, dto.text);
+  }
+
+  // Separate endpoint (not a discriminated union on the same route) so a
+  // client outside the compliance window has an unambiguous path to take —
+  // see docs/COMM-COMPLIANCE-ENGINE.md.
+  @RequirePermission(Permission.REPLY_CONVERSATIONS)
+  @Post(":id/template-messages")
+  async replyWithTemplate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: ReplyConversationTemplateDto,
+  ): Promise<MessageSummary> {
+    return this.conversationService.replyWithTemplate(
+      user.workspaceId!,
+      id,
+      user.userId,
+      dto.templateId,
+      dto.bodyParameters,
+    );
   }
 
   @RequirePermission(Permission.REPLY_CONVERSATIONS)

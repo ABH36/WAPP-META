@@ -5,6 +5,7 @@ import { RequirePermission } from "../../identity/decorators/require-permission.
 import type { AuthenticatedUser } from "../../identity/identity.types.js";
 import { MessageService } from "../services/message.service.js";
 import { SendMessageDto } from "../dto/send-message.dto.js";
+import { SendTemplateMessageDto } from "../dto/send-template-message.dto.js";
 import type { MessageSummary } from "../communication.types.js";
 
 @Controller({ path: "communication", version: "1" })
@@ -19,6 +20,16 @@ export class MessageController {
     @Body() dto: SendMessageDto,
   ): Promise<MessageSummary> {
     return this.messageService.sendText(user.workspaceId!, phoneNumberId, user.userId, dto);
+  }
+
+  @RequirePermission(Permission.REPLY_CONVERSATIONS)
+  @Post("phone-numbers/:phoneNumberId/template-messages")
+  async sendTemplate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("phoneNumberId") phoneNumberId: string,
+    @Body() dto: SendTemplateMessageDto,
+  ): Promise<MessageSummary> {
+    return this.messageService.sendTemplate(user.workspaceId!, phoneNumberId, user.userId, dto);
   }
 
   @RequirePermission(Permission.REPLY_CONVERSATIONS)

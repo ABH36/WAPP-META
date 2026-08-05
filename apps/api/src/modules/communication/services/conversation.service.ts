@@ -136,6 +136,35 @@ export class ConversationService {
     );
   }
 
+  /** Template reply — the only reply path available once a conversation is outside the 24h compliance window (see ComplianceEngineService). */
+  async replyWithTemplate(
+    workspaceId: string,
+    conversationId: string,
+    actorId: string,
+    templateId: string,
+    bodyParameters: string[],
+  ): Promise<MessageSummary> {
+    const conversation = await this.findOrThrow(workspaceId, conversationId);
+    const contact = await this.contactRepository.findByIdForWorkspace(
+      workspaceId,
+      conversation.contactId.toString(),
+    );
+    if (!contact) {
+      throw new NotFoundException("Contact not found");
+    }
+
+    return this.messageService.sendTemplate(
+      workspaceId,
+      conversation.phoneNumberId.toString(),
+      actorId,
+      {
+        to: contact.phoneNumber,
+        templateId,
+        bodyParameters,
+      },
+    );
+  }
+
   async updateStatus(
     workspaceId: string,
     conversationId: string,

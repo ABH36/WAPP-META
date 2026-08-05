@@ -2,6 +2,11 @@ import type { MessageDirection, MessageStatus, MessageType } from "./schemas/mes
 import type { ConversationStatus } from "./schemas/conversation.schema.js";
 import type { QualityRating } from "./schemas/phone-number.schema.js";
 import type { WhatsAppConnectionStatus } from "./schemas/whatsapp-connection.schema.js";
+import type {
+  TemplateCategory,
+  TemplateComponent,
+  TemplateStatus,
+} from "./schemas/template.schema.js";
 
 export interface ConnectionSummary {
   id: string;
@@ -50,5 +55,17 @@ export interface ConversationNoteSummary {
   conversationId: string;
   authorUserId: string;
   text: string;
+  createdAt: string;
+}
+
+export interface TemplateSummary {
+  id: string;
+  name: string;
+  category: TemplateCategory;
+  language: string;
+  components: TemplateComponent[];
+  status: TemplateStatus;
+  metaTemplateId: string | null;
+  rejectionReason: string | null;
   createdAt: string;
 }

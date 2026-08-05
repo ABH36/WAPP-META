@@ -7,9 +7,12 @@ import { PhoneNumberRepository } from "../repositories/phone-number.repository.j
 import { ContactRepository } from "../repositories/contact.repository.js";
 import { MessageRepository } from "../repositories/message.repository.js";
 import { ConversationRepository } from "../repositories/conversation.repository.js";
+import { TemplateRepository } from "../repositories/template.repository.js";
+import { ComplianceEngineService } from "./compliance-engine.service.js";
 import { MetaApiClient } from "./meta-api-client.service.js";
 import { TokenEncryptionService } from "../../../common/security/token-encryption.service.js";
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
+import { TemplateStatus } from "../schemas/template.schema.js";
 import { MetaAuthenticationException } from "../exceptions/meta-api.exceptions.js";
 
 describe("MessageService", () => {
@@ -19,6 +22,8 @@ describe("MessageService", () => {
   let contactRepository: jest.Mocked<ContactRepository>;
   let messageRepository: jest.Mocked<MessageRepository>;
   let conversationRepository: jest.Mocked<ConversationRepository>;
+  let templateRepository: jest.Mocked<TemplateRepository>;
+  let complianceEngine: jest.Mocked<ComplianceEngineService>;
   let metaApiClient: jest.Mocked<MetaApiClient>;
   let tokenEncryption: jest.Mocked<TokenEncryptionService>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
@@ -37,8 +42,16 @@ describe("MessageService", () => {
           provide: MessageRepository,
           useValue: { create: jest.fn(), findByContact: jest.fn(), findByConversation: jest.fn() },
         },
-        { provide: ConversationRepository, useValue: { recordActivity: jest.fn() } },
-        { provide: MetaApiClient, useValue: { sendTextMessage: jest.fn() } },
+        {
+          provide: ConversationRepository,
+          useValue: { recordActivity: jest.fn(), findByContact: jest.fn() },
+        },
+        { provide: TemplateRepository, useValue: { findByIdForWorkspace: jest.fn() } },
+        { provide: ComplianceEngineService, useValue: { assertFreeTextAllowed: jest.fn() } },
+        {
+          provide: MetaApiClient,
+          useValue: { sendTextMessage: jest.fn(), sendTemplateMessage: jest.fn() },
+        },
         { provide: TokenEncryptionService, useValue: { decrypt: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
@@ -50,6 +63,8 @@ describe("MessageService", () => {
     contactRepository = moduleRef.get(ContactRepository);
     messageRepository = moduleRef.get(MessageRepository);
     conversationRepository = moduleRef.get(ConversationRepository);
+    templateRepository = moduleRef.get(TemplateRepository);
+    complianceEngine = moduleRef.get(ComplianceEngineService);
     metaApiClient = moduleRef.get(MetaApiClient);
     tokenEncryption = moduleRef.get(TokenEncryptionService);
     eventEmitter = moduleRef.get(EventEmitter2);
@@ -67,6 +82,9 @@ describe("MessageService", () => {
     metaApiClient.sendTextMessage.mockResolvedValue("wamid.OUT1");
     contactRepository.findOrCreate.mockResolvedValue({
       _id: { toString: () => "contact-1" },
+    } as never);
+    conversationRepository.findByContact.mockResolvedValue({
+      lastCustomerMessageAt: new Date(),
     } as never);
     conversationRepository.recordActivity.mockResolvedValue({
       _id: { toString: () => "conversation-1" },
@@ -87,6 +105,7 @@ describe("MessageService", () => {
       text: "Hello",
     });
 
+    expect(complianceEngine.assertFreeTextAllowed).toHaveBeenCalled();
     expect(metaApiClient.sendTextMessage).toHaveBeenCalledWith(
       "meta-phone-1",
       "raw-access-token",
@@ -130,6 +149,12 @@ describe("MessageService", () => {
     connectionRepository.findByWorkspace.mockResolvedValue({
       accessTokenEncrypted: "encrypted-token",
     } as never);
+    contactRepository.findOrCreate.mockResolvedValue({
+      _id: { toString: () => "contact-1" },
+    } as never);
+    conversationRepository.findByContact.mockResolvedValue({
+      lastCustomerMessageAt: new Date(),
+    } as never);
     tokenEncryption.decrypt.mockReturnValue("raw-access-token");
     metaApiClient.sendTextMessage.mockRejectedValue(
       new MetaAuthenticationException("Token expired"),
@@ -140,5 +165,118 @@ describe("MessageService", () => {
     ).rejects.toThrow(MetaAuthenticationException);
     expect(connectionRepository.recordError).toHaveBeenCalledWith("workspace-1", "Token expired");
     expect(messageRepository.create).not.toHaveBeenCalled();
+  });
+
+  it("never calls Meta when the compliance engine rejects the send", async () => {
+    phoneNumberRepository.findByIdForWorkspace.mockResolvedValue({
+      _id: { toString: () => "phone-1" },
+      phoneNumberId: "meta-phone-1",
+    } as never);
+    connectionRepository.findByWorkspace.mockResolvedValue({
+      accessTokenEncrypted: "encrypted-token",
+    } as never);
+    contactRepository.findOrCreate.mockResolvedValue({
+      _id: { toString: () => "contact-1" },
+    } as never);
+    conversationRepository.findByContact.mockResolvedValue(null);
+    complianceEngine.assertFreeTextAllowed.mockImplementation(() => {
+      throw new ForbiddenException("outside window");
+    });
+
+    await expect(
+      service.sendText("workspace-1", "phone-1", "user-1", { to: "+919876543210", text: "Hi" }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(metaApiClient.sendTextMessage).not.toHaveBeenCalled();
+  });
+
+  describe("sendTemplate", () => {
+    beforeEach(() => {
+      phoneNumberRepository.findByIdForWorkspace.mockResolvedValue({
+        _id: { toString: () => "phone-1" },
+        phoneNumberId: "meta-phone-1",
+      } as never);
+      connectionRepository.findByWorkspace.mockResolvedValue({
+        accessTokenEncrypted: "encrypted-token",
+        wabaId: "waba-1",
+      } as never);
+      tokenEncryption.decrypt.mockReturnValue("raw-access-token");
+    });
+
+    it("throws NotFoundException when the template doesn't exist", async () => {
+      templateRepository.findByIdForWorkspace.mockResolvedValue(null);
+
+      await expect(
+        service.sendTemplate("workspace-1", "phone-1", "user-1", {
+          to: "+919876543210",
+          templateId: "template-1",
+          bodyParameters: [],
+        }),
+      ).rejects.toThrow(NotFoundException);
+      expect(metaApiClient.sendTemplateMessage).not.toHaveBeenCalled();
+    });
+
+    it("throws when the template isn't APPROVED", async () => {
+      templateRepository.findByIdForWorkspace.mockResolvedValue({
+        status: TemplateStatus.PENDING,
+        name: "order_update",
+        language: "en_US",
+      } as never);
+
+      await expect(
+        service.sendTemplate("workspace-1", "phone-1", "user-1", {
+          to: "+919876543210",
+          templateId: "template-1",
+          bodyParameters: [],
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(metaApiClient.sendTemplateMessage).not.toHaveBeenCalled();
+    });
+
+    it("sends an approved template, bypassing the compliance engine entirely", async () => {
+      templateRepository.findByIdForWorkspace.mockResolvedValue({
+        _id: { toString: () => "template-1" },
+        status: TemplateStatus.APPROVED,
+        name: "order_update",
+        language: "en_US",
+        components: [{ type: "BODY", text: "Hi {{1}}, your order shipped." }],
+      } as never);
+      metaApiClient.sendTemplateMessage.mockResolvedValue("wamid.TPL1");
+      contactRepository.findOrCreate.mockResolvedValue({
+        _id: { toString: () => "contact-1" },
+      } as never);
+      conversationRepository.recordActivity.mockResolvedValue({
+        _id: { toString: () => "conversation-1" },
+      } as never);
+      messageRepository.create.mockResolvedValue({
+        _id: { toString: () => "message-2" },
+        conversationId: { toString: () => "conversation-1" },
+        contactId: { toString: () => "contact-1" },
+        direction: MessageDirection.OUTBOUND,
+        type: MessageType.TEMPLATE,
+        text: "Hi John, your order shipped.",
+        status: MessageStatus.SENT,
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+      } as never);
+
+      const result = await service.sendTemplate("workspace-1", "phone-1", "user-1", {
+        to: "+919876543210",
+        templateId: "template-1",
+        bodyParameters: ["John"],
+      });
+
+      expect(complianceEngine.assertFreeTextAllowed).not.toHaveBeenCalled();
+      expect(metaApiClient.sendTemplateMessage).toHaveBeenCalledWith(
+        "meta-phone-1",
+        "raw-access-token",
+        "+919876543210",
+        "order_update",
+        "en_US",
+        ["John"],
+      );
+      expect(messageRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ type: MessageType.TEMPLATE, waMessageId: "wamid.TPL1" }),
+      );
+      expect(result.id).toBe("message-2");
+    });
   });
 });

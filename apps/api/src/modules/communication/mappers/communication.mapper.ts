@@ -5,12 +5,14 @@ import type { MessageDocument } from "../schemas/message.schema.js";
 import type { ContactDocument } from "../schemas/contact.schema.js";
 import type { ConversationDocument } from "../schemas/conversation.schema.js";
 import type { ConversationNoteDocument } from "../schemas/conversation-note.schema.js";
+import type { TemplateDocument } from "../schemas/template.schema.js";
 import type {
   ConnectionSummary,
   ConversationNoteSummary,
   ConversationSummary,
   MessageSummary,
   PhoneNumberSummary,
+  TemplateSummary,
 } from "../communication.types.js";
 
 export function toConnectionSummary(connection: WhatsAppConnectionDocument): ConnectionSummary {
@@ -78,5 +80,19 @@ export function toConversationNoteSummary(note: ConversationNoteDocument): Conve
     authorUserId: note.authorUserId,
     text: note.text,
     createdAt: note.createdAt.toISOString(),
+  };
+}
+
+export function toTemplateSummary(template: TemplateDocument): TemplateSummary {
+  return {
+    id: template._id.toString(),
+    name: template.name,
+    category: template.category,
+    language: template.language,
+    components: template.components,
+    status: template.status,
+    metaTemplateId: template.metaTemplateId,
+    rejectionReason: template.rejectionReason,
+    createdAt: template.createdAt.toISOString(),
   };
 }

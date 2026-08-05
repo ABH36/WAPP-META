@@ -19,6 +19,10 @@ export enum MessageType {
   LOCATION = "LOCATION",
   CONTACTS = "CONTACTS",
   INTERACTIVE = "INTERACTIVE",
+  // Outbound-only (Part 3, MessageService.sendTemplate) — Meta never sends
+  // this as an *inbound* webhook message type, it's how we record our own
+  // approved-template sends locally.
+  TEMPLATE = "TEMPLATE",
   UNKNOWN = "UNKNOWN",
 }
 

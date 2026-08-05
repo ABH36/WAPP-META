@@ -85,6 +85,16 @@ export class DomainEventLoggerListener {
     this.log(DomainEvent.CONVERSATION_NOTE_ADDED, payload);
   }
 
+  @OnEvent(DomainEvent.TEMPLATE_SUBMITTED)
+  onTemplateSubmitted(payload: unknown): void {
+    this.log(DomainEvent.TEMPLATE_SUBMITTED, payload);
+  }
+
+  @OnEvent(DomainEvent.TEMPLATE_STATUS_CHANGED)
+  onTemplateStatusChanged(payload: unknown): void {
+    this.log(DomainEvent.TEMPLATE_STATUS_CHANGED, payload);
+  }
+
   private log(event: string, payload: unknown): void {
     this.logger.log(`domain event published: ${event} ${JSON.stringify(payload)}`);
   }

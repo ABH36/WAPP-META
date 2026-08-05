@@ -16,6 +16,30 @@ export interface MetaPhoneNumberDetails {
   messagingLimitTier: string | null;
 }
 
+export interface MetaTemplateComponentInput {
+  type: "HEADER" | "BODY" | "FOOTER" | "BUTTONS";
+  format?: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "LOCATION";
+  text?: string;
+  buttons?: Array<Record<string, unknown>>;
+}
+
+export interface CreateTemplateInput {
+  name: string;
+  category: string;
+  language: string;
+  components: MetaTemplateComponentInput[];
+}
+
+export interface MetaTemplateSummary {
+  metaTemplateId: string;
+  name: string;
+  status: string;
+  category: string;
+  language: string;
+  components: MetaTemplateComponentInput[];
+  rejectedReason: string | null;
+}
+
 interface MetaErrorBody {
   error?: {
     message?: string;
@@ -111,6 +135,93 @@ export class MetaApiClient {
         to,
         type: "text",
         text: { body: text },
+      },
+    });
+
+    const messageId = body.messages[0]?.id;
+    if (!messageId) {
+      throw new MetaUnknownException("Meta did not return a message id");
+    }
+    return messageId;
+  }
+
+  /** Submits a new template for Meta review (WhatsApp Business Management API). */
+  async createTemplate(
+    wabaId: string,
+    accessToken: string,
+    input: CreateTemplateInput,
+  ): Promise<{ metaTemplateId: string; status: string }> {
+    const url = new URL(`${this.baseUrl()}/${wabaId}/message_templates`);
+    const body = await this.request<{ id: string; status: string }>(url, {
+      method: "POST",
+      accessToken,
+      jsonBody: {
+        name: input.name,
+        category: input.category,
+        language: input.language,
+        components: input.components,
+      },
+    });
+    return { metaTemplateId: body.id, status: body.status };
+  }
+
+  /** Pulls the current template list + review status for a WABA — the sync path (TemplateService.syncFromMeta). */
+  async listTemplates(wabaId: string, accessToken: string): Promise<MetaTemplateSummary[]> {
+    const url = new URL(`${this.baseUrl()}/${wabaId}/message_templates`);
+    url.searchParams.set("fields", "id,name,status,category,language,components,rejected_reason");
+    const body = await this.request<{
+      data: Array<{
+        id: string;
+        name: string;
+        status: string;
+        category: string;
+        language: string;
+        components: MetaTemplateComponentInput[];
+        rejected_reason?: string;
+      }>;
+    }>(url, { method: "GET", accessToken });
+
+    return body.data.map((item) => ({
+      metaTemplateId: item.id,
+      name: item.name,
+      status: item.status,
+      category: item.category,
+      language: item.language,
+      components: item.components,
+      rejectedReason: item.rejected_reason ?? null,
+    }));
+  }
+
+  /** Sends an approved template message — usable outside the 24h customer-service window (docs/COMM-COMPLIANCE-ENGINE.md), unlike sendTextMessage. */
+  async sendTemplateMessage(
+    phoneNumberId: string,
+    accessToken: string,
+    to: string,
+    templateName: string,
+    languageCode: string,
+    bodyParameters: string[],
+  ): Promise<string> {
+    const url = new URL(`${this.baseUrl()}/${phoneNumberId}/messages`);
+    const body = await this.request<{ messages: Array<{ id: string }> }>(url, {
+      method: "POST",
+      accessToken,
+      jsonBody: {
+        messaging_product: "whatsapp",
+        to,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components:
+            bodyParameters.length > 0
+              ? [
+                  {
+                    type: "body",
+                    parameters: bodyParameters.map((text) => ({ type: "text", text })),
+                  },
+                ]
+              : [],
+        },
       },
     });
 

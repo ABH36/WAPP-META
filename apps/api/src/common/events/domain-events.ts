@@ -26,6 +26,8 @@ export const DomainEvent = {
   CONVERSATION_ASSIGNED: "communication.conversation_assigned",
   CONVERSATION_STATUS_CHANGED: "communication.conversation_status_changed",
   CONVERSATION_NOTE_ADDED: "communication.conversation_note_added",
+  TEMPLATE_SUBMITTED: "communication.template_submitted",
+  TEMPLATE_STATUS_CHANGED: "communication.template_status_changed",
 } as const;
 
 interface BaseEventPayload {
@@ -109,4 +111,16 @@ export interface ConversationNoteAddedPayload extends BaseEventPayload {
   conversationId: string;
   contactId: string;
   authorUserId: string;
+}
+
+export interface TemplateSubmittedPayload extends BaseEventPayload {
+  templateId: string;
+  metaTemplateId: string;
+  submittedBy: string;
+}
+
+export interface TemplateStatusChangedPayload extends BaseEventPayload {
+  templateId: string;
+  previousStatus: string;
+  newStatus: string;
 }
