@@ -5,6 +5,7 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { DomainEvent } from "../../../common/events/domain-events.js";
 import type {
   BroadcastCompletedPayload,
+  BroadcastFinishedPayload,
   BroadcastStartedPayload,
 } from "../../../common/events/domain-events.js";
 import { BroadcastRepository } from "../repositories/broadcast.repository.js";
@@ -56,10 +57,16 @@ export class BroadcastService {
     @InjectQueue(BROADCAST_EXECUTION_QUEUE) private readonly queue: Queue,
   ) {}
 
+  /**
+   * `campaignId` is never accepted from the public DTO/controller — only
+   * CampaignService passes it, when creating a wave (see
+   * docs/COMM-CAMPAIGN-LIFECYCLE.md). A standalone Broadcast never has one.
+   */
   async create(
     workspaceId: string,
     createdBy: string,
     dto: CreateBroadcastDto,
+    campaignId?: string,
   ): Promise<BroadcastSummary> {
     const template = await this.templateRepository.findByIdForWorkspace(
       workspaceId,
@@ -94,6 +101,7 @@ export class BroadcastService {
       name: dto.name,
       templateId: dto.templateId,
       phoneNumberId: dto.phoneNumberId,
+      campaignId: campaignId ?? null,
       bodyParameters: dto.bodyParameters,
       status,
       scheduledAt: dto.scheduledAt ?? null,
@@ -220,6 +228,7 @@ export class BroadcastService {
       throw new BadRequestException(`Broadcast is already ${broadcast.status}`);
     }
     const updated = await this.broadcastRepository.updateStatus(id, BroadcastStatus.CANCELLED);
+    this.emitFinished(workspaceId, id, broadcast.campaignId, BroadcastStatus.CANCELLED);
     return toBroadcastSummary(updated!);
   }
 
@@ -251,6 +260,7 @@ export class BroadcastService {
       await this.broadcastRepository.updateStatus(broadcastId, BroadcastStatus.FAILED, {
         failureReason: "Template is not (or is no longer) approved",
       });
+      this.emitFinished(workspaceId, broadcastId, broadcast.campaignId, BroadcastStatus.FAILED);
       return;
     }
 
@@ -336,6 +346,23 @@ export class BroadcastService {
       failedCount: stats.failed,
       occurredAt: new Date().toISOString(),
     } satisfies BroadcastCompletedPayload);
+    this.emitFinished(workspaceId, broadcastId, broadcast.campaignId, BroadcastStatus.COMPLETED);
+  }
+
+  /** See BroadcastFinishedPayload's doc comment — this is Campaign completion-detection's own signal, distinct from BROADCAST_COMPLETED. */
+  private emitFinished(
+    workspaceId: string,
+    broadcastId: string,
+    campaignId: BroadcastDocument["campaignId"],
+    finalStatus: BroadcastStatus,
+  ): void {
+    this.eventEmitter.emit(DomainEvent.BROADCAST_FINISHED, {
+      workspaceId,
+      broadcastId,
+      campaignId: campaignId ? campaignId.toString() : null,
+      finalStatus,
+      occurredAt: new Date().toISOString(),
+    } satisfies BroadcastFinishedPayload);
   }
 
   private async findOrThrow(workspaceId: string, id: string) {

@@ -17,6 +17,7 @@ import {
   BroadcastRecipient,
   BroadcastRecipientSchema,
 } from "./schemas/broadcast-recipient.schema.js";
+import { Campaign, CampaignSchema } from "./schemas/campaign.schema.js";
 import { WhatsAppConnectionRepository } from "./repositories/whatsapp-connection.repository.js";
 import { PhoneNumberRepository } from "./repositories/phone-number.repository.js";
 import { ContactRepository } from "./repositories/contact.repository.js";
@@ -26,6 +27,7 @@ import { ConversationNoteRepository } from "./repositories/conversation-note.rep
 import { TemplateRepository } from "./repositories/template.repository.js";
 import { BroadcastRepository } from "./repositories/broadcast.repository.js";
 import { BroadcastRecipientRepository } from "./repositories/broadcast-recipient.repository.js";
+import { CampaignRepository } from "./repositories/campaign.repository.js";
 import { MetaApiClient } from "./services/meta-api-client.service.js";
 import { WhatsAppConnectionService } from "./services/whatsapp-connection.service.js";
 import { WebhookService } from "./services/webhook.service.js";
@@ -34,6 +36,7 @@ import { ConversationService } from "./services/conversation.service.js";
 import { TemplateService } from "./services/template.service.js";
 import { ComplianceEngineService } from "./services/compliance-engine.service.js";
 import { BroadcastService } from "./services/broadcast.service.js";
+import { CampaignService } from "./services/campaign.service.js";
 import { WEBHOOK_PROCESSING_QUEUE } from "./queue/webhook-processing.constants.js";
 import { WebhookProcessingProcessor } from "./queue/webhook-processing.processor.js";
 import { CONVERSATION_AUTO_CLOSE_QUEUE } from "./communication.constants.js";
@@ -46,6 +49,7 @@ import { MessageController } from "./controllers/message.controller.js";
 import { ConversationController } from "./controllers/conversation.controller.js";
 import { TemplateController } from "./controllers/template.controller.js";
 import { BroadcastController } from "./controllers/broadcast.controller.js";
+import { CampaignController } from "./controllers/campaign.controller.js";
 
 /**
  * Communication (Phase-4). Part 1 (PRD-003 Part 1 — Core Messaging Engine &
@@ -58,9 +62,12 @@ import { BroadcastController } from "./controllers/broadcast.controller.js";
  * (Broadcast Management, 2026-08-05) adds `broadcasts` and
  * `broadcast_recipients` — a one-time template fan-out to an explicit
  * Contact list (see docs/COMM-BROADCAST-LIFECYCLE.md for the audience-model
- * scoping decision). Campaign (Part 3b-ii), Rule-Based Automation (Part 4),
- * and Analytics (Part 5) remain later scope, reviewed and approved as their
- * own slices.
+ * scoping decision). Part 3b-ii (Campaign Management, 2026-08-05) adds
+ * `campaigns` — a container orchestrating multiple Broadcasts ("waves") over
+ * a timeline, owning no send mechanics of its own (see
+ * docs/COMM-CAMPAIGN-LIFECYCLE.md). Rule-Based Automation (Part 4) and
+ * Analytics (Part 5) remain later scope, reviewed and approved as their own
+ * slices.
  *
  * Imports IdentityModule for UserRepository — Part 2's assignment feature
  * needs to validate an assignee is an active workspace member with Shared
@@ -80,6 +87,7 @@ import { BroadcastController } from "./controllers/broadcast.controller.js";
       { name: Template.name, schema: TemplateSchema },
       { name: Broadcast.name, schema: BroadcastSchema },
       { name: BroadcastRecipient.name, schema: BroadcastRecipientSchema },
+      { name: Campaign.name, schema: CampaignSchema },
     ]),
     BullModule.registerQueue(
       { name: WEBHOOK_PROCESSING_QUEUE },
@@ -94,6 +102,7 @@ import { BroadcastController } from "./controllers/broadcast.controller.js";
     ConversationController,
     TemplateController,
     BroadcastController,
+    CampaignController,
   ],
   providers: [
     WhatsAppConnectionRepository,
@@ -105,6 +114,7 @@ import { BroadcastController } from "./controllers/broadcast.controller.js";
     TemplateRepository,
     BroadcastRepository,
     BroadcastRecipientRepository,
+    CampaignRepository,
     MetaApiClient,
     WhatsAppConnectionService,
     WebhookService,
@@ -113,6 +123,7 @@ import { BroadcastController } from "./controllers/broadcast.controller.js";
     TemplateService,
     ComplianceEngineService,
     BroadcastService,
+    CampaignService,
     WebhookProcessingProcessor,
     ConversationAutoCloseProcessor,
     BroadcastExecutionProcessor,

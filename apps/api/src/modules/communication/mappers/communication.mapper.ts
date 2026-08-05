@@ -8,9 +8,11 @@ import type { ConversationNoteDocument } from "../schemas/conversation-note.sche
 import type { TemplateDocument } from "../schemas/template.schema.js";
 import type { BroadcastDocument } from "../schemas/broadcast.schema.js";
 import type { BroadcastRecipientDocument } from "../schemas/broadcast-recipient.schema.js";
+import type { CampaignDocument } from "../schemas/campaign.schema.js";
 import type {
   BroadcastRecipientSummary,
   BroadcastSummary,
+  CampaignSummary,
   ConnectionSummary,
   ConversationNoteSummary,
   ConversationSummary,
@@ -107,6 +109,7 @@ export function toBroadcastSummary(broadcast: BroadcastDocument): BroadcastSumma
     name: broadcast.name,
     templateId: broadcast.templateId.toString(),
     phoneNumberId: broadcast.phoneNumberId.toString(),
+    campaignId: broadcast.campaignId ? broadcast.campaignId.toString() : null,
     bodyParameters: broadcast.bodyParameters,
     status: broadcast.status,
     scheduledAt: broadcast.scheduledAt ? broadcast.scheduledAt.toISOString() : null,
@@ -127,5 +130,17 @@ export function toBroadcastRecipientSummary(
     messageId: recipient.messageId ? recipient.messageId.toString() : null,
     errorDetail: recipient.errorDetail,
     sentAt: recipient.sentAt ? recipient.sentAt.toISOString() : null,
+  };
+}
+
+export function toCampaignSummary(campaign: CampaignDocument): CampaignSummary {
+  return {
+    id: campaign._id.toString(),
+    name: campaign.name,
+    phoneNumberId: campaign.phoneNumberId.toString(),
+    targetContactIds: campaign.targetContactIds,
+    status: campaign.status,
+    completedAt: campaign.completedAt ? campaign.completedAt.toISOString() : null,
+    createdAt: campaign.createdAt.toISOString(),
   };
 }

@@ -44,6 +44,12 @@ export class Broadcast {
   @Prop({ type: SchemaTypes.ObjectId, ref: "PhoneNumber", required: true })
   phoneNumberId!: Types.ObjectId;
 
+  // Set only when this Broadcast is one wave of a Campaign (Part 3b-ii) —
+  // null for a standalone Broadcast. A Campaign owns no send mechanics of
+  // its own; every wave is a real Broadcast, this is the back-reference.
+  @Prop({ type: SchemaTypes.ObjectId, ref: "Campaign", default: null, index: true })
+  campaignId!: Types.ObjectId | null;
+
   // Substituted into the template's BODY placeholders identically for every
   // recipient — no per-recipient personalization in this slice (Contact has
   // no reliable per-contact attributes beyond phoneNumber/waProfileName to

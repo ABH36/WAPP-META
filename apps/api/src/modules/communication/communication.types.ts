@@ -9,6 +9,7 @@ import type {
 } from "./schemas/template.schema.js";
 import type { BroadcastStatus } from "./schemas/broadcast.schema.js";
 import type { BroadcastRecipientStatus } from "./schemas/broadcast-recipient.schema.js";
+import type { CampaignStatus } from "./schemas/campaign.schema.js";
 
 export interface ConnectionSummary {
   id: string;
@@ -77,6 +78,7 @@ export interface BroadcastSummary {
   name: string;
   templateId: string;
   phoneNumberId: string;
+  campaignId: string | null;
   bodyParameters: string[];
   status: BroadcastStatus;
   scheduledAt: string | null;
@@ -93,4 +95,22 @@ export interface BroadcastRecipientSummary {
   messageId: string | null;
   errorDetail: string | null;
   sentAt: string | null;
+}
+
+export interface CampaignSummary {
+  id: string;
+  name: string;
+  phoneNumberId: string;
+  targetContactIds: string[];
+  status: CampaignStatus;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface CampaignStatsSummary {
+  waveCount: number;
+  pending: number;
+  sent: number;
+  failed: number;
+  total: number;
 }

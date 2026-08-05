@@ -105,6 +105,21 @@ export class DomainEventLoggerListener {
     this.log(DomainEvent.BROADCAST_COMPLETED, payload);
   }
 
+  @OnEvent(DomainEvent.BROADCAST_FINISHED)
+  onBroadcastFinished(payload: unknown): void {
+    this.log(DomainEvent.BROADCAST_FINISHED, payload);
+  }
+
+  @OnEvent(DomainEvent.CAMPAIGN_COMPLETED)
+  onCampaignCompleted(payload: unknown): void {
+    this.log(DomainEvent.CAMPAIGN_COMPLETED, payload);
+  }
+
+  @OnEvent(DomainEvent.CAMPAIGN_CANCELLED)
+  onCampaignCancelled(payload: unknown): void {
+    this.log(DomainEvent.CAMPAIGN_CANCELLED, payload);
+  }
+
   private log(event: string, payload: unknown): void {
     this.logger.log(`domain event published: ${event} ${JSON.stringify(payload)}`);
   }

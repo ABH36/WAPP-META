@@ -30,6 +30,13 @@ export const DomainEvent = {
   TEMPLATE_STATUS_CHANGED: "communication.template_status_changed",
   BROADCAST_STARTED: "communication.broadcast_started",
   BROADCAST_COMPLETED: "communication.broadcast_completed",
+  // Fires on every terminal transition (COMPLETED/FAILED/CANCELLED), unlike
+  // BROADCAST_COMPLETED which only fires on successful completion — this is
+  // CampaignService's own completion-detection signal (see
+  // docs/COMM-CAMPAIGN-LIFECYCLE.md), not a general-purpose audit event.
+  BROADCAST_FINISHED: "communication.broadcast_finished",
+  CAMPAIGN_COMPLETED: "communication.campaign_completed",
+  CAMPAIGN_CANCELLED: "communication.campaign_cancelled",
 } as const;
 
 interface BaseEventPayload {
@@ -136,4 +143,19 @@ export interface BroadcastCompletedPayload extends BaseEventPayload {
   broadcastId: string;
   sentCount: number;
   failedCount: number;
+}
+
+export interface BroadcastFinishedPayload extends BaseEventPayload {
+  broadcastId: string;
+  campaignId: string | null;
+  finalStatus: string;
+}
+
+export interface CampaignCompletedPayload extends BaseEventPayload {
+  campaignId: string;
+}
+
+export interface CampaignCancelledPayload extends BaseEventPayload {
+  campaignId: string;
+  actorId: string;
 }
