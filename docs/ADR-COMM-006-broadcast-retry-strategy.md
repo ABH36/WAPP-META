@@ -1,0 +1,36 @@
+# COMM-006 — Broadcast Retry Strategy
+
+**Status:** Accepted
+**Type:** Future architecture (documentation only — no implementation required by this ADR)
+**Date:** 2026-08-05
+**Raised by:** Architecture Review (Phase-4 Part-3b-i recommendation #1)
+
+## Current state
+
+`BroadcastService.processRecipients()` catches any error from `MessageService.sendTemplate()` and immediately marks that one `BroadcastRecipient` `FAILED` — no retry, regardless of error category. This mirrors Part-1's original `MessageService` gap (no retry logic, classification only) and Part-3a's `COMM-META-ERROR-HANDLING-STRATEGY.md`, which explicitly deferred implementing retry behavior while building the classification it depends on. This ADR is that deferred piece, scoped to Broadcast specifically.
+
+## Decision — retry target depends on error category, not a single per-recipient rule
+
+The five typed Graph API exceptions already exist (`docs/COMM-META-ERROR-HANDLING-STRATEGY.md`). The key insight for Broadcast specifically: **not every failure is actually about the recipient being sent to.** An authentication failure means the workspace's WABA token is bad — every other `PENDING` recipient in the same run will fail identically. Retrying (or even continuing) per-recipient in that case just burns through the whole list generating the same error N times.
+
+| Category                                           | Retry target                     | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| -------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Validation** (`MetaValidationException`)         | That recipient only              | Mark `FAILED` immediately, no retry (bad phone number, invalid parameters — retrying an identical malformed request fails identically). Matches today's behavior exactly.                                                                                                                                                                                                                                                                                                         |
+| **Authentication** (`MetaAuthenticationException`) | The whole run, not the recipient | **Halt the Broadcast**, not just fail one recipient — transition to `FAILED` with `failureReason` set (mirroring the existing pre-send Template-not-approved check), leaving all still-`PENDING` recipients untouched (not marked `FAILED` — they were never actually attempted against a live token). Same `WhatsAppConnection.status = ERROR` side effect `MessageService.sendText`/`sendTemplate` already trigger applies here too, since it's the same underlying connection. |
+| **Rate Limit** (`MetaRateLimitException`)          | That recipient, after a delay    | Retry once after `retryAfterSeconds` (or the existing static `BROADCAST_SEND_DELAY_MS` as a floor if Meta didn't provide one), then mark `FAILED` if still rate-limited. This is the one category where per-recipient retry is clearly correct — the rate limit is transient and number/time-scoped, not connection-scoped.                                                                                                                                                       |
+| **Temporary** (`MetaTemporaryException`)           | That recipient                   | Standard exponential backoff, small fixed attempt count — same 3-attempt schedule already established for email (TAD-001 v1.2 Email Patch) and referenced as the model in `COMM-META-ERROR-HANDLING-STRATEGY.md`, rather than inventing a new retry philosophy for Broadcast specifically.                                                                                                                                                                                        |
+| **Unknown** (`MetaUnknownException`)               | That recipient only              | Mark `FAILED`, no retry — an unrecognized failure mode should be looked at, not blindly repeated (same reasoning as the base strategy doc).                                                                                                                                                                                                                                                                                                                                       |
+
+## Cancelled broadcasts — a real gap this ADR surfaces
+
+`BroadcastRecipientStatus` today only has `PENDING`/`SENT`/`FAILED`. When a Broadcast is cancelled (or paused and never resumed) with recipients still `PENDING`, those rows stay `PENDING` forever — indistinguishable from "hasn't been reached yet" vs. "will never be reached because the run was cancelled." This is ambiguous enough to need closing before retry logic is built on top of it (retry logic needs to know unambiguously which `PENDING` rows are still eligible to be picked up vs. permanently abandoned).
+
+**Recommendation:** add a fourth status, `SKIPPED`, applied to every still-`PENDING` recipient at the moment a Broadcast transitions to `CANCELLED`. Not implemented by this ADR — a small, contained addition (one enum value, one repository method, one call site in `BroadcastService.cancel()`) for whoever picks up retry logic next.
+
+## Retry limits
+
+Fixed, small attempt counts (matching the established email/webhook-processing pattern elsewhere in the codebase — 3 attempts, exponential backoff), not unbounded — a stuck recipient should end in `FAILED` and be visible in stats, not retry forever. Exact backoff timing (base delay, multiplier) should reuse whatever constant the eventual implementation of `docs/COMM-META-ERROR-HANDLING-STRATEGY.md`'s general retry logic settles on, rather than Broadcast inventing its own — retry timing should be one shared policy across every outbound Graph API call, not per-feature.
+
+## What this ADR does not do
+
+No retry logic, no `SKIPPED` status, no backoff implementation is added by this document — per the Architect's framing, this is documentation only. It exists so whoever builds Broadcast retry has a decided per-category strategy (and the cancelled-recipient gap already named) instead of re-deriving one, and so it's built as part of the same general Graph-API retry effort `COMM-META-ERROR-HANDLING-STRATEGY.md` already deferred, not a second, divergent implementation.
