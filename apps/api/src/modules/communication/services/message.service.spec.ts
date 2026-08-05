@@ -9,6 +9,7 @@ import { MessageRepository } from "../repositories/message.repository.js";
 import { MetaApiClient } from "./meta-api-client.service.js";
 import { TokenEncryptionService } from "../../../common/security/token-encryption.service.js";
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
+import { MetaAuthenticationException } from "../exceptions/meta-api.exceptions.js";
 
 describe("MessageService", () => {
   let service: MessageService;
@@ -24,7 +25,10 @@ describe("MessageService", () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         MessageService,
-        { provide: WhatsAppConnectionRepository, useValue: { findByWorkspace: jest.fn() } },
+        {
+          provide: WhatsAppConnectionRepository,
+          useValue: { findByWorkspace: jest.fn(), recordError: jest.fn() },
+        },
         { provide: PhoneNumberRepository, useValue: { findByIdForWorkspace: jest.fn() } },
         { provide: ContactRepository, useValue: { findOrCreate: jest.fn() } },
         {
@@ -108,5 +112,25 @@ describe("MessageService", () => {
     await expect(
       service.sendText("workspace-1", "phone-1", "user-1", { to: "+919876543210", text: "Hi" }),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it("marks the connection ERROR when Meta reports an authentication failure", async () => {
+    phoneNumberRepository.findByIdForWorkspace.mockResolvedValue({
+      _id: { toString: () => "phone-1" },
+      phoneNumberId: "meta-phone-1",
+    } as never);
+    connectionRepository.findByWorkspace.mockResolvedValue({
+      accessTokenEncrypted: "encrypted-token",
+    } as never);
+    tokenEncryption.decrypt.mockReturnValue("raw-access-token");
+    metaApiClient.sendTextMessage.mockRejectedValue(
+      new MetaAuthenticationException("Token expired"),
+    );
+
+    await expect(
+      service.sendText("workspace-1", "phone-1", "user-1", { to: "+919876543210", text: "Hi" }),
+    ).rejects.toThrow(MetaAuthenticationException);
+    expect(connectionRepository.recordError).toHaveBeenCalledWith("workspace-1", "Token expired");
+    expect(messageRepository.create).not.toHaveBeenCalled();
   });
 });

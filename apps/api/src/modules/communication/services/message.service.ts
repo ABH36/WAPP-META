@@ -12,6 +12,7 @@ import { toMessageSummary } from "../mappers/communication.mapper.js";
 import type { MessageSummary } from "../communication.types.js";
 import type { SendMessageDto } from "../dto/send-message.dto.js";
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
+import { MetaAuthenticationException } from "../exceptions/meta-api.exceptions.js";
 
 /**
  * Outbound text-message sending (PRD-003 Part 1 scope — template messages
@@ -52,12 +53,23 @@ export class MessageService {
     }
 
     const accessToken = this.tokenEncryption.decrypt(connection.accessTokenEncrypted);
-    const waMessageId = await this.metaApiClient.sendTextMessage(
-      phoneNumber.phoneNumberId,
-      accessToken,
-      dto.to,
-      dto.text,
-    );
+    let waMessageId: string;
+    try {
+      waMessageId = await this.metaApiClient.sendTextMessage(
+        phoneNumber.phoneNumberId,
+        accessToken,
+        dto.to,
+        dto.text,
+      );
+    } catch (error) {
+      // COMM-META-ERROR-HANDLING-STRATEGY.md — an auth failure means the
+      // customer's WABA token is no longer valid; the connection needs the
+      // Owner/Admin to reconnect (Embedded Signup again), not a retry.
+      if (error instanceof MetaAuthenticationException) {
+        await this.connectionRepository.recordError(workspaceId, error.message);
+      }
+      throw error;
+    }
 
     const contact = await this.contactRepository.findOrCreate(workspaceId, dto.to, null);
 

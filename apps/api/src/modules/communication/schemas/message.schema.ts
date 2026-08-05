@@ -22,7 +22,19 @@ export enum MessageType {
   UNKNOWN = "UNKNOWN",
 }
 
-/** Outbound delivery lifecycle (Meta's `statuses` webhook field). Inbound messages skip straight to RECEIVED. */
+/**
+ * The canonical Message state machine (docs/COMM-MESSAGE-STATE-MACHINE.md)
+ * — Outbound: QUEUED -> SENT -> DELIVERED -> READ (or -> FAILED at any
+ * point before DELIVERED). Inbound: RECEIVED -> PROCESSED -> VISIBLE.
+ *
+ * PROCESSED and VISIBLE are reserved by Part-1, not yet transitioned to —
+ * every inbound message currently stops at RECEIVED (see WebhookService).
+ * PROCESSED depends on business rules (dedup/automation) that don't exist
+ * until Part 4; VISIBLE depends on the Shared Inbox/Conversation entity
+ * that doesn't exist until Part 2. Defining the values now, before their
+ * producers exist, is the same pattern already used for the domain event
+ * catalog — the state machine is the contract Part 2/4 build against.
+ */
 export enum MessageStatus {
   QUEUED = "QUEUED",
   SENT = "SENT",
@@ -30,6 +42,8 @@ export enum MessageStatus {
   READ = "READ",
   FAILED = "FAILED",
   RECEIVED = "RECEIVED",
+  PROCESSED = "PROCESSED",
+  VISIBLE = "VISIBLE",
 }
 
 /**

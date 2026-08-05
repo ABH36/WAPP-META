@@ -1,0 +1,39 @@
+# Meta Error Handling Strategy
+
+**Status:** Accepted
+**Date:** 2026-08-05
+**Raised by:** Architecture Review (Phase-4 Part-1 recommendation #3) — "before implementing retry behaviour, define a Meta Error Handling Strategy"
+**Implemented in:** `apps/api/src/modules/communication/services/meta-api-client.service.ts`
+
+## Scope of this document
+
+Classification only — **actual automatic retry logic for outbound Graph API calls (connect flow, send message) is deliberately not implemented yet**, per the recommendation's own ordering ("before implementing retry behaviour, define..."). What ships with this document is: every Graph API error `MetaApiClient` receives is now classified into one of four categories and surfaced as a distinct, typed exception — so retry logic, when it's built, has a reliable signal to key off instead of a single generic error type. The one piece of retry that already existed before this document (BullMQ's 3-attempt exponential backoff on _inbound webhook processing_) is unaffected — that retries our own Mongo writes, not a Graph API call, and was never in scope here.
+
+## Classification
+
+| Category               | Signal                                                                                                                           | Example causes                                                                                    | Our response today                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Validation**         | HTTP 400, or Meta error object with no auth/rate-limit/transient markers                                                         | Malformed phone number, invalid message payload, unknown template name                            | `MetaValidationException` → surfaced as `400 Bad Request` to our caller. **Never retry** — the request itself is wrong; retrying an identical malformed request fails identically.                                                                                                                                                                                                    |
+| **Authentication**     | HTTP 401/403, or Meta error `code: 190` (OAuthException — expired/invalid/revoked token)                                         | Customer revoked WAPP's access in Meta Business Settings, token expired, insufficient permissions | `MetaAuthenticationException` → surfaced as `424 Failed Dependency` (deliberately not `401`, which would misleadingly suggest the _caller's own_ WAPP session is invalid). **Never retry automatically** — a bad token stays bad. The workspace's `WhatsAppConnection.status` is marked `ERROR` so the UI can prompt reconnection (Embedded Signup again), not silently keep failing. |
+| **Rate Limit**         | HTTP 429, or a `Retry-After` response header present                                                                             | Meta's per-app or per-phone-number messaging rate limits                                          | `MetaRateLimitException` → surfaced as `429 Too Many Requests`, carrying `retryAfterSeconds` when Meta provides it. **Safe to retry after the indicated delay** — once retry logic exists, it should honor `Retry-After` rather than a fixed backoff.                                                                                                                                 |
+| **Temporary**          | HTTP 5xx, or Meta error object with `is_transient: true` (a flag Meta's Graph API sets specifically to mark retry-safe failures) | Meta-side outage, transient network failure                                                       | `MetaTemporaryException` → surfaced as `503 Service Unavailable`. **Safe to retry** with standard exponential backoff once retry logic exists.                                                                                                                                                                                                                                        |
+| **Unknown** (fallback) | Anything not matching the above                                                                                                  | Any error shape not yet seen in practice                                                          | `MetaUnknownException` → surfaced as `500 Internal Server Error`, full Meta error body logged server-side. **Do not retry automatically** — an unrecognized failure mode should be looked at, not blindly repeated.                                                                                                                                                                   |
+
+## Why HTTP status, `is_transient`, and error code together (not error code alone)
+
+Meta's numeric error codes (`error.code`) are the least stable signal — Meta has changed code assignments before, and different Graph API surfaces (Messages API vs. Business Management API) don't always use the same code for conceptually the same failure. HTTP status and the `is_transient` boolean (which Meta added to the error object specifically so API consumers don't have to maintain a hand-rolled table of "which codes are retryable") are more stable. `code: 190` for auth failures is the one numeric code treated as reliable here, since it has been Meta's consistent OAuthException marker across API versions for years.
+
+**Confidence note:** this classification is built from well-documented, stable Graph API conventions, not from observing real error traffic against v26.0 (no live traffic exists yet — see `docs/ADR-COMM-001`'s "not verified live" note, same underlying limitation). Treat the exact HTTP-status/code boundaries as a reasonable starting point to refine once real error responses are observed, not as Meta's own documented specification verified against this exact API version.
+
+## What retry logic should do once it's built
+
+Not implemented now, but the shape this classification sets up for:
+
+- **Validation, Authentication, Unknown:** fail fast, no automatic retry.
+- **Rate Limit:** retry once after `retryAfterSeconds` (or a conservative default if Meta didn't provide one), then fail if still rate-limited.
+- **Temporary:** standard exponential backoff, small fixed attempt count (mirroring the pattern already established for email — TAD-001 v1.2 Email Patch's 3-attempt schedule — rather than inventing a new retry philosophy).
+
+## Consequences
+
+- `MetaApiClient`'s single generic `InternalServerErrorException` on any failure (Phase-4 Part-1's original implementation) is replaced by these five typed exceptions. Any caller (`WhatsAppConnectionService`, `MessageService`) that only cared about "did it throw" is unaffected; a caller that wants to react differently per category now can.
+- The `WhatsAppConnection.status = ERROR` + `lastError` fields (already in the Part-1 schema, previously only used by a repository method with no caller) now have a real caller: `MessageService` marks a connection `ERROR` on `MetaAuthenticationException`.

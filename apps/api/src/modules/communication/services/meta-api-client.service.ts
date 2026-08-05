@@ -1,6 +1,13 @@
-import { Injectable, InternalServerErrorException, Logger } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { AppConfig } from "../../../config/configuration.js";
+import {
+  MetaAuthenticationException,
+  MetaRateLimitException,
+  MetaTemporaryException,
+  MetaUnknownException,
+  MetaValidationException,
+} from "../exceptions/meta-api.exceptions.js";
 
 export interface MetaPhoneNumberDetails {
   displayPhoneNumber: string;
@@ -10,7 +17,12 @@ export interface MetaPhoneNumberDetails {
 }
 
 interface MetaErrorBody {
-  error?: { message?: string; type?: string; code?: number };
+  error?: {
+    message?: string;
+    type?: string;
+    code?: number;
+    is_transient?: boolean;
+  };
 }
 
 /**
@@ -104,7 +116,7 @@ export class MetaApiClient {
 
     const messageId = body.messages[0]?.id;
     if (!messageId) {
-      throw new InternalServerErrorException("Meta did not return a message id");
+      throw new MetaUnknownException("Meta did not return a message id");
     }
     return messageId;
   }
@@ -139,11 +151,42 @@ export class MetaApiClient {
       this.logger.error(
         `Meta Graph API request failed: ${opts.method} ${url.pathname} -> ${response.status} ${errorBody.error?.message ?? "unknown error"}`,
       );
-      throw new InternalServerErrorException(
-        `WhatsApp platform request failed: ${errorBody.error?.message ?? response.statusText}`,
-      );
+      throw this.classifyError(response, errorBody);
     }
 
     return response.json() as Promise<T>;
+  }
+
+  /** See docs/COMM-META-ERROR-HANDLING-STRATEGY.md for the full classification rationale. */
+  private classifyError(response: Response, errorBody: MetaErrorBody): Error {
+    const message = errorBody.error?.message ?? response.statusText ?? "Unknown Meta API error";
+
+    // code 190 (OAuthException) — Meta's stable marker for expired/invalid/
+    // revoked tokens across API versions; checked before HTTP status since
+    // Meta doesn't always use 401/403 consistently for this case.
+    if (errorBody.error?.code === 190 || response.status === 401 || response.status === 403) {
+      return new MetaAuthenticationException(message);
+    }
+
+    if (response.status === 429) {
+      const retryAfterHeader = response.headers.get("Retry-After");
+      const retryAfterSeconds = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : null;
+      return new MetaRateLimitException(
+        message,
+        Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : null,
+      );
+    }
+
+    // Meta's own retry-safety flag takes priority over a plain 5xx check —
+    // it can be true even on a status code that isn't in the 5xx range.
+    if (errorBody.error?.is_transient === true || response.status >= 500) {
+      return new MetaTemporaryException(message);
+    }
+
+    if (response.status === 400) {
+      return new MetaValidationException(message);
+    }
+
+    return new MetaUnknownException(message);
   }
 }
