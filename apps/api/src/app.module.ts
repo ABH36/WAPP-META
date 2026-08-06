@@ -15,6 +15,7 @@ import { InfrastructureModule } from "./infrastructure/infrastructure.module.js"
 import { IdentityModule } from "./modules/identity/identity.module.js";
 import { WorkspaceModule } from "./modules/workspace/workspace.module.js";
 import { CommunicationModule } from "./modules/communication/communication.module.js";
+import { CrmModule } from "./modules/crm/crm.module.js";
 
 /**
  * Root module — Modular Monolith composition root (SAD-001 Volume-1 §4).
@@ -67,6 +68,7 @@ import { CommunicationModule } from "./modules/communication/communication.modul
     IdentityModule,
     WorkspaceModule,
     CommunicationModule,
+    CrmModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

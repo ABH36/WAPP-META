@@ -88,6 +88,10 @@ import { AutomationSettingsController } from "./controllers/automation-settings.
  * reassigns still-unanswered Conversations to a Manager — see
  * docs/COMM-SLA-ESCALATION.md. Analytics (Part 5) remains later scope.
  *
+ * Exports ContactRepository — Phase-5 CRM's CustomerService resolves/creates
+ * the Contact a new Customer references through it (ADR-COMM-002, PRD-004
+ * Volume-1 §9: Customer references Contact, never duplicates it).
+ *
  * Imports IdentityModule for UserRepository (Part 2's assignment feature)
  * and WorkspaceModule for WorkspaceRepository (Part 4a's Business Hours
  * read) — the same cross-module dependency pattern in both directions.
@@ -155,5 +159,6 @@ import { AutomationSettingsController } from "./controllers/automation-settings.
     BroadcastExecutionProcessor,
     SlaEscalationProcessor,
   ],
+  exports: [ContactRepository],
 })
 export class CommunicationModule {}

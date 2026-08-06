@@ -44,6 +44,12 @@ export const DomainEvent = {
   // doesn't say *why* an assignment happened; this event is that "why" for
   // the SLA-breach case specifically.
   CONVERSATION_SLA_BREACHED: "communication.conversation_sla_breached",
+  // Phase-5 Part-1 (Customer Management, PRD-004 Volume-1 §16/BR-008/009/010).
+  CUSTOMER_CREATED: "crm.customer_created",
+  CUSTOMER_UPDATED: "crm.customer_updated",
+  CUSTOMER_BLOCKED: "crm.customer_blocked",
+  CUSTOMER_ACTIVATED: "crm.customer_activated",
+  CUSTOMER_ARCHIVED: "crm.customer_archived",
 } as const;
 
 interface BaseEventPayload {
@@ -174,4 +180,23 @@ export interface ConversationSlaBreachedPayload extends BaseEventPayload {
   escalatedToUserId: string | null;
   previousAssignedToUserId: string | null;
   breachedSinceHours: number;
+}
+
+export interface CustomerCreatedPayload extends BaseEventPayload {
+  customerId: string;
+  contactId: string;
+  source: string;
+  createdBy: string;
+}
+
+export interface CustomerUpdatedPayload extends BaseEventPayload {
+  customerId: string;
+  updatedBy: string;
+}
+
+export interface CustomerStatusChangedPayload extends BaseEventPayload {
+  customerId: string;
+  previousStatus: string;
+  newStatus: string;
+  actorId: string;
 }
