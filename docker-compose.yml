@@ -6,15 +6,61 @@
 name: wapp-dev
 
 services:
+  # Single-node replica set (docs/ADR-INFRA-001-mongo-replica-set-strategy.md)
+  # — required for multi-document transactions (PRD-004 Volume-3 BR-008,
+  # Lead Conversion). MongoDB Atlas (production, TAD-001) is always a
+  # replica set already; this makes local dev match that capability
+  # instead of silently diverging from it.
   mongo:
     image: mongo:7
     restart: unless-stopped
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     ports:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
     environment:
       MONGO_INITDB_DATABASE: wapp_dev
+    healthcheck:
+      test: echo "try { rs.status() } catch (e) { quit(1) }" | mongosh --quiet
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # One-shot: initiates the replica set on first boot only (rs.status()
+  # succeeding on later restarts skips re-initiation — safe to leave
+  # running indefinitely, matches `docker-compose up`'s normal lifecycle).
+  #
+  # The member is registered as `localhost:27017`, not the Docker-internal
+  # `mongo:27017` hostname — apps/api runs on the host machine (see this
+  # file's own top comment), not inside this compose network, and only
+  # resolves the container via its published port on localhost. Once
+  # initiated, the driver learns the primary's address *from the replica
+  # set config itself* and reconnects to whatever that says — pointing it
+  # at a hostname the host machine can't resolve breaks every subsequent
+  # connection even though the seed URI itself was fine.
+  mongo-init:
+    image: mongo:7
+    restart: "no"
+    depends_on:
+      - mongo
+    entrypoint:
+      - bash
+      - -c
+      - |
+        until mongosh --host mongo --quiet --eval 'db.runCommand({ ping: 1 })' >/dev/null 2>&1; do
+          sleep 1
+        done
+        mongosh --host mongo --quiet --eval '
+          try {
+            rs.status();
+            print("Replica set already initiated");
+          } catch (e) {
+            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27017" }] });
+            print("Replica set initiated");
+          }
+        '
 
   redis:
     image: redis:7-alpine

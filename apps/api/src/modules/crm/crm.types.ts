@@ -24,6 +24,13 @@ export interface CustomerSummary {
   updatedAt: string;
 }
 
+export interface LeadConversionResult {
+  leadId: string;
+  customerId: string;
+  dealId: string;
+  convertedAt: string;
+}
+
 export interface LeadSummary {
   id: string;
   contactId: string;
@@ -39,6 +46,9 @@ export interface LeadSummary {
   notes: string | null;
   assignedUserId: string | null;
   archivedAt: string | null;
+  dealId: string | null;
+  convertedAt: string | null;
+  convertedBy: string | null;
   createdBy: string;
   updatedBy: string;
   createdAt: string;

@@ -76,6 +76,20 @@ export class Lead {
   @Prop({ type: Date, default: null })
   archivedAt!: Date | null;
 
+  // PRD-004 Volume-3 §9 — immutable conversion metadata, set exactly once
+  // by LeadConversionService within its transaction. dealId/convertedAt
+  // being independent of archivedAt is deliberate (§4 lists "Not Archived"
+  // and "Not already converted" as two separate preconditions) — see
+  // docs/ADR-CRM-009-lead-conversion-strategy.md.
+  @Prop({ type: SchemaTypes.ObjectId, ref: "Deal", default: null })
+  dealId!: Types.ObjectId | null;
+
+  @Prop({ type: Date, default: null })
+  convertedAt!: Date | null;
+
+  @Prop({ type: String, default: null })
+  convertedBy!: string | null;
+
   @Prop({ type: String, required: true })
   createdBy!: string;
 

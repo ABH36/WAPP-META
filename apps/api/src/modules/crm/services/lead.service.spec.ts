@@ -316,6 +316,18 @@ describe("LeadService", () => {
         expect.objectContaining({ leadId: "lead-1", updatedBy: "user-1" }),
       );
     });
+
+    it("rejects updates to a converted Lead (BR-006)", async () => {
+      leadRepository.findByIdForWorkspace.mockResolvedValue({
+        ...baseLead,
+        convertedAt: new Date(),
+      } as never);
+
+      await expect(
+        service.update("workspace-1", "lead-1", { company: "Acme Inc" }, "user-1"),
+      ).rejects.toThrow(BadRequestException);
+      expect(leadRepository.update).not.toHaveBeenCalled();
+    });
   });
 
   describe("assign", () => {
@@ -382,6 +394,17 @@ describe("LeadService", () => {
       leadRepository.findByIdForWorkspace.mockResolvedValue({
         ...baseLead,
         archivedAt: new Date(),
+      } as never);
+
+      await expect(service.assign("workspace-1", "lead-1", "user-2", "user-1")).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("rejects assignment on a converted Lead (BR-006)", async () => {
+      leadRepository.findByIdForWorkspace.mockResolvedValue({
+        ...baseLead,
+        convertedAt: new Date(),
       } as never);
 
       await expect(service.assign("workspace-1", "lead-1", "user-2", "user-1")).rejects.toThrow(
@@ -456,6 +479,18 @@ describe("LeadService", () => {
         service.updateStatus("workspace-1", "lead-1", LeadStatus.CONTACTED, "user-1"),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it("rejects a status change on a converted Lead (BR-006)", async () => {
+      leadRepository.findByIdForWorkspace.mockResolvedValue({
+        ...baseLead,
+        status: LeadStatus.WON,
+        convertedAt: new Date(),
+      } as never);
+
+      await expect(
+        service.updateStatus("workspace-1", "lead-1", LeadStatus.LOST, "user-1"),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe("archive", () => {
@@ -479,6 +514,17 @@ describe("LeadService", () => {
       leadRepository.findByIdForWorkspace.mockResolvedValue({
         ...baseLead,
         archivedAt: new Date(),
+      } as never);
+
+      await expect(service.archive("workspace-1", "lead-1", "user-1")).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("rejects archiving a converted Lead (BR-006)", async () => {
+      leadRepository.findByIdForWorkspace.mockResolvedValue({
+        ...baseLead,
+        convertedAt: new Date(),
       } as never);
 
       await expect(service.archive("workspace-1", "lead-1", "user-1")).rejects.toThrow(

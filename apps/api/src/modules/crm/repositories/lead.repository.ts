@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { FilterQuery, Model } from "mongoose";
+import { ClientSession, FilterQuery, Model } from "mongoose";
 import { LeadSource, LeadStatus } from "@wapp/shared-types";
 import { Lead, LeadDocument } from "../schemas/lead.schema.js";
 import { LEAD_ACTIVE_STATUSES } from "../crm.constants.js";
@@ -164,6 +164,37 @@ export class LeadRepository {
         { _id: id, workspaceId },
         { $set: { archivedAt: new Date(), updatedBy } },
         { new: true },
+      )
+      .exec();
+  }
+
+  /**
+   * PRD-004 Volume-3 §9 — always called inside LeadConversionService's
+   * transaction. Also (re)writes customerId: when the Lead had none, the
+   * conversion just created one, and the Lead record must reflect that
+   * link going forward, not just the Deal it produced.
+   */
+  async markConverted(
+    workspaceId: string,
+    id: string,
+    customerId: string,
+    dealId: string,
+    convertedBy: string,
+    session: ClientSession,
+  ): Promise<LeadDocument | null> {
+    return this.leadModel
+      .findOneAndUpdate(
+        { _id: id, workspaceId },
+        {
+          $set: {
+            customerId,
+            dealId,
+            convertedAt: new Date(),
+            convertedBy,
+            updatedBy: convertedBy,
+          },
+        },
+        { new: true, session },
       )
       .exec();
   }

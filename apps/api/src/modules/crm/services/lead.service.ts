@@ -199,7 +199,12 @@ export class LeadService {
     };
   }
 
-  /** Lead Editing Policy — same as Customer's (ADR-CRM-004): archived is read-only. */
+  /**
+   * Lead Editing Policy — archived is read-only (ADR-CRM-004, same rule as
+   * Customer's). A converted Lead is also read-only (BR-006, PRD-004
+   * Volume-3 §14): conversion is the terminal event in a Lead's lifecycle,
+   * and its Deal is the authoritative record going forward.
+   */
   async update(
     workspaceId: string,
     id: string,
@@ -209,6 +214,9 @@ export class LeadService {
     const lead = await this.findOrThrow(workspaceId, id);
     if (lead.archivedAt) {
       throw new BadRequestException("An archived Lead is read-only");
+    }
+    if (lead.convertedAt) {
+      throw new BadRequestException("A converted Lead is read-only");
     }
 
     const updated = await this.leadRepository.update(workspaceId, id, dto, actorId);
@@ -236,6 +244,9 @@ export class LeadService {
     const lead = await this.findOrThrow(workspaceId, id);
     if (lead.archivedAt) {
       throw new BadRequestException("An archived Lead is read-only");
+    }
+    if (lead.convertedAt) {
+      throw new BadRequestException("A converted Lead is read-only");
     }
 
     if (assignedUserId) {
@@ -287,6 +298,9 @@ export class LeadService {
     if (lead.archivedAt) {
       throw new BadRequestException("An archived Lead is read-only");
     }
+    if (lead.convertedAt) {
+      throw new BadRequestException("A converted Lead is read-only");
+    }
 
     const allowed = LEAD_STATUS_TRANSITIONS[lead.status];
     if (!allowed.includes(newStatus)) {
@@ -315,6 +329,9 @@ export class LeadService {
     const lead = await this.findOrThrow(workspaceId, id);
     if (lead.archivedAt) {
       throw new BadRequestException("Lead is already archived");
+    }
+    if (lead.convertedAt) {
+      throw new BadRequestException("A converted Lead is read-only");
     }
 
     const updated = await this.leadRepository.archive(workspaceId, id, actorId);

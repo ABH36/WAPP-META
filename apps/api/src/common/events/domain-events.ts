@@ -66,6 +66,17 @@ export const DomainEvent = {
   LEAD_LOST: "crm.lead_lost",
   LEAD_STATUS_CHANGED: "crm.lead_status_changed",
   LEAD_ARCHIVED: "crm.lead_archived",
+  // Phase-5 Part-3 (Lead Conversion, PRD-004 Volume-3 §12/BR-009). All
+  // three fire only after the transaction commits — see
+  // docs/ADR-CRM-009-lead-conversion-strategy.md. CUSTOMER_CREATED_FROM_LEAD
+  // fires only when conversion actually created a new Customer (not when an
+  // already-linked one was reused); note this is deliberately distinct from
+  // the existing CUSTOMER_CREATED (Part-1) — a future listener needs to
+  // know *why* a Customer was created, the same reasoning already applied
+  // to CONVERSATION_SLA_BREACHED vs. CONVERSATION_ASSIGNED.
+  LEAD_CONVERTED: "crm.lead_converted",
+  DEAL_CREATED_FROM_LEAD: "crm.deal_created_from_lead",
+  CUSTOMER_CREATED_FROM_LEAD: "crm.customer_created_from_lead",
 } as const;
 
 interface BaseEventPayload {
@@ -247,4 +258,26 @@ export interface LeadStatusChangedPayload extends BaseEventPayload {
 export interface LeadArchivedPayload extends BaseEventPayload {
   leadId: string;
   actorId: string;
+}
+
+export interface LeadConvertedPayload extends BaseEventPayload {
+  leadId: string;
+  customerId: string;
+  dealId: string;
+  convertedBy: string;
+}
+
+export interface DealCreatedFromLeadPayload extends BaseEventPayload {
+  dealId: string;
+  contactId: string;
+  customerId: string;
+  sourceLeadId: string;
+  createdBy: string;
+}
+
+export interface CustomerCreatedFromLeadPayload extends BaseEventPayload {
+  customerId: string;
+  contactId: string;
+  sourceLeadId: string;
+  createdBy: string;
 }

@@ -4,12 +4,13 @@ import { CurrentUser } from "../../identity/decorators/current-user.decorator.js
 import { RequirePermission } from "../../identity/decorators/require-permission.decorator.js";
 import type { AuthenticatedUser } from "../../identity/identity.types.js";
 import { LeadService } from "../services/lead.service.js";
+import { LeadConversionService } from "../services/lead-conversion.service.js";
 import { CreateLeadDto } from "../dto/create-lead.dto.js";
 import { UpdateLeadDto } from "../dto/update-lead.dto.js";
 import { AssignLeadDto } from "../dto/assign-lead.dto.js";
 import { UpdateLeadStatusDto } from "../dto/update-lead-status.dto.js";
 import type { LeadSortField } from "../repositories/lead.repository.js";
-import type { LeadSummary } from "../crm.types.js";
+import type { LeadConversionResult, LeadSummary } from "../crm.types.js";
 import type { Paginated } from "../../../common/interceptors/response.interceptor.js";
 
 const SORT_FIELDS = new Set<LeadSortField>(["leadName", "createdAt", "updatedAt", "expectedValue"]);
@@ -24,7 +25,10 @@ const SORT_FIELDS = new Set<LeadSortField>(["leadName", "createdAt", "updatedAt"
  */
 @Controller({ path: "crm/leads", version: "1" })
 export class LeadController {
-  constructor(private readonly leadService: LeadService) {}
+  constructor(
+    private readonly leadService: LeadService,
+    private readonly leadConversionService: LeadConversionService,
+  ) {}
 
   @RequirePermission(Permission.CREATE_LEADS)
   @Post()
@@ -122,5 +126,16 @@ export class LeadController {
     @Param("id") id: string,
   ): Promise<LeadSummary> {
     return this.leadService.archive(user.workspaceId!, id, user.userId);
+  }
+
+  // PRD-004 Volume-3 §14/§19 — its own permission (CONVERT_LEADS), distinct
+  // from every other Lead mutation's UPDATE_LEAD_STAGE.
+  @RequirePermission(Permission.CONVERT_LEADS)
+  @Post(":id/convert")
+  async convert(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+  ): Promise<LeadConversionResult> {
+    return this.leadConversionService.convert(user.workspaceId!, id, user.userId);
   }
 }

@@ -134,11 +134,14 @@ export const PERMISSION_MATRIX: Readonly<
     [TenantRole.SUPPORT_MANAGER]: PermissionLevel.NONE,
     [TenantRole.SUPPORT_EXECUTIVE]: PermissionLevel.NONE,
   },
+  // SALES_EXECUTIVE updated to FULL 2026-08-06 (PRD-004 Volume-3 §13,
+  // Architecture Review) — Volume-3 explicitly grants Sales Executives
+  // conversion access; the prior NONE predates Volume-3 being relayed.
   [Permission.CONVERT_LEADS]: {
     [TenantRole.OWNER]: PermissionLevel.FULL,
     [TenantRole.ADMINISTRATOR]: PermissionLevel.FULL,
     [TenantRole.SALES_MANAGER]: PermissionLevel.FULL,
-    [TenantRole.SALES_EXECUTIVE]: PermissionLevel.NONE,
+    [TenantRole.SALES_EXECUTIVE]: PermissionLevel.FULL,
     [TenantRole.MARKETING_EXECUTIVE]: PermissionLevel.NONE,
     [TenantRole.SUPPORT_MANAGER]: PermissionLevel.NONE,
     [TenantRole.SUPPORT_EXECUTIVE]: PermissionLevel.NONE,

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { FilterQuery, Model } from "mongoose";
+import { ClientSession, FilterQuery, Model } from "mongoose";
 import { CustomerSource, CustomerStatus } from "@wapp/shared-types";
 import { Customer, CustomerDocument } from "../schemas/customer.schema.js";
 
@@ -67,12 +67,13 @@ export class CustomerRepository {
     @InjectModel(Customer.name) private readonly customerModel: Model<CustomerDocument>,
   ) {}
 
-  async create(input: CreateCustomerInput): Promise<CustomerDocument> {
-    return this.customerModel.create({
-      ...input,
-      status: CustomerStatus.ACTIVE,
-      updatedBy: input.createdBy,
-    });
+  /** `session` — passed by LeadConversionService when creating a Customer as part of its transaction (BR-008); omitted for the normal, non-transactional Part-1 create path. */
+  async create(input: CreateCustomerInput, session?: ClientSession): Promise<CustomerDocument> {
+    const [created] = await this.customerModel.create(
+      [{ ...input, status: CustomerStatus.ACTIVE, updatedBy: input.createdBy }],
+      { session },
+    );
+    return created!;
   }
 
   async findByIdForWorkspace(workspaceId: string, id: string): Promise<CustomerDocument | null> {
