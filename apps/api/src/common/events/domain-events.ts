@@ -50,6 +50,22 @@ export const DomainEvent = {
   CUSTOMER_BLOCKED: "crm.customer_blocked",
   CUSTOMER_ACTIVATED: "crm.customer_activated",
   CUSTOMER_ARCHIVED: "crm.customer_archived",
+  // Phase-5 Part-2 (Lead Management, PRD-004 Volume-2 §17/BR-010). Every
+  // status transition emits an event: the three named "milestone" targets
+  // (QUALIFIED/WON/LOST) get their own dedicated event; every other target
+  // (CONTACTED/PROPOSAL_SENT/NEGOTIATION/UNQUALIFIED) emits the generic
+  // LEAD_STATUS_CHANGED fallback — same dual-event shape ADR-COMM-013
+  // already established for CONVERSATION_ASSIGNED vs CONVERSATION_SLA_BREACHED.
+  // See docs/ADR-CRM-005-lead-qualification-strategy.md.
+  LEAD_CREATED: "crm.lead_created",
+  LEAD_UPDATED: "crm.lead_updated",
+  LEAD_ASSIGNED: "crm.lead_assigned",
+  LEAD_UNASSIGNED: "crm.lead_unassigned",
+  LEAD_QUALIFIED: "crm.lead_qualified",
+  LEAD_WON: "crm.lead_won",
+  LEAD_LOST: "crm.lead_lost",
+  LEAD_STATUS_CHANGED: "crm.lead_status_changed",
+  LEAD_ARCHIVED: "crm.lead_archived",
 } as const;
 
 interface BaseEventPayload {
@@ -198,5 +214,37 @@ export interface CustomerStatusChangedPayload extends BaseEventPayload {
   customerId: string;
   previousStatus: string;
   newStatus: string;
+  actorId: string;
+}
+
+export interface LeadCreatedPayload extends BaseEventPayload {
+  leadId: string;
+  contactId: string;
+  customerId: string | null;
+  source: string;
+  createdBy: string;
+}
+
+export interface LeadUpdatedPayload extends BaseEventPayload {
+  leadId: string;
+  updatedBy: string;
+}
+
+export interface LeadAssignedPayload extends BaseEventPayload {
+  leadId: string;
+  /** null for LEAD_UNASSIGNED. */
+  assignedUserId: string | null;
+  actorId: string;
+}
+
+export interface LeadStatusChangedPayload extends BaseEventPayload {
+  leadId: string;
+  previousStatus: string;
+  newStatus: string;
+  actorId: string;
+}
+
+export interface LeadArchivedPayload extends BaseEventPayload {
+  leadId: string;
   actorId: string;
 }

@@ -1,4 +1,4 @@
-import type { CustomerSource, CustomerStatus } from "@wapp/shared-types";
+import type { CustomerSource, CustomerStatus, LeadSource, LeadStatus } from "@wapp/shared-types";
 
 export interface CustomerSummary {
   id: string;
@@ -18,6 +18,27 @@ export interface CustomerSummary {
   website: string | null;
   industry: string | null;
   notes: string | null;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeadSummary {
+  id: string;
+  contactId: string;
+  customerId: string | null;
+  leadName: string;
+  mobileNumber: string;
+  source: LeadSource;
+  status: LeadStatus;
+  company: string | null;
+  email: string | null;
+  industry: string | null;
+  expectedValue: number | null;
+  notes: string | null;
+  assignedUserId: string | null;
+  archivedAt: string | null;
   createdBy: string;
   updatedBy: string;
   createdAt: string;
