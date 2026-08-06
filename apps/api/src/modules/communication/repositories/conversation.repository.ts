@@ -183,4 +183,32 @@ export class ConversationRepository {
   async updateAwayLastSentAt(id: string, at: Date): Promise<void> {
     await this.conversationModel.updateOne({ _id: id }, { $set: { awayLastSentAt: at } }).exec();
   }
+
+  /**
+   * Part 4c (SLA Monitoring) sweep target set — a Conversation whose
+   * customer's last message is still the most recent message overall (no
+   * agent has replied since, expressed as lastMessageAt == lastCustomerMessageAt
+   * via $expr rather than a separate "awaiting reply" flag) and that wait
+   * has lasted past `cutoff`. Excludes PENDING (deliberately "waiting on the
+   * customer," per conversation-state-machine.ts — the business isn't the
+   * one behind) and every terminal status. The same `cutoff` also gates
+   * re-escalation: `lastEscalatedAt` must be null or itself before `cutoff`,
+   * so an already-escalated Conversation isn't re-escalated again until a
+   * full SLA window has passed with still no reply — see
+   * docs/COMM-SLA-ESCALATION.md.
+   */
+  async findSlaBreachCandidates(cutoff: Date): Promise<ConversationDocument[]> {
+    return this.conversationModel
+      .find({
+        status: { $nin: [...TERMINAL_CONVERSATION_STATUSES, ConversationStatus.PENDING] },
+        lastCustomerMessageAt: { $ne: null, $lte: cutoff },
+        $expr: { $eq: ["$lastMessageAt", "$lastCustomerMessageAt"] },
+        $or: [{ lastEscalatedAt: null }, { lastEscalatedAt: { $lte: cutoff } }],
+      })
+      .exec();
+  }
+
+  async updateLastEscalatedAt(id: string, at: Date): Promise<void> {
+    await this.conversationModel.updateOne({ _id: id }, { $set: { lastEscalatedAt: at } }).exec();
+  }
 }

@@ -45,12 +45,14 @@ import { BroadcastService } from "./services/broadcast.service.js";
 import { CampaignService } from "./services/campaign.service.js";
 import { AutomationService } from "./services/automation.service.js";
 import { AutoAssignmentService } from "./services/auto-assignment.service.js";
+import { EscalationService } from "./services/escalation.service.js";
 import { WEBHOOK_PROCESSING_QUEUE } from "./queue/webhook-processing.constants.js";
 import { WebhookProcessingProcessor } from "./queue/webhook-processing.processor.js";
-import { CONVERSATION_AUTO_CLOSE_QUEUE } from "./communication.constants.js";
+import { CONVERSATION_AUTO_CLOSE_QUEUE, SLA_ESCALATION_QUEUE } from "./communication.constants.js";
 import { ConversationAutoCloseProcessor } from "./queue/conversation-auto-close.processor.js";
 import { BROADCAST_EXECUTION_QUEUE } from "./queue/broadcast-execution.constants.js";
 import { BroadcastExecutionProcessor } from "./queue/broadcast-execution.processor.js";
+import { SlaEscalationProcessor } from "./queue/sla-escalation.processor.js";
 import { WhatsAppConnectionController } from "./controllers/whatsapp-connection.controller.js";
 import { WebhookController } from "./controllers/webhook.controller.js";
 import { MessageController } from "./controllers/message.controller.js";
@@ -80,9 +82,11 @@ import { AutomationSettingsController } from "./controllers/automation-settings.
  * docs/COMM-AUTOMATION-BUSINESS-HOURS.md). Part 4b (Auto Assignment,
  * 2026-08-05) extends that same `automation_settings` document with an
  * assignment strategy (Round Robin / Least Active Agent) and adds no new
- * collection of its own (see docs/COMM-AUTO-ASSIGNMENT.md). SLA Monitoring +
- * Escalation Rules (Part 4c) remain later scope, reviewed and approved as
- * its own slice, as does Analytics (Part 5).
+ * collection of its own (see docs/COMM-AUTO-ASSIGNMENT.md). Part 4c (SLA
+ * Monitoring + Escalation Rules, 2026-08-06) adds a periodic sweep
+ * (`sla-escalation` queue, same shape as the auto-close sweep) that
+ * reassigns still-unanswered Conversations to a Manager — see
+ * docs/COMM-SLA-ESCALATION.md. Analytics (Part 5) remains later scope.
  *
  * Imports IdentityModule for UserRepository (Part 2's assignment feature)
  * and WorkspaceModule for WorkspaceRepository (Part 4a's Business Hours
@@ -109,6 +113,7 @@ import { AutomationSettingsController } from "./controllers/automation-settings.
       { name: WEBHOOK_PROCESSING_QUEUE },
       { name: CONVERSATION_AUTO_CLOSE_QUEUE },
       { name: BROADCAST_EXECUTION_QUEUE },
+      { name: SLA_ESCALATION_QUEUE },
     ),
   ],
   controllers: [
@@ -144,9 +149,11 @@ import { AutomationSettingsController } from "./controllers/automation-settings.
     CampaignService,
     AutomationService,
     AutoAssignmentService,
+    EscalationService,
     WebhookProcessingProcessor,
     ConversationAutoCloseProcessor,
     BroadcastExecutionProcessor,
+    SlaEscalationProcessor,
   ],
 })
 export class CommunicationModule {}

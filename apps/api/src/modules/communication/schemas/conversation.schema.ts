@@ -83,6 +83,13 @@ export class Conversation {
   @Prop({ type: Date, default: null })
   awayLastSentAt!: Date | null;
 
+  // Part 4c (SLA Monitoring + Escalation Rules) — last time this
+  // Conversation was escalated for an SLA breach. Guards the periodic sweep
+  // from re-escalating the same still-unanswered Conversation on every
+  // pass — see docs/COMM-SLA-ESCALATION.md.
+  @Prop({ type: Date, default: null })
+  lastEscalatedAt!: Date | null;
+
   createdAt!: Date;
   updatedAt!: Date;
 }

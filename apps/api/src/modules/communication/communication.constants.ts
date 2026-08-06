@@ -35,3 +35,27 @@ export const AUTO_ASSIGNMENT_ELIGIBLE_ROLES = [
   TenantRole.SALES_EXECUTIVE,
   TenantRole.SUPPORT_EXECUTIVE,
 ] as const;
+
+/**
+ * Part 4c (SLA Monitoring + Escalation Rules) — how long a Conversation may
+ * go with the customer's last message still unanswered before it's an SLA
+ * breach (see docs/COMM-SLA-ESCALATION.md — response-time SLA, not
+ * resolution-time). Fixed platform-wide, not yet per-workspace configurable
+ * or business-hours-aware — same known simplification pattern as
+ * CONVERSATION_AUTO_CLOSE_HOURS above (see TD-005, docs/TECH-DEBT.md). Also
+ * doubles as the re-escalation cooldown — a Conversation already escalated
+ * isn't escalated again until another full window has passed with still no
+ * reply.
+ */
+export const SLA_RESPONSE_HOURS = 4;
+
+/** How often the SLA escalation sweep runs. */
+export const SLA_ESCALATION_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+
+export const SLA_ESCALATION_QUEUE = "sla-escalation";
+
+/** Part 4c — the roles an SLA-breached Conversation may be escalated to. */
+export const SLA_ESCALATION_MANAGER_ROLES = [
+  TenantRole.SALES_MANAGER,
+  TenantRole.SUPPORT_MANAGER,
+] as const;

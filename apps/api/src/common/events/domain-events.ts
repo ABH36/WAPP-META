@@ -37,6 +37,13 @@ export const DomainEvent = {
   BROADCAST_FINISHED: "communication.broadcast_finished",
   CAMPAIGN_COMPLETED: "communication.campaign_completed",
   CAMPAIGN_CANCELLED: "communication.campaign_cancelled",
+  // Part 4c (SLA Monitoring + Escalation Rules) — fires once per escalation
+  // sweep hit, in addition to (not instead of) CONVERSATION_ASSIGNED when a
+  // Manager was actually reassigned (see docs/COMM-SLA-ESCALATION.md and
+  // ADR-COMM-013's payload-gap discussion). CONVERSATION_ASSIGNED alone
+  // doesn't say *why* an assignment happened; this event is that "why" for
+  // the SLA-breach case specifically.
+  CONVERSATION_SLA_BREACHED: "communication.conversation_sla_breached",
 } as const;
 
 interface BaseEventPayload {
@@ -158,4 +165,13 @@ export interface CampaignCompletedPayload extends BaseEventPayload {
 export interface CampaignCancelledPayload extends BaseEventPayload {
   campaignId: string;
   actorId: string;
+}
+
+export interface ConversationSlaBreachedPayload extends BaseEventPayload {
+  conversationId: string;
+  contactId: string;
+  /** null when there was no eligible Manager to escalate to — the breach is still reported, just unassigned. */
+  escalatedToUserId: string | null;
+  previousAssignedToUserId: string | null;
+  breachedSinceHours: number;
 }
