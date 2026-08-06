@@ -320,6 +320,13 @@ describe("Customer Management (e2e)", () => {
     );
     expect(archiveAgainRes.status).toBe(400);
 
+    // Customer Editing Policy (ADR-CRM-004) — ARCHIVED is read-only for the
+    // general update endpoint.
+    const editArchivedRes = await authed("patch", `/api/v1/crm/customers/${manualCustomerId}`).send(
+      { companyName: "Should Not Apply" },
+    );
+    expect(editArchivedRes.status).toBe(400);
+
     // BR-005 — archived Customers remain searchable.
     const searchRes = await authed("get", "/api/v1/crm/customers/search?q=Acme");
     const searched = (searchRes.body as ApiSuccessResponse<CustomerSummary[]>).data;

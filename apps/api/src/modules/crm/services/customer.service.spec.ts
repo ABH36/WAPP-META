@@ -208,6 +208,39 @@ describe("CustomerService", () => {
         expect.objectContaining({ customerId: "customer-1", updatedBy: "user-1" }),
       );
     });
+
+    it("allows updates while BLOCKED (Customer Editing Policy — ADR-CRM-004)", async () => {
+      customerRepository.findByIdForWorkspace.mockResolvedValue({
+        ...baseCustomer,
+        status: CustomerStatus.BLOCKED,
+      } as never);
+      customerRepository.update.mockResolvedValue({
+        ...baseCustomer,
+        status: CustomerStatus.BLOCKED,
+        companyName: "Acme Inc",
+      } as never);
+
+      const result = await service.update(
+        "workspace-1",
+        "customer-1",
+        { companyName: "Acme Inc" },
+        "user-1",
+      );
+
+      expect(result.companyName).toBe("Acme Inc");
+    });
+
+    it("rejects updates to an ARCHIVED Customer (Customer Editing Policy — ADR-CRM-004)", async () => {
+      customerRepository.findByIdForWorkspace.mockResolvedValue({
+        ...baseCustomer,
+        status: CustomerStatus.ARCHIVED,
+      } as never);
+
+      await expect(
+        service.update("workspace-1", "customer-1", { companyName: "Acme Inc" }, "user-1"),
+      ).rejects.toThrow(BadRequestException);
+      expect(customerRepository.update).not.toHaveBeenCalled();
+    });
   });
 
   describe("lifecycle transitions", () => {

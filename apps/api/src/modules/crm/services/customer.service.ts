@@ -166,13 +166,23 @@ export class CustomerService {
     };
   }
 
+  /**
+   * Customer Editing Policy (ADR-CRM-004, resolved 2026-08-06): ACTIVE and
+   * BLOCKED are editable; ARCHIVED is read-only for general updates — the
+   * record stays searchable/referencable/reportable, but business-profile
+   * fields can no longer change. Status itself is never touched here (see
+   * transitionStatus for the dedicated block/activate/archive endpoints).
+   */
   async update(
     workspaceId: string,
     id: string,
     dto: UpdateCustomerDto,
     actorId: string,
   ): Promise<CustomerSummary> {
-    await this.findOrThrow(workspaceId, id);
+    const customer = await this.findOrThrow(workspaceId, id);
+    if (customer.status === CustomerStatus.ARCHIVED) {
+      throw new BadRequestException("An archived Customer is read-only");
+    }
 
     const updated = await this.customerRepository.update(workspaceId, id, dto, actorId);
     if (!updated) {
