@@ -173,3 +173,18 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** once GTM pricing is approved (closes TD-009), newly generated Invoices will automatically carry a real `amount` — no action needed in this module. `tax` needs its own, separate resolution: a formally approved tax-rate source (a fixed platform-wide GST percentage, or a more elaborate per-state/per-plan rule) has to be designed and approved before `InvoiceService` can compute anything but `null` for it.
 
 **Trigger to revisit:** GTM pricing approval (for `amount`, shared with TD-009) and a formally approved tax-rate decision (for `tax`) — required before production deployment.
+
+---
+
+## TD-012 — Payment Gateway Integration (webhooks, reconciliation, retries, signature verification, idempotency)
+
+**Raised:** 2026-08-07 (Phase-6 Part-2, Billing — Invoices & Payments; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** PRD-005 Volume-2 §14 explicitly excludes Payment Gateway Integration from scope. As a direct consequence, none of the following exist anywhere in `apps/api`'s Billing module: a real payment gateway client, webhook/callback endpoints, signature verification for inbound gateway callbacks, idempotency handling for retried/duplicate webhook deliveries, automatic payment retry, or reconciliation (matching the platform's own Payment records against a gateway's transaction history). `PaymentService.record()` is entirely manual — every Payment is created and resolved to its final outcome in one synchronous call by whoever is recording it (see `docs/ADR-BILL-004-invoice-payment-relationship.md`), which is the interim mechanism this Tech Debt entry brackets.
+
+**Why accepted for now:** Explicitly out of scope per the relayed PRD-005 Volume-2 document itself (§14) — building any of this now would be implementing a slice of an unreviewed, unapproved future volume, the same reasoning already applied to TD-010 (Platform Billing Operations). Manual recording ships the real underlying capability (Invoices get marked paid, Refunds get tracked) without requiring gateway credentials, webhook infrastructure, or signature-verification logic that doesn't have an approved design yet.
+
+**Closing this out looks like:** a dedicated Payment Integration volume/phase that adds: a real gateway client (e.g. an India-market payment gateway, once a vendor decision is formally approved), inbound webhook endpoints with signature verification, idempotency keys so a retried webhook delivery never double-processes the same event, automatic retry logic for failed charges (§14's "Auto Retry" exclusion), and a reconciliation job comparing Payment records against the gateway's own transaction ledger. `PaymentService.record()`'s manual path likely stays as an operator override/fallback even after this lands, rather than being removed outright.
+
+**Trigger to revisit:** Payment Integration volume/phase planning and approval — the natural next Billing volume once a payment gateway vendor decision has been made.
