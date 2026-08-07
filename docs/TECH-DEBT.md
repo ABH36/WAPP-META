@@ -222,3 +222,18 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** once GTM/product limits are formally approved per Plan, set the real numeric values on each Plan's `PlanLimits` document — a direct database update or a small one-off seed-correction script, mirroring how TD-009 expects to close (no Plan-limits-mutation endpoint exists for this to interact with, §13 is read-only).
 
 **Trigger to revisit:** commercial usage-limit approval per Plan tier, required before production deployment — the moment this closes, `USAGE_THRESHOLD_REACHED`/`USAGE_LIMIT_EXCEEDED`/`WORKSPACE_LOCKED` all become live for the first time (they're wired correctly today but dormant, since nothing can cross a `null` limit).
+
+---
+
+## TD-015 — Enforcement Retrofit Program (CRM, Communication, Workspace)
+
+**Raised:** 2026-08-07 (Phase-6 Part-3, Billing — Usage, Limits & Enforcement; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** `UsageService.checkLimit()`/`checkFeatureEnabled()` (`apps/api/src/modules/billing/services/usage.service.ts`) exist and are exported from `BillingModule`, but nothing in this codebase calls them. §4's "Business modules shall never bypass Usage enforcement" is not yet true anywhere — CRM's `CustomerService`/`LeadService`/`DealService`, Communication's `BroadcastService`/`CampaignService`, and Workspace's `TeamService` (invite) all create resources today with zero Usage check in the path.
+
+**Why accepted for now:** Resolved 2026-08-07, Architecture Review: retrofitting already-frozen CRM (Phase-5) and Communication (Phase-4) mutation paths is out of Volume-3's own scope — the same frozen-module discipline already applied to TD-007. Volume-3's job was building the engine (counters, entitlements, evaluation) and the reusable check methods; wiring each business module to actually call them is real, non-trivial, per-module work (see `docs/ADR-BILL-009-usage-enforcement-evolution.md` for the integration pattern) that deserves its own review, not a silent addition to an unrelated Part.
+
+**Closing this out looks like:** for each of CRM/Communication/Workspace, individually: import `BillingModule`, inject `UsageService`, add a pre-flight `checkLimit`/`checkFeatureEnabled` call (guard-based for simple one-counter checks, inline for composite ones like Broadcast-consumes-N-Messages) immediately before the existing creation logic, fail-closed on a Usage-service error. Counting itself needs no change — `UsageCounterListener` already increments reactively off the same domain events these services already emit.
+
+**Trigger to revisit:** each business module's own next approved maintenance/enhancement pass, individually — not a single big-bang retrofit. Loosely gated by TD-014 (commercial limits are still null, so enforcement has no observable effect until real numbers are approved) — TD-014 closing is a natural prioritization trigger for this, though not a strict prerequisite.
