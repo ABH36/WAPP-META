@@ -1,10 +1,15 @@
 import type {
+  ActivityType,
   CustomerSource,
   CustomerStatus,
   DealLostReason,
   DealStage,
+  FollowUpType,
   LeadSource,
   LeadStatus,
+  ReminderType,
+  TaskPriority,
+  TaskStatus,
 } from "@wapp/shared-types";
 
 export interface CustomerSummary {
@@ -48,6 +53,32 @@ export interface DealSummary {
   wonAt: string | null;
   lostAt: string | null;
   lostReason: DealLostReason | null;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActivitySummary {
+  id: string;
+  workspaceId: string;
+  type: ActivityType;
+  customerId: string | null;
+  dealId: string | null;
+  title: string | null;
+  description: string | null;
+  text: string | null;
+  mentions: string[];
+  dueDate: string | null;
+  priority: TaskPriority | null;
+  status: TaskStatus | null;
+  assignedUserId: string | null;
+  followUpDate: string | null;
+  followUpType: FollowUpType | null;
+  followUpCompletedAt: string | null;
+  reminderDate: string | null;
+  reminderType: ReminderType | null;
+  archivedAt: string | null;
   createdBy: string;
   updatedBy: string;
   createdAt: string;

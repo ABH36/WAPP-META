@@ -92,6 +92,29 @@ export const DomainEvent = {
   DEAL_WON: "crm.deal_won",
   DEAL_LOST: "crm.deal_lost",
   DEAL_REOPENED: "crm.deal_reopened",
+  // Phase-5 Part-5 (Activities, Tasks, Follow-ups & Notes, PRD-004
+  // Volume-5 §16). Creation dispatches by type: NOTE_ADDED and
+  // FOLLOW_UP_SCHEDULED are the named milestones, ACTIVITY_CREATED is the
+  // generic fallback (Task/Call/Meeting/Email/Reminder) — same dual-event
+  // shape as Lead/Deal. No REMINDER_TRIGGERED yet: resolved 2026-08-07,
+  // nothing in this Part detects a due reminder (no Notification module to
+  // fire into), so declaring an event with zero emitters would be dead
+  // code — see docs/ADR-CRM-015-activity-timeline-strategy.md. No
+  // ACTIVITY_ARCHIVED in §16 either, but added here anyway for consistency
+  // with every other soft-delete-capable CRM entity (Customer, Lead) —
+  // BR-006 needs a corresponding audit event the same way its archive
+  // endpoint needed to exist at all.
+  ACTIVITY_CREATED: "crm.activity_created",
+  ACTIVITY_UPDATED: "crm.activity_updated",
+  ACTIVITY_ARCHIVED: "crm.activity_archived",
+  TASK_ASSIGNED: "crm.task_assigned",
+  TASK_UNASSIGNED: "crm.task_unassigned",
+  TASK_COMPLETED: "crm.task_completed",
+  FOLLOW_UP_SCHEDULED: "crm.follow_up_scheduled",
+  FOLLOW_UP_ASSIGNED: "crm.follow_up_assigned",
+  FOLLOW_UP_UNASSIGNED: "crm.follow_up_unassigned",
+  FOLLOW_UP_COMPLETED: "crm.follow_up_completed",
+  NOTE_ADDED: "crm.note_added",
 } as const;
 
 interface BaseEventPayload {
@@ -318,5 +341,47 @@ export interface DealStageChangedPayload extends BaseEventPayload {
 
 export interface DealReopenedPayload extends BaseEventPayload {
   dealId: string;
+  actorId: string;
+}
+
+export interface ActivityCreatedPayload extends BaseEventPayload {
+  activityId: string;
+  type: string;
+  customerId: string | null;
+  dealId: string | null;
+  createdBy: string;
+}
+
+export interface ActivityUpdatedPayload extends BaseEventPayload {
+  activityId: string;
+  updatedBy: string;
+}
+
+export interface ActivityArchivedPayload extends BaseEventPayload {
+  activityId: string;
+  actorId: string;
+}
+
+export interface TaskAssignedPayload extends BaseEventPayload {
+  activityId: string;
+  /** null for TASK_UNASSIGNED. */
+  assignedUserId: string | null;
+  actorId: string;
+}
+
+export interface TaskCompletedPayload extends BaseEventPayload {
+  activityId: string;
+  actorId: string;
+}
+
+export interface FollowUpAssignedPayload extends BaseEventPayload {
+  activityId: string;
+  /** null for FOLLOW_UP_UNASSIGNED. */
+  assignedUserId: string | null;
+  actorId: string;
+}
+
+export interface FollowUpCompletedPayload extends BaseEventPayload {
+  activityId: string;
   actorId: string;
 }

@@ -1,7 +1,8 @@
 import type { CustomerDocument } from "../schemas/customer.schema.js";
 import type { LeadDocument } from "../schemas/lead.schema.js";
 import type { DealDocument } from "../schemas/deal.schema.js";
-import type { CustomerSummary, DealSummary, LeadSummary } from "../crm.types.js";
+import type { ActivityDocument } from "../schemas/activity.schema.js";
+import type { ActivitySummary, CustomerSummary, DealSummary, LeadSummary } from "../crm.types.js";
 
 export function toCustomerSummary(customer: CustomerDocument): CustomerSummary {
   return {
@@ -77,5 +78,35 @@ export function toDealSummary(deal: DealDocument): DealSummary {
     updatedBy: deal.updatedBy,
     createdAt: deal.createdAt.toISOString(),
     updatedAt: deal.updatedAt.toISOString(),
+  };
+}
+
+export function toActivitySummary(activity: ActivityDocument): ActivitySummary {
+  return {
+    id: activity._id.toString(),
+    workspaceId: activity.workspaceId,
+    type: activity.type,
+    customerId: activity.customerId ? activity.customerId.toString() : null,
+    dealId: activity.dealId ? activity.dealId.toString() : null,
+    title: activity.title,
+    description: activity.description,
+    text: activity.text,
+    mentions: activity.mentions,
+    dueDate: activity.dueDate ? activity.dueDate.toISOString() : null,
+    priority: activity.priority,
+    status: activity.status,
+    assignedUserId: activity.assignedUserId,
+    followUpDate: activity.followUpDate ? activity.followUpDate.toISOString() : null,
+    followUpType: activity.followUpType,
+    followUpCompletedAt: activity.followUpCompletedAt
+      ? activity.followUpCompletedAt.toISOString()
+      : null,
+    reminderDate: activity.reminderDate ? activity.reminderDate.toISOString() : null,
+    reminderType: activity.reminderType,
+    archivedAt: activity.archivedAt ? activity.archivedAt.toISOString() : null,
+    createdBy: activity.createdBy,
+    updatedBy: activity.updatedBy,
+    createdAt: activity.createdAt.toISOString(),
+    updatedAt: activity.updatedAt.toISOString(),
   };
 }

@@ -6,16 +6,20 @@ import { CommunicationModule } from "../communication/communication.module.js";
 import { Customer, CustomerSchema } from "./schemas/customer.schema.js";
 import { Lead, LeadSchema } from "./schemas/lead.schema.js";
 import { Deal, DealSchema } from "./schemas/deal.schema.js";
+import { Activity, ActivitySchema } from "./schemas/activity.schema.js";
 import { CustomerRepository } from "./repositories/customer.repository.js";
 import { LeadRepository } from "./repositories/lead.repository.js";
 import { DealRepository } from "./repositories/deal.repository.js";
+import { ActivityRepository } from "./repositories/activity.repository.js";
 import { CustomerService } from "./services/customer.service.js";
 import { LeadService } from "./services/lead.service.js";
 import { LeadConversionService } from "./services/lead-conversion.service.js";
 import { DealService } from "./services/deal.service.js";
+import { ActivityService } from "./services/activity.service.js";
 import { CustomerController } from "./controllers/customer.controller.js";
 import { LeadController } from "./controllers/lead.controller.js";
 import { DealController } from "./controllers/deal.controller.js";
+import { ActivityController } from "./controllers/activity.controller.js";
 
 /**
  * CRM (Phase-5). Part-1 (PRD-004 Volume-1 — Customer Management,
@@ -52,8 +56,17 @@ import { DealController } from "./controllers/deal.controller.js";
  * the only creation path; DealService never creates a Deal itself — see
  * docs/ADR-CRM-012-deal-lifecycle-strategy.md.
  *
- * Part-5 (Activities, Tasks, Follow-ups & Notes) and Part-6 (CRM Reports &
- * Dashboard) remain later scope, reviewed and approved as their own slices.
+ * Part-5 (Activities, Tasks, Follow-ups & Notes, PRD-004 Volume-5,
+ * 2026-08-07) adds `activities` — a single, type-discriminated collection
+ * (Task/Follow-up/Note/Reminder/Call/Meeting/Email) referencing Customer
+ * and/or Deal without owning either — see
+ * docs/ADR-CRM-015-activity-timeline-strategy.md and
+ * docs/ADR-CRM-016-activity-ownership-strategy.md. Has no permission of its
+ * own; access is inherited from whichever record an Activity references,
+ * checked inline in ActivityService rather than via `@RequirePermission`.
+ *
+ * Part-6 (CRM Reports & Dashboard) remains later scope, reviewed and
+ * approved as its own slice.
  */
 @Module({
   imports: [
@@ -64,17 +77,20 @@ import { DealController } from "./controllers/deal.controller.js";
       { name: Customer.name, schema: CustomerSchema },
       { name: Lead.name, schema: LeadSchema },
       { name: Deal.name, schema: DealSchema },
+      { name: Activity.name, schema: ActivitySchema },
     ]),
   ],
-  controllers: [CustomerController, LeadController, DealController],
+  controllers: [CustomerController, LeadController, DealController, ActivityController],
   providers: [
     CustomerRepository,
     LeadRepository,
     DealRepository,
+    ActivityRepository,
     CustomerService,
     LeadService,
     LeadConversionService,
     DealService,
+    ActivityService,
   ],
 })
 export class CrmModule {}
