@@ -171,6 +171,12 @@ export const DomainEvent = {
   FEATURE_DISABLED: "billing.feature_disabled",
   WORKSPACE_LOCKED: "billing.workspace_locked",
   WORKSPACE_UNLOCKED: "billing.workspace_unlocked",
+  // Phase-7 Part-1 (Workspace Settings, PRD-006 Volume-1). Fires only for
+  // Settings-owned data (branding, preferences) — Workspace's own
+  // Business Profile/Business Hours/Notification Settings keep emitting
+  // WORKSPACE_UPDATED unchanged, since Settings orchestrates that data
+  // rather than owning it (docs/ADR-SET-001-settings-ownership-strategy.md).
+  SETTINGS_UPDATED: "settings.updated",
 } as const;
 
 interface BaseEventPayload {
@@ -564,4 +570,9 @@ export interface WorkspaceLockedPayload extends BaseEventPayload {
 
 export interface WorkspaceUnlockedPayload extends BaseEventPayload {
   counterType: string;
+}
+
+export interface SettingsUpdatedPayload extends BaseEventPayload {
+  section: "branding" | "preferences";
+  updatedBy: string;
 }

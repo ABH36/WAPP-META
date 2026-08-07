@@ -252,3 +252,18 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** once real usage data volume makes live aggregation noticeably slow, one or more of: (a) a short-TTL cache in front of the dashboard specifically (the most frequently hit, least time-sensitive endpoint), (b) a scheduled job that periodically materializes expensive aggregations (e.g. `monthlyRevenueBreakdown`) into their own collection, refreshed on a timer rather than every request, or (c) moving CSV/Excel export generation to a background job (BullMQ, same infrastructure already used for `SubscriptionLifecycleProcessor`/`InvoiceLifecycleProcessor`) with the client polling or receiving a download link once ready, for exports large enough that synchronous generation risks a request timeout.
 
 **Trigger to revisit:** first real, measured latency complaint about any Billing Reports endpoint, or when Billing History/Usage History (both append-only, unbounded-growth collections) reach a size where their own aggregations noticeably slow down.
+
+---
+
+## TD-017 — Localization Strategy (editable language selection, translation resources, locale management)
+
+**Raised:** 2026-08-07 (Phase-7 Part-1, Settings — Workspace Settings; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** `Workspace.language` (`apps/api/src/modules/workspace/schemas/workspace.schema.ts`) remains fixed at `"en"` with no selector — `SettingsOverview.language` (`apps/api/src/modules/settings/`) surfaces the current value for Settings' unified read view, but no endpoint exists anywhere to change it. No translation resources, no locale-aware formatting, no i18n infrastructure exists in this codebase.
+
+**Why accepted for now:** `Workspace.language`'s own existing code comment (`ADR-027`) explains the field was deliberately added early so that enabling a real selector later would be "an additive change, not a schema migration" — it anticipated this moment without confirming Volume-1 (Workspace Settings) was the intended trigger. Resolved 2026-08-07, Architecture Review: real localization (translated UI/content, not just a stored preference string) is a meaningfully bigger effort than one Settings field, and deserves its own dedicated planning/review rather than being folded into Workspace Settings almost incidentally.
+
+**Closing this out looks like:** a dedicated Localization/i18n initiative that adds: a real `PATCH` endpoint to change `Workspace.language` away from `"en"`, translation resource files/tooling for the supported language set (already named in `ADR-027`'s own comment: Hindi/Gujarati/Marathi/Tamil/Telugu/Kannada/Malayalam), locale-aware date/number formatting (which may end up related to — but is distinct from — Settings' own `dateFormat`/`timeFormat` display preferences), and a decision on whether changing language affects existing data (a question §6 of PRD-006 Volume-1 itself already flagged and explicitly deferred).
+
+**Trigger to revisit:** Localization/i18n initiative planning and approval — the natural moment `ADR-027`'s own anticipated "additive change" actually happens.
