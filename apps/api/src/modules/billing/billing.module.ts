@@ -26,6 +26,7 @@ import { BillingHistoryRepository } from "./repositories/billing-history.reposit
 import { PlanLimitsRepository } from "./repositories/plan-limits.repository.js";
 import { WorkspaceUsageRepository } from "./repositories/workspace-usage.repository.js";
 import { UsageHistoryRepository } from "./repositories/usage-history.repository.js";
+import { BillingReportsRepository } from "./repositories/billing-reports.repository.js";
 import { PlanService } from "./services/plan.service.js";
 import { SubscriptionService } from "./services/subscription.service.js";
 import { InvoiceService } from "./services/invoice.service.js";
@@ -34,6 +35,7 @@ import { BillingHistoryService } from "./services/billing-history.service.js";
 import { PlanLimitsService } from "./services/plan-limits.service.js";
 import { UsageService } from "./services/usage.service.js";
 import { UsageHistoryService } from "./services/usage-history.service.js";
+import { BillingReportsService } from "./services/billing-reports.service.js";
 import { WorkspaceCreatedListener } from "./listeners/workspace-created.listener.js";
 import { InvoiceGenerationListener } from "./listeners/invoice-generation.listener.js";
 import { BillingHistoryListener } from "./listeners/billing-history.listener.js";
@@ -48,6 +50,7 @@ import { SubscriptionController } from "./controllers/subscription.controller.js
 import { InvoiceController } from "./controllers/invoice.controller.js";
 import { PaymentController } from "./controllers/payment.controller.js";
 import { UsageController } from "./controllers/usage.controller.js";
+import { BillingReportsController } from "./controllers/billing-reports.controller.js";
 
 /**
  * Billing (Phase-6). Part-1 (PRD-005 Volume-1 — Subscription & Plans,
@@ -81,8 +84,11 @@ import { UsageController } from "./controllers/usage.controller.js";
  * docs/ADR-BILL-007-usage-counter-strategy.md and
  * docs/ADR-BILL-008-commercial-enforcement-strategy.md.
  *
- * Billing Reports remain a later Volume, reviewed and approved as its own
- * slice — see PRD-005's own §3/§18.
+ * Part-4 (PRD-005 Volume-4 — Billing Reports & Administration, 2026-08-07)
+ * adds no new schema — a pure, workspace-scoped read/aggregation layer over
+ * Subscription/Invoice/Payment/Usage (resolved 2026-08-07, Architecture
+ * Review, matching CRM Reports' own precedent — never a cross-tenant
+ * aggregation). See docs/ADR-BILL-010-billing-reporting-boundary.md.
  */
 @Module({
   imports: [
@@ -109,6 +115,7 @@ import { UsageController } from "./controllers/usage.controller.js";
     InvoiceController,
     PaymentController,
     UsageController,
+    BillingReportsController,
   ],
   providers: [
     PlanRepository,
@@ -120,6 +127,7 @@ import { UsageController } from "./controllers/usage.controller.js";
     PlanLimitsRepository,
     WorkspaceUsageRepository,
     UsageHistoryRepository,
+    BillingReportsRepository,
     PlanService,
     SubscriptionService,
     InvoiceService,
@@ -128,6 +136,7 @@ import { UsageController } from "./controllers/usage.controller.js";
     PlanLimitsService,
     UsageService,
     UsageHistoryService,
+    BillingReportsService,
     WorkspaceCreatedListener,
     InvoiceGenerationListener,
     BillingHistoryListener,

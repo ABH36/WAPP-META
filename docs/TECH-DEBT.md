@@ -237,3 +237,18 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** for each of CRM/Communication/Workspace, individually: import `BillingModule`, inject `UsageService`, add a pre-flight `checkLimit`/`checkFeatureEnabled` call (guard-based for simple one-counter checks, inline for composite ones like Broadcast-consumes-N-Messages) immediately before the existing creation logic, fail-closed on a Usage-service error. Counting itself needs no change — `UsageCounterListener` already increments reactively off the same domain events these services already emit.
 
 **Trigger to revisit:** each business module's own next approved maintenance/enhancement pass, individually — not a single big-bang retrofit. Loosely gated by TD-014 (commercial limits are still null, so enforcement has no observable effect until real numbers are approved) — TD-014 closing is a natural prioritization trigger for this, though not a strict prerequisite.
+
+---
+
+## TD-016 — Reporting Performance Strategy (caching, materialized views, scheduled snapshots, background exports)
+
+**Raised:** 2026-08-07 (Phase-6 Part-4, Billing — Reports & Administration; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** `BillingReportsService`/`BillingReportsRepository` (`apps/api/src/modules/billing/services/billing-reports.service.ts`, `apps/api/src/modules/billing/repositories/billing-reports.repository.ts`) run a live MongoDB aggregation on every request — no caching layer, no materialized view, no scheduled snapshot job, and `GET /billing/reports/export` (CSV/Excel) generates its file synchronously within the request/response cycle rather than as a background job.
+
+**Why accepted for now:** Explicit business rule (§Business Rules — "Reports never cache commercial data... Reports always calculate from current state") and the same deliberate simplicity-first choice already made for CRM Reports (`docs/ADR-CRM-019-crm-reporting-strategy.md`) — a live aggregation is correct and fast enough at current (pre-launch, low-data-volume) scale, and avoids the real complexity of cache invalidation across Subscription/Invoice/Payment/Usage's independently-changing collections.
+
+**Closing this out looks like:** once real usage data volume makes live aggregation noticeably slow, one or more of: (a) a short-TTL cache in front of the dashboard specifically (the most frequently hit, least time-sensitive endpoint), (b) a scheduled job that periodically materializes expensive aggregations (e.g. `monthlyRevenueBreakdown`) into their own collection, refreshed on a timer rather than every request, or (c) moving CSV/Excel export generation to a background job (BullMQ, same infrastructure already used for `SubscriptionLifecycleProcessor`/`InvoiceLifecycleProcessor`) with the client polling or receiving a download link once ready, for exports large enough that synchronous generation risks a request timeout.
+
+**Trigger to revisit:** first real, measured latency complaint about any Billing Reports endpoint, or when Billing History/Usage History (both append-only, unbounded-growth collections) reach a size where their own aggregations noticeably slow down.

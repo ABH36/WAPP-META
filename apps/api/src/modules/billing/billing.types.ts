@@ -129,3 +129,86 @@ export interface UsageHistoryEntrySummary {
   occurredAt: string;
   createdAt: string;
 }
+
+export interface PlanDistributionEntry {
+  planName: string;
+  count: number;
+}
+
+/**
+ * Workspace-scoped (resolved 2026-08-07, Architecture Review) — every field
+ * below describes THIS Workspace's own single Subscription, never a
+ * cross-tenant total. activeSubscriptions/trialWorkspaces/
+ * expiredWorkspaces/gracePeriodWorkspaces are each 0 or 1, matching that a
+ * Workspace has exactly one Subscription in exactly one status at a time —
+ * see docs/ADR-BILL-010-billing-reporting-boundary.md.
+ */
+export interface BillingDashboardReport {
+  activeSubscriptions: number;
+  trialWorkspaces: number;
+  // Derived from Workspace.status === EXPIRED (covers both GRACE_PERIOD and
+  // non-payment SUSPENDED Subscription states, per ADR-BILL-002's mapping)
+  // — a broader signal than gracePeriodWorkspaces below.
+  expiredWorkspaces: number;
+  gracePeriodWorkspaces: number;
+  monthlyRevenue: number;
+  annualRevenue: number;
+  // "Pending" maps to InvoiceStatus.ISSUED — no literal PENDING value exists.
+  pendingInvoices: number;
+  paidInvoices: number;
+  failedPayments: number;
+  refunds: number;
+  planDistribution: PlanDistributionEntry[];
+  usage: UsageSummary;
+}
+
+export interface TrialReportSummary {
+  isInTrial: boolean;
+  trialEndsAt: string | null;
+  daysRemaining: number | null;
+}
+
+/** §Reports "Trial Report" is folded in here (§13's API surface has no dedicated /trial route) rather than a separate endpoint — see ADR-BILL-010. */
+export interface BillingSubscriptionReport {
+  subscription: SubscriptionSummary;
+  planName: string;
+  daysUntilRenewal: number | null;
+  trial: TrialReportSummary;
+}
+
+export interface BillingInvoiceReport {
+  totalInvoices: number;
+  // Null only when zero Invoices have a non-null amount (TD-011) — distinct
+  // from 0, which would misleadingly assert "confirmed zero," not "not yet
+  // priced."
+  totalAmount: number | null;
+  countByStatus: Record<InvoiceStatus, number>;
+  invoices: InvoiceSummary[];
+}
+
+export interface BillingPaymentReport {
+  totalPayments: number;
+  totalCollected: number;
+  countByStatus: Record<PaymentStatus, number>;
+  payments: PaymentSummary[];
+}
+
+export interface MonthlyRevenueEntry {
+  month: string;
+  revenue: number;
+}
+
+export interface RevenueForecast {
+  nextRenewalDate: string;
+  // Null until GTM pricing is approved (TD-009) — computed the same way
+  // InvoiceService.generateForSubscriptionUpgrade() computes Invoice.amount.
+  expectedAmount: number | null;
+}
+
+/** §Reports "Forecast" is folded in here (§13's API surface has no dedicated /forecast route) rather than a separate endpoint — see ADR-BILL-010. */
+export interface RevenueReport {
+  monthlyRevenue: number;
+  annualRevenue: number;
+  monthlyBreakdown: MonthlyRevenueEntry[];
+  forecast: RevenueForecast;
+}

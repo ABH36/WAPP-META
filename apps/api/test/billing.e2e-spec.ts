@@ -16,11 +16,16 @@ import { InvoiceService } from "../src/modules/billing/services/invoice.service.
 import { PlanLimits } from "../src/modules/billing/schemas/plan-limits.schema.js";
 import type { PlanLimitsDocument } from "../src/modules/billing/schemas/plan-limits.schema.js";
 import type {
+  BillingDashboardReport,
+  BillingInvoiceReport,
+  BillingPaymentReport,
+  BillingSubscriptionReport,
   EntitlementsSummary,
   InvoiceSummary,
   PaymentSummary,
   PlanLimitsSummary,
   PlanSummary,
+  RevenueReport,
   SubscriptionSummary,
   UsageHistoryEntrySummary,
   UsageSummary,
@@ -1024,5 +1029,255 @@ describe("Billing — Usage, Limits & Enforcement (e2e)", () => {
     const customers = usage.counters.find((c) => c.counterType === UsageCounterType.CUSTOMERS)!;
     expect(customers.locked).toBe(false);
     expect(customers.limit).toBe(100);
+  });
+});
+
+/**
+ * Covers Phase-6 Part-4 (PRD-005 Volume-4, Billing Reports & Administration)
+ * end-to-end against the real replica-set Mongo: all 7 read-only endpoints,
+ * workspace-scoping (resolved 2026-08-07, Architecture Review — never
+ * cross-tenant), real revenue from a recorded Payment, and CSV/Excel
+ * export reusing the same computation as the dashboard.
+ */
+describe("Billing — Reports & Administration (e2e)", () => {
+  let app: INestApplication;
+  let sentEmails: SendEmailJob[];
+
+  const runId = Date.now();
+  const ownerEmail = `billing-reports-owner-${runId}@example.com`;
+  const ownerMobile = `+9629${String(runId).slice(-8)}`;
+  const execEmail = `billing-reports-exec-${runId}@example.com`;
+  const execMobile = `+9639${String(runId).slice(-8)}`;
+  const adminEmail = `billing-reports-admin-${runId}@example.com`;
+  const adminMobile = `+9649${String(runId).slice(-8)}`;
+  const password = "Passw0rd1";
+
+  let ownerAccessToken: string;
+  let salesExecutiveAccessToken: string;
+  let administratorAccessToken: string;
+  let growthPlanId: string;
+
+  beforeAll(async () => {
+    sentEmails = [];
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(EmailService)
+      .useValue({
+        send: jest.fn((job: SendEmailJob) => {
+          sentEmails.push(job);
+          return Promise.resolve();
+        }),
+      })
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
+    app.setGlobalPrefix("api");
+    await app.init();
+
+    await request(server()).post("/api/v1/auth/register").send({
+      fullName: "Billing Reports Owner",
+      email: ownerEmail,
+      mobileNumber: ownerMobile,
+      password,
+    });
+    const verifyToken = extractToken(extractLink(ownerEmail));
+    const verifyRes = await request(server())
+      .post("/api/v1/auth/verify-email")
+      .send({ token: verifyToken });
+    const tokens = (verifyRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data.tokens;
+
+    const createRes = await request(server())
+      .post("/api/v1/workspaces")
+      .set("Authorization", `Bearer ${tokens.accessToken}`)
+      .send({ name: "Billing Reports Test Co" });
+    const createBody = createRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>;
+    ownerAccessToken = createBody.data.tokens.accessToken;
+
+    salesExecutiveAccessToken = await inviteAndAccept(
+      execEmail,
+      execMobile,
+      "Exec",
+      "SALES_EXECUTIVE",
+    );
+    administratorAccessToken = await inviteAndAccept(
+      adminEmail,
+      adminMobile,
+      "Admin",
+      "ADMINISTRATOR",
+    );
+
+    const plansRes = await authed("get", "/api/v1/billing/plans");
+    const plans = (plansRes.body as ApiSuccessResponse<PlanSummary[]>).data;
+    growthPlanId = plans.find((p) => p.name === "Growth")!.id;
+
+    // Upgrade generates an Invoice reactively (Volume-2) — wait for it, then
+    // record a real Payment so Revenue/Payment reports have something to show.
+    await authed("post", "/api/v1/billing/subscription/upgrade").send({ planId: growthPlanId });
+    const invoiceId = await waitForFirstInvoiceId();
+    await authed("post", "/api/v1/billing/payments").send({
+      invoiceId,
+      gateway: "BANK_TRANSFER",
+      gatewayReference: "REF-REPORTS-1",
+      amount: 999,
+      currency: "INR",
+      outcome: "PAID",
+    });
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  function server(): Server {
+    return app.getHttpServer() as Server;
+  }
+
+  function authed(method: "get" | "post" | "patch", path: string, token = ownerAccessToken) {
+    return request(server())[method](path).set("Authorization", `Bearer ${token}`);
+  }
+
+  function extractToken(link: string): string {
+    return new URL(link).searchParams.get("token") ?? "";
+  }
+
+  function extractLink(to: string, category = "email-verification"): string {
+    const job = sentEmails.find((email) => email.to === to && email.category === category);
+    const link = job?.html.match(/href="([^"]+)"/)?.[1];
+    if (!link) {
+      throw new Error(`No ${category} email found for ${to}`);
+    }
+    return link;
+  }
+
+  async function inviteAndAccept(
+    email: string,
+    mobileNumber: string,
+    fullName: string,
+    role: string,
+  ): Promise<string> {
+    await request(server()).post("/api/v1/auth/register").send({
+      fullName,
+      email,
+      mobileNumber,
+      password,
+    });
+    const verifyToken = extractToken(extractLink(email));
+    const verifyRes = await request(server())
+      .post("/api/v1/auth/verify-email")
+      .send({ token: verifyToken });
+    const memberTokens = (verifyRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data
+      .tokens;
+
+    await authed("post", "/api/v1/team/invitations").send({ email, role });
+    const inviteToken = extractToken(extractLink(email, "team-invitation"));
+    const acceptRes = await request(server())
+      .post("/api/v1/team/invitations/accept")
+      .set("Authorization", `Bearer ${memberTokens.accessToken}`)
+      .send({ token: inviteToken });
+    const acceptBody = (acceptRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data;
+
+    return acceptBody.tokens.accessToken;
+  }
+
+  /** Invoice generation is fire-and-forget (Volume-2) — poll rather than assume synchronous completion. */
+  async function waitForFirstInvoiceId(): Promise<string> {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const res = await authed("get", "/api/v1/billing/invoices");
+      const invoices = (res.body as ApiSuccessResponse<InvoiceSummary[]>).data;
+      if (invoices.length > 0) {
+        return invoices[0]!.id;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error("Timed out waiting for an Invoice to be generated");
+  }
+
+  it("GET dashboard reflects this Workspace's own single Subscription state, never cross-tenant totals", async () => {
+    const res = await authed("get", "/api/v1/billing/reports/dashboard");
+    expect(res.status).toBe(200);
+    const dashboard = (res.body as ApiSuccessResponse<BillingDashboardReport>).data;
+    expect(dashboard.activeSubscriptions).toBe(1);
+    expect(dashboard.trialWorkspaces).toBe(0);
+    expect(dashboard.paidInvoices).toBe(1);
+    expect(dashboard.monthlyRevenue).toBe(999);
+    expect(dashboard.annualRevenue).toBe(999);
+    expect(dashboard.planDistribution).toEqual([{ planName: "Growth", count: 1 }]);
+  });
+
+  it("GET subscriptions reports the current Plan and non-Trial status", async () => {
+    const res = await authed("get", "/api/v1/billing/reports/subscriptions");
+    expect(res.status).toBe(200);
+    const report = (res.body as ApiSuccessResponse<BillingSubscriptionReport>).data;
+    expect(report.planName).toBe("Growth");
+    expect(report.trial.isInTrial).toBe(false);
+  });
+
+  it("GET invoices reports the real generated Invoice with a null amount (Plan pricing not yet approved)", async () => {
+    const res = await authed("get", "/api/v1/billing/reports/invoices");
+    expect(res.status).toBe(200);
+    const report = (res.body as ApiSuccessResponse<BillingInvoiceReport>).data;
+    expect(report.totalInvoices).toBe(1);
+    expect(report.countByStatus.PAID).toBe(1);
+  });
+
+  it("GET payments reports the real recorded Payment and totalCollected", async () => {
+    const res = await authed("get", "/api/v1/billing/reports/payments");
+    expect(res.status).toBe(200);
+    const report = (res.body as ApiSuccessResponse<BillingPaymentReport>).data;
+    expect(report.totalPayments).toBe(1);
+    expect(report.totalCollected).toBe(999);
+    expect(report.countByStatus.PAID).toBe(1);
+  });
+
+  it("GET revenue includes a deterministic forecast based on the current Plan and renewal date", async () => {
+    const res = await authed("get", "/api/v1/billing/reports/revenue");
+    expect(res.status).toBe(200);
+    const report = (res.body as ApiSuccessResponse<RevenueReport>).data;
+    expect(report.monthlyRevenue).toBe(999);
+    expect(report.forecast.nextRenewalDate).toBeTruthy();
+  });
+
+  it("GET usage matches Volume-3's own /billing/usage endpoint", async () => {
+    const res = await authed("get", "/api/v1/billing/reports/usage");
+    expect(res.status).toBe(200);
+    const usage = (res.body as ApiSuccessResponse<UsageSummary>).data;
+    expect(usage.counters.length).toBe(9);
+  });
+
+  it("exports the dashboard report as CSV with the right headers", async () => {
+    const res = await authed("get", "/api/v1/billing/reports/export?type=dashboard&format=csv");
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/csv");
+    expect(res.headers["content-disposition"]).toContain("dashboard-report.csv");
+    expect(res.text).toContain("Active Subscriptions");
+  });
+
+  it("exports the revenue report as Excel with the right headers", async () => {
+    const res = await authed("get", "/api/v1/billing/reports/export?type=revenue&format=excel");
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("spreadsheetml");
+    expect(res.headers["content-disposition"]).toContain("revenue-report.xlsx");
+    expect(Number(res.headers["content-length"])).toBeGreaterThan(0);
+  });
+
+  it("Sales Executive (no BILLING_ACCESS) is forbidden from every report endpoint; Administrator (VIEW_ONLY) can view all", async () => {
+    for (const path of ["dashboard", "subscriptions", "invoices", "payments", "revenue", "usage"]) {
+      const execRes = await authed(
+        "get",
+        `/api/v1/billing/reports/${path}`,
+        salesExecutiveAccessToken,
+      );
+      expect(execRes.status).toBe(403);
+
+      const adminRes = await authed(
+        "get",
+        `/api/v1/billing/reports/${path}`,
+        administratorAccessToken,
+      );
+      expect(adminRes.status).toBe(200);
+    }
   });
 });
