@@ -154,6 +154,23 @@ export const DomainEvent = {
   PAYMENT_FAILED: "billing.payment_failed",
   PAYMENT_REFUNDED: "billing.payment_refunded",
   BILLING_HISTORY_RECORDED: "billing.billing_history_recorded",
+  // Phase-6 Part-3 (Usage, Limits & Enforcement, PRD-005 Volume-3 §12).
+  // Deliberately dormant in practice today: every seeded Plan's limits are
+  // null pending commercial approval (TD-014), so no counter can ever cross
+  // a threshold or exceed a limit yet — these events exist and are wired
+  // correctly, they simply have nothing to fire on until real limits are
+  // approved. WORKSPACE_LOCKED/UNLOCKED are per-counter, never
+  // WorkspaceStatus — resolved 2026-08-07, Architecture Review: "locked"
+  // means new-resource-creation blocked for one over-limit resource type,
+  // not a workspace-wide state, and never touches the canonical
+  // WorkspaceStatus enum (BR-002). See
+  // docs/ADR-BILL-008-commercial-enforcement-strategy.md.
+  USAGE_THRESHOLD_REACHED: "billing.usage_threshold_reached",
+  USAGE_LIMIT_EXCEEDED: "billing.usage_limit_exceeded",
+  FEATURE_ENABLED: "billing.feature_enabled",
+  FEATURE_DISABLED: "billing.feature_disabled",
+  WORKSPACE_LOCKED: "billing.workspace_locked",
+  WORKSPACE_UNLOCKED: "billing.workspace_unlocked",
 } as const;
 
 interface BaseEventPayload {
@@ -518,4 +535,33 @@ export interface PaymentRefundedPayload extends BaseEventPayload {
 export interface BillingHistoryRecordedPayload extends BaseEventPayload {
   entryId: string;
   eventType: string;
+}
+
+export interface UsageThresholdReachedPayload extends BaseEventPayload {
+  counterType: string;
+  threshold: number;
+  currentCount: number;
+  limit: number;
+}
+
+export interface UsageLimitExceededPayload extends BaseEventPayload {
+  counterType: string;
+  currentCount: number;
+  limit: number;
+}
+
+export interface FeatureEnabledPayload extends BaseEventPayload {
+  feature: string;
+}
+
+export interface FeatureDisabledPayload extends BaseEventPayload {
+  feature: string;
+}
+
+export interface WorkspaceLockedPayload extends BaseEventPayload {
+  counterType: string;
+}
+
+export interface WorkspaceUnlockedPayload extends BaseEventPayload {
+  counterType: string;
 }

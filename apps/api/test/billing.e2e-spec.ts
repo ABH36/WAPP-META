@@ -1,20 +1,29 @@
 import { Test } from "@nestjs/testing";
 import { VersioningType, type INestApplication } from "@nestjs/common";
+import { getModelToken } from "@nestjs/mongoose";
+import type { Model } from "mongoose";
 import type { Server } from "http";
 import request from "supertest";
-import { PaymentStatus, type ApiSuccessResponse } from "@wapp/shared-types";
+import { PaymentStatus, UsageCounterType, type ApiSuccessResponse } from "@wapp/shared-types";
 import { AppModule } from "../src/app.module.js";
 import { EmailService } from "../src/infrastructure/email/email.service.js";
 import type { SendEmailJob } from "../src/infrastructure/email/email.types.js";
 import type { IssuedTokenPair } from "../src/modules/identity/identity.types.js";
 import type { WorkspaceProfile } from "../src/modules/workspace/workspace.types.js";
+import type { CustomerSummary } from "../src/modules/crm/crm.types.js";
 import { SubscriptionService } from "../src/modules/billing/services/subscription.service.js";
 import { InvoiceService } from "../src/modules/billing/services/invoice.service.js";
+import { PlanLimits } from "../src/modules/billing/schemas/plan-limits.schema.js";
+import type { PlanLimitsDocument } from "../src/modules/billing/schemas/plan-limits.schema.js";
 import type {
+  EntitlementsSummary,
   InvoiceSummary,
   PaymentSummary,
+  PlanLimitsSummary,
   PlanSummary,
   SubscriptionSummary,
+  UsageHistoryEntrySummary,
+  UsageSummary,
 } from "../src/modules/billing/billing.types.js";
 
 /**
@@ -718,5 +727,302 @@ describe("Billing — Invoices & Payments (e2e)", () => {
       new Date(future.getTime() + 60 * 60 * 1000),
     );
     expect(flaggedSecondPass).toBe(0);
+  });
+});
+
+/**
+ * Covers Phase-6 Part-3 (PRD-005 Volume-3, Usage, Limits & Enforcement)
+ * end-to-end against the real replica-set Mongo: the 4 read-only endpoints,
+ * event-driven counter increments (via real CRM Customer creation), the
+ * BILLING_ACCESS permission, and — since every seeded PlanLimits document
+ * has null limits by default (TD-014) — threshold/exceeded/locked/plan-
+ * change-diff behavior is exercised by directly setting a real limit on
+ * Starter's PlanLimits document via the Mongoose model (test-only setup,
+ * same "grab a real instance from moduleRef" approach the Subscription
+ * lifecycle sweep tests already use above), then driving real API calls
+ * against it.
+ */
+describe("Billing — Usage, Limits & Enforcement (e2e)", () => {
+  let app: INestApplication;
+  let sentEmails: SendEmailJob[];
+  let planLimitsModel: Model<PlanLimitsDocument>;
+
+  const runId = Date.now();
+  const ownerEmail = `billing-usage-owner-${runId}@example.com`;
+  const ownerMobile = `+9689${String(runId).slice(-8)}`;
+  const execEmail = `billing-usage-exec-${runId}@example.com`;
+  const execMobile = `+9699${String(runId).slice(-8)}`;
+  const adminEmail = `billing-usage-admin-${runId}@example.com`;
+  const adminMobile = `+9609${String(runId).slice(-8)}`;
+  const password = "Passw0rd1";
+
+  let ownerAccessToken: string;
+  let salesExecutiveAccessToken: string;
+  let administratorAccessToken: string;
+  let plans: PlanSummary[];
+  let starterPlanId: string;
+  let growthPlanId: string;
+
+  beforeAll(async () => {
+    sentEmails = [];
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(EmailService)
+      .useValue({
+        send: jest.fn((job: SendEmailJob) => {
+          sentEmails.push(job);
+          return Promise.resolve();
+        }),
+      })
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
+    app.setGlobalPrefix("api");
+    await app.init();
+
+    planLimitsModel = moduleRef.get(getModelToken(PlanLimits.name));
+
+    await request(server()).post("/api/v1/auth/register").send({
+      fullName: "Billing Usage Owner",
+      email: ownerEmail,
+      mobileNumber: ownerMobile,
+      password,
+    });
+    const verifyToken = extractToken(extractLink(ownerEmail));
+    const verifyRes = await request(server())
+      .post("/api/v1/auth/verify-email")
+      .send({ token: verifyToken });
+    const tokens = (verifyRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data.tokens;
+
+    const createRes = await request(server())
+      .post("/api/v1/workspaces")
+      .set("Authorization", `Bearer ${tokens.accessToken}`)
+      .send({ name: "Billing Usage Test Co" });
+    const createBody = createRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>;
+    ownerAccessToken = createBody.data.tokens.accessToken;
+
+    salesExecutiveAccessToken = await inviteAndAccept(
+      execEmail,
+      execMobile,
+      "Exec",
+      "SALES_EXECUTIVE",
+    );
+    administratorAccessToken = await inviteAndAccept(
+      adminEmail,
+      adminMobile,
+      "Admin",
+      "ADMINISTRATOR",
+    );
+
+    const plansRes = await authed("get", "/api/v1/billing/plans");
+    plans = (plansRes.body as ApiSuccessResponse<PlanSummary[]>).data;
+    starterPlanId = plans.find((p) => p.name === "Starter")!.id;
+    growthPlanId = plans.find((p) => p.name === "Growth")!.id;
+
+    // Test-only setup: real limits, since every seeded PlanLimits is null
+    // by default (TD-014) — Starter gets a tight Customers limit and no
+    // Automation; Growth gets a looser limit and Automation enabled, to
+    // exercise the threshold/exceeded/locked and plan-change-diff paths.
+    await planLimitsModel.updateOne(
+      { planId: starterPlanId },
+      { $set: { customersLimit: 3, automationEnabled: false } },
+    );
+    await planLimitsModel.updateOne(
+      { planId: growthPlanId },
+      { $set: { customersLimit: 100, automationEnabled: true } },
+    );
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  function server(): Server {
+    return app.getHttpServer() as Server;
+  }
+
+  function authed(method: "get" | "post" | "patch", path: string, token = ownerAccessToken) {
+    return request(server())[method](path).set("Authorization", `Bearer ${token}`);
+  }
+
+  function extractToken(link: string): string {
+    return new URL(link).searchParams.get("token") ?? "";
+  }
+
+  function extractLink(to: string, category = "email-verification"): string {
+    const job = sentEmails.find((email) => email.to === to && email.category === category);
+    const link = job?.html.match(/href="([^"]+)"/)?.[1];
+    if (!link) {
+      throw new Error(`No ${category} email found for ${to}`);
+    }
+    return link;
+  }
+
+  async function inviteAndAccept(
+    email: string,
+    mobileNumber: string,
+    fullName: string,
+    role: string,
+  ): Promise<string> {
+    await request(server()).post("/api/v1/auth/register").send({
+      fullName,
+      email,
+      mobileNumber,
+      password,
+    });
+    const verifyToken = extractToken(extractLink(email));
+    const verifyRes = await request(server())
+      .post("/api/v1/auth/verify-email")
+      .send({ token: verifyToken });
+    const memberTokens = (verifyRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data
+      .tokens;
+
+    await authed("post", "/api/v1/team/invitations").send({ email, role });
+    const inviteToken = extractToken(extractLink(email, "team-invitation"));
+    const acceptRes = await request(server())
+      .post("/api/v1/team/invitations/accept")
+      .set("Authorization", `Bearer ${memberTokens.accessToken}`)
+      .send({ token: inviteToken });
+    const acceptBody = (acceptRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data;
+
+    return acceptBody.tokens.accessToken;
+  }
+
+  async function createCustomer(mobileSuffix: string): Promise<CustomerSummary> {
+    const res = await authed("post", "/api/v1/crm/customers").send({
+      customerName: `Usage Test Customer ${mobileSuffix}`,
+      mobileNumber: `+9611${mobileSuffix}`,
+    });
+    expect(res.status).toBe(201);
+    return (res.body as ApiSuccessResponse<CustomerSummary>).data;
+  }
+
+  /** Event-driven counters are fire-and-forget (eventEmitter.emit) — same eventual-consistency reasoning as Invoice generation (Volume-2). */
+  async function waitForCustomersCount(min: number): Promise<UsageSummary> {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const res = await authed("get", "/api/v1/billing/usage");
+      const usage = (res.body as ApiSuccessResponse<UsageSummary>).data;
+      const customers = usage.counters.find((c) => c.counterType === UsageCounterType.CUSTOMERS);
+      if (customers && customers.count >= min) {
+        return usage;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error(`Timed out waiting for Customers count >= ${min}`);
+  }
+
+  async function waitForHistoryEventType(eventType: string): Promise<UsageHistoryEntrySummary[]> {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const res = await authed("get", "/api/v1/billing/usage/history");
+      const entries = (res.body as ApiSuccessResponse<UsageHistoryEntrySummary[]>).data;
+      if (entries.some((e) => e.eventType === eventType)) {
+        return entries;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error(`Timed out waiting for a Usage History entry of type ${eventType}`);
+  }
+
+  it("GET /billing/limits reflects the real limit set on Starter (entitlements otherwise default true)", async () => {
+    const res = await authed("get", "/api/v1/billing/limits");
+    expect(res.status).toBe(200);
+    const limits = (res.body as ApiSuccessResponse<PlanLimitsSummary>).data;
+    expect(limits.planId).toBe(starterPlanId);
+    expect(limits.limits.customers).toBe(3);
+    expect(limits.entitlements.automation).toBe(false);
+    expect(limits.entitlements.crm).toBe(true);
+  });
+
+  it("GET /billing/entitlements returns just the boolean flags", async () => {
+    const res = await authed("get", "/api/v1/billing/entitlements");
+    expect(res.status).toBe(200);
+    const entitlements = (res.body as ApiSuccessResponse<EntitlementsSummary>).data;
+    expect(entitlements.automation).toBe(false);
+    expect(entitlements.reports).toBe(true);
+  });
+
+  it("GET /billing/usage returns all 9 counters, with deferred ones (Campaigns/Storage/API Requests) at limit null", async () => {
+    const res = await authed("get", "/api/v1/billing/usage");
+    expect(res.status).toBe(200);
+    const usage = (res.body as ApiSuccessResponse<UsageSummary>).data;
+    expect(usage.counters).toHaveLength(9);
+    const campaigns = usage.counters.find((c) => c.counterType === UsageCounterType.CAMPAIGNS)!;
+    expect(campaigns.limit).toBeNull();
+  });
+
+  it("Sales Executive (no BILLING_ACCESS) is forbidden; Administrator (VIEW_ONLY) can view all 4 endpoints", async () => {
+    for (const path of ["usage", "limits", "entitlements", "usage/history"]) {
+      const execRes = await authed("get", `/api/v1/billing/${path}`, salesExecutiveAccessToken);
+      expect(execRes.status).toBe(403);
+
+      const adminRes = await authed("get", `/api/v1/billing/${path}`, administratorAccessToken);
+      expect(adminRes.status).toBe(200);
+    }
+  });
+
+  it("increments the Customers counter reactively as real Customers are created via the CRM API", async () => {
+    await createCustomer("00001");
+    const usage = await waitForCustomersCount(1);
+    const customers = usage.counters.find((c) => c.counterType === UsageCounterType.CUSTOMERS)!;
+    expect(customers.count).toBe(1);
+    expect(customers.limit).toBe(3);
+    expect(customers.locked).toBe(false);
+  });
+
+  it("reaches the 100% warning threshold at the limit without being locked, then exceeds and locks on the next creation", async () => {
+    // Starter's customersLimit is 3; one Customer already exists from the
+    // previous test, so two more reaches exactly 3 (100%, a warning, not
+    // yet a rejection — §8 resolved 2026-08-07).
+    await createCustomer("00002");
+    await createCustomer("00003");
+    const atLimit = await waitForCustomersCount(3);
+    const atLimitCounter = atLimit.counters.find(
+      (c) => c.counterType === UsageCounterType.CUSTOMERS,
+    )!;
+    expect(atLimitCounter.count).toBe(3);
+    expect(atLimitCounter.locked).toBe(false);
+    await waitForHistoryEventType("billing.usage_threshold_reached");
+
+    // The 4th Customer pushes usage to 4 > 3 — now exceeded and locked.
+    // Waiting for the WORKSPACE_LOCKED history entry (not just the count)
+    // guarantees setLocked()'s write already completed: recordCreation()
+    // awaits setLocked() before emitting WORKSPACE_LOCKED, and the history
+    // listener only writes its entry after receiving that same emit.
+    await createCustomer("00004");
+    await waitForCustomersCount(4);
+    await waitForHistoryEventType("billing.usage_limit_exceeded");
+    await waitForHistoryEventType("billing.workspace_locked");
+
+    const overLimitRes = await authed("get", "/api/v1/billing/usage");
+    const overLimit = (overLimitRes.body as ApiSuccessResponse<UsageSummary>).data;
+    const overLimitCounter = overLimit.counters.find(
+      (c) => c.counterType === UsageCounterType.CUSTOMERS,
+    )!;
+    expect(overLimitCounter.count).toBe(4);
+    expect(overLimitCounter.locked).toBe(true);
+  });
+
+  it("upgrading to a Plan with a higher limit and a newly-granted feature unlocks Customers and enables Automation", async () => {
+    const res = await authed("post", "/api/v1/billing/subscription/upgrade").send({
+      planId: growthPlanId,
+    });
+    expect(res.status).toBe(201);
+
+    await waitForHistoryEventType("billing.workspace_unlocked");
+    await waitForHistoryEventType("billing.feature_enabled");
+
+    const limitsRes = await authed("get", "/api/v1/billing/limits");
+    const limits = (limitsRes.body as ApiSuccessResponse<PlanLimitsSummary>).data;
+    expect(limits.planId).toBe(growthPlanId);
+    expect(limits.entitlements.automation).toBe(true);
+
+    const usageRes = await authed("get", "/api/v1/billing/usage");
+    const usage = (usageRes.body as ApiSuccessResponse<UsageSummary>).data;
+    const customers = usage.counters.find((c) => c.counterType === UsageCounterType.CUSTOMERS)!;
+    expect(customers.locked).toBe(false);
+    expect(customers.limit).toBe(100);
   });
 });

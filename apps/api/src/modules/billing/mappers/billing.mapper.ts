@@ -2,9 +2,11 @@ import type { PlanDocument } from "../schemas/plan.schema.js";
 import type { SubscriptionDocument } from "../schemas/subscription.schema.js";
 import type { InvoiceDocument } from "../schemas/invoice.schema.js";
 import type { PaymentDocument } from "../schemas/payment.schema.js";
+import type { PlanLimitsDocument } from "../schemas/plan-limits.schema.js";
 import type {
   InvoiceSummary,
   PaymentSummary,
+  PlanLimitsSummary,
   PlanSummary,
   SubscriptionSummary,
 } from "../billing.types.js";
@@ -78,5 +80,33 @@ export function toPaymentSummary(payment: PaymentDocument): PaymentSummary {
     recordedBy: payment.recordedBy,
     createdAt: payment.createdAt.toISOString(),
     updatedAt: payment.updatedAt.toISOString(),
+  };
+}
+
+export function toPlanLimitsSummary(planLimits: PlanLimitsDocument): PlanLimitsSummary {
+  return {
+    planId: planLimits.planId.toString(),
+    entitlements: {
+      crm: planLimits.crmEnabled,
+      broadcast: planLimits.broadcastEnabled,
+      campaigns: planLimits.campaignsEnabled,
+      automation: planLimits.automationEnabled,
+      teamMembers: planLimits.teamMembersEnabled,
+      reports: planLimits.reportsEnabled,
+      apiAccess: planLimits.apiAccessEnabled,
+      webhooks: planLimits.webhooksEnabled,
+      integrations: planLimits.integrationsEnabled,
+    },
+    limits: {
+      teamMembers: planLimits.teamMembersLimit,
+      customers: planLimits.customersLimit,
+      leads: planLimits.leadsLimit,
+      deals: planLimits.dealsLimit,
+      broadcasts: planLimits.broadcastsLimit,
+      campaigns: planLimits.campaignsLimit,
+      messages: planLimits.messagesLimit,
+      storage: planLimits.storageLimit,
+      apiRequests: planLimits.apiRequestsLimit,
+    },
   };
 }

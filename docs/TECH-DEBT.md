@@ -188,3 +188,37 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** a dedicated Payment Integration volume/phase that adds: a real gateway client (e.g. an India-market payment gateway, once a vendor decision is formally approved), inbound webhook endpoints with signature verification, idempotency keys so a retried webhook delivery never double-processes the same event, automatic retry logic for failed charges (§14's "Auto Retry" exclusion), and a reconciliation job comparing Payment records against the gateway's own transaction ledger. `PaymentService.record()`'s manual path likely stays as an operator override/fallback even after this lands, rather than being removed outright.
 
 **Trigger to revisit:** Payment Integration volume/phase planning and approval — the natural next Billing volume once a payment gateway vendor decision has been made.
+
+---
+
+## TD-013 — Deferred commercial counters: Campaigns, Storage, API Requests
+
+**Raised:** 2026-08-07 (Phase-6 Part-3, Billing — Usage, Limits & Enforcement; formally tracked as a Governance Recommendation per Architecture Review, extended during implementation)
+**Status:** Open
+
+**What:** §6 lists 9 usage counters. `UsageCounterListener` (`apps/api/src/modules/billing/listeners/usage-counter.listener.ts`) wires 6 of them to a real creation-time domain event. Three have no viable data source today and are not counted at all (`WorkspaceUsage.{campaignsCount,storageCount,apiRequestsCount}` stay `0` forever):
+
+- **Storage** — file uploads bypass the API entirely; the client uploads directly to Cloudinary using a signature `StorageService` issues (`apps/api/src/infrastructure/storage/storage.service.ts`, SEC-016). The backend has no visibility into whether an upload happened or how large it was.
+- **API Requests** — the only existing request-counting infrastructure is `ThrottlerModule` (`app.module.ts`, SEC-009), a technical, platform-wide, per-route rate limiter unrelated to a per-workspace commercial counter.
+- **Campaigns** (identified during implementation, not in the original Architecture Review's two named counters) — Communication's domain event catalog (`apps/api/src/common/events/domain-events.ts`) has `CAMPAIGN_COMPLETED`/`CAMPAIGN_CANCELLED` but no `CAMPAIGN_CREATED`/`CAMPAIGN_STARTED` — there is no creation-time event to hook, the same shape of gap as the other two.
+
+**Why accepted for now:** Resolved during Architecture Review for Storage/API Requests, and the same reasoning extends cleanly to Campaigns once it surfaced: each would require new infrastructure or a new event in an already-frozen module (Communication, Phase-4) that Volume-3 has no mandate to modify. `PlanLimits`/`WorkspaceUsage` both declare fields for all 9 counters (schema completeness, matching how `Plan.monthlyPrice` stayed a real field while null pending approval) so no future migration is needed once each is closed — only a new event source and a new listener handler.
+
+**Closing this out looks like:** per counter — Campaigns needs a new `CAMPAIGN_CREATED`/`CAMPAIGN_STARTED` event added to Communication's catalog (a small, additive change, not a redesign) plus a new `UsageCounterListener` handler; Storage needs a Cloudinary webhook (or periodic reconciliation against Cloudinary's own API) to attribute and size uploads per workspace; API Requests needs a new global interceptor tracking authenticated requests per workspace, distinct from the existing technical rate limiter.
+
+**Trigger to revisit:** first real need to enforce any of these three specifically, or a maintenance pass over Communication that's already touching campaign creation for another reason.
+
+---
+
+## TD-014 — Plan usage limits (teamMembersLimit, customersLimit, etc.) are null pending commercial approval
+
+**Raised:** 2026-08-07 (Phase-6 Part-3, Billing — Usage, Limits & Enforcement)
+**Status:** Open
+
+**What:** `PlanLimitsService.onModuleInit()` (`apps/api/src/modules/billing/services/plan-limits.service.ts`) seeds one `PlanLimits` document per Plan (Starter/Growth/Enterprise) with all entitlement flags `true` and every numeric limit field (`teamMembersLimit`, `customersLimit`, `leadsLimit`, `dealsLimit`, `broadcastsLimit`, `campaignsLimit`, `messagesLimit`, `storageLimit`, `apiRequestsLimit`) `null`.
+
+**Why accepted for now:** Same discipline already applied to `Plan.monthlyPrice`/`yearlyPrice` (TD-009) and `Invoice.amount`/`tax` (TD-011): a specific number like "10 Team Members" or "500 Customers" is exactly as much an unapproved commercial decision as a price — it differentiates what a customer gets for what they pay — and persisting an invented figure (including treating `null` as if it silently meant "unlimited" without that being an actual approved decision) would be exactly the unapproved-commercial-value problem the standing instruction exists to prevent. `null` here means "not yet approved," and reads identically to "unlimited" from every consumer's perspective (`UsageService.checkLimit`/`recordCreation` both treat a `null` limit as nothing to enforce or warn about) — which is the correct behavior either way until real numbers are approved.
+
+**Closing this out looks like:** once GTM/product limits are formally approved per Plan, set the real numeric values on each Plan's `PlanLimits` document — a direct database update or a small one-off seed-correction script, mirroring how TD-009 expects to close (no Plan-limits-mutation endpoint exists for this to interact with, §13 is read-only).
+
+**Trigger to revisit:** commercial usage-limit approval per Plan tier, required before production deployment — the moment this closes, `USAGE_THRESHOLD_REACHED`/`USAGE_LIMIT_EXCEEDED`/`WORKSPACE_LOCKED` all become live for the first time (they're wired correctly today but dormant, since nothing can cross a `null` limit).
