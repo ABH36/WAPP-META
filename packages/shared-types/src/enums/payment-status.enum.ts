@@ -7,9 +7,15 @@ export enum PaymentStatus {
   PENDING = "PENDING",
   PAID = "PAID",
   FAILED = "FAILED",
-  /** Future Phase — Refund Automation is out of scope for Phase-1 (PRD-005 Out of Scope). */
+  /**
+   * Resolved 2026-08-07 (PRD-005 Volume-2 Architecture Review): manual
+   * Refund recording (POST /billing/refunds) IS in scope for Volume-2 — only
+   * gateway-triggered automatic refund execution stays out of scope (no
+   * Payment Gateway Integration until a later volume). This value is
+   * reachable in Volume-2, not deferred.
+   */
   REFUNDED = "REFUNDED",
-  /** Future Phase. */
+  /** Future Phase — partial refunds are not supported; a Refund is always for the full Payment amount in Volume-2. */
   PARTIALLY_REFUNDED = "PARTIALLY_REFUNDED",
   /** Future Phase. */
   CHARGEBACK = "CHARGEBACK",

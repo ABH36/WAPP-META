@@ -1,6 +1,13 @@
 import type { PlanDocument } from "../schemas/plan.schema.js";
 import type { SubscriptionDocument } from "../schemas/subscription.schema.js";
-import type { PlanSummary, SubscriptionSummary } from "../billing.types.js";
+import type { InvoiceDocument } from "../schemas/invoice.schema.js";
+import type { PaymentDocument } from "../schemas/payment.schema.js";
+import type {
+  InvoiceSummary,
+  PaymentSummary,
+  PlanSummary,
+  SubscriptionSummary,
+} from "../billing.types.js";
 
 export function toPlanSummary(plan: PlanDocument): PlanSummary {
   return {
@@ -35,5 +42,41 @@ export function toSubscriptionSummary(subscription: SubscriptionDocument): Subsc
     updatedBy: subscription.updatedBy,
     createdAt: subscription.createdAt.toISOString(),
     updatedAt: subscription.updatedAt.toISOString(),
+  };
+}
+
+export function toInvoiceSummary(invoice: InvoiceDocument): InvoiceSummary {
+  return {
+    id: invoice._id.toString(),
+    workspaceId: invoice.workspaceId,
+    subscriptionId: invoice.subscriptionId.toString(),
+    invoiceNumber: invoice.invoiceNumber,
+    amount: invoice.amount,
+    tax: invoice.tax,
+    currency: invoice.currency,
+    dueDate: invoice.dueDate.toISOString(),
+    issuedAt: invoice.issuedAt.toISOString(),
+    paidAt: invoice.paidAt ? invoice.paidAt.toISOString() : null,
+    status: invoice.status,
+    createdAt: invoice.createdAt.toISOString(),
+    updatedAt: invoice.updatedAt.toISOString(),
+  };
+}
+
+export function toPaymentSummary(payment: PaymentDocument): PaymentSummary {
+  return {
+    id: payment._id.toString(),
+    workspaceId: payment.workspaceId,
+    invoiceId: payment.invoiceId.toString(),
+    gateway: payment.gateway,
+    gatewayReference: payment.gatewayReference,
+    amount: payment.amount,
+    currency: payment.currency,
+    status: payment.status,
+    paidAt: payment.paidAt ? payment.paidAt.toISOString() : null,
+    refundedAt: payment.refundedAt ? payment.refundedAt.toISOString() : null,
+    recordedBy: payment.recordedBy,
+    createdAt: payment.createdAt.toISOString(),
+    updatedAt: payment.updatedAt.toISOString(),
   };
 }

@@ -132,6 +132,28 @@ export const DomainEvent = {
   SUBSCRIPTION_CANCELLED: "billing.subscription_cancelled",
   GRACE_PERIOD_STARTED: "billing.grace_period_started",
   SUBSCRIPTION_SUSPENDED: "billing.subscription_suspended",
+  // Phase-6 Part-2 (Invoices & Payments, PRD-005 Volume-2 §10). PAYMENT_PAID
+  // (not PAYMENT_SUCCESSFUL, §10's literal wording) mirrors this catalog's
+  // existing convention of naming events after the resulting status
+  // (CUSTOMER_BLOCKED/CUSTOMER_ACTIVATED, INVOICE_PAID itself) — consistent
+  // with the Architecture Review's resolution to use PaymentStatus.PAID
+  // (ADR-039) rather than "Success" for the status value itself. Every
+  // Payment is created PENDING first and resolved synchronously in the same
+  // call (PAYMENT_INITIATED always fires, immediately followed by
+  // PAYMENT_PAID or PAYMENT_FAILED) — there is no async gateway callback yet
+  // (Payment Gateway Integration is §14 Out of Scope), so "initiated" and
+  // "resolved" happen back-to-back rather than being genuinely
+  // time-separated. BILLING_HISTORY_RECORDED fires once per
+  // BillingHistoryEntry written (§10's own literal 8th event) — see
+  // docs/ADR-BILL-005-billing-event-strategy.md.
+  INVOICE_GENERATED: "billing.invoice_generated",
+  INVOICE_PAID: "billing.invoice_paid",
+  INVOICE_OVERDUE: "billing.invoice_overdue",
+  PAYMENT_INITIATED: "billing.payment_initiated",
+  PAYMENT_PAID: "billing.payment_paid",
+  PAYMENT_FAILED: "billing.payment_failed",
+  PAYMENT_REFUNDED: "billing.payment_refunded",
+  BILLING_HISTORY_RECORDED: "billing.billing_history_recorded",
 } as const;
 
 interface BaseEventPayload {
@@ -450,4 +472,50 @@ export interface GracePeriodStartedPayload extends BaseEventPayload {
 
 export interface SubscriptionSuspendedPayload extends BaseEventPayload {
   subscriptionId: string;
+}
+
+export interface InvoiceGeneratedPayload extends BaseEventPayload {
+  invoiceId: string;
+  subscriptionId: string;
+  invoiceNumber: string;
+  /** Null when Plan pricing is not yet approved — see TD-009/TD-011. */
+  amount: number | null;
+}
+
+export interface InvoicePaidPayload extends BaseEventPayload {
+  invoiceId: string;
+  paymentId: string;
+}
+
+export interface InvoiceOverduePayload extends BaseEventPayload {
+  invoiceId: string;
+  dueDate: string;
+}
+
+export interface PaymentInitiatedPayload extends BaseEventPayload {
+  paymentId: string;
+  invoiceId: string;
+  gateway: string;
+}
+
+export interface PaymentPaidPayload extends BaseEventPayload {
+  paymentId: string;
+  invoiceId: string;
+  amount: number;
+}
+
+export interface PaymentFailedPayload extends BaseEventPayload {
+  paymentId: string;
+  invoiceId: string;
+}
+
+export interface PaymentRefundedPayload extends BaseEventPayload {
+  paymentId: string;
+  invoiceId: string;
+  actorId: string;
+}
+
+export interface BillingHistoryRecordedPayload extends BaseEventPayload {
+  entryId: string;
+  eventType: string;
 }

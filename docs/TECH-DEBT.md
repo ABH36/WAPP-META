@@ -143,3 +143,33 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** once the GTM pricing decision is formally approved, set the real `monthlyPrice`/`yearlyPrice` for all three Plan documents — a direct database update or a small one-off seed-correction script is sufficient, since `§15`'s API surface has no Plan-mutation endpoint (`GET /billing/plans` is read-only) for this to interact with.
 
 **Trigger to revisit:** GTM pricing approval, required before production deployment.
+
+---
+
+## TD-010 — Platform Billing Operations have no dedicated platform-operator role yet
+
+**Raised:** 2026-08-07 (Phase-6 Part-2, Billing — Invoices & Payments; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** `POST /billing/payments` and `POST /billing/refunds` (`apps/api/src/modules/billing/controllers/payment.controller.ts`) are manual recording actions — Payment Gateway Integration is §14 Out of Scope, so there is no real gateway to independently verify a claimed payment. Resolved during Architecture Review that these should be platform-operator-only, but no such concept exists anywhere in `apps/api` yet: `PlatformRole` (`packages/shared-types/src/enums/role.enum.ts`) is pre-scaffolded with `PLATFORM_SUPER_ADMIN`/`PLATFORM_SUPPORT_MANAGER`/`PLATFORM_SUPPORT_EXECUTIVE`, but has zero live consumers — no `User.platformRole` field, no guard, nothing wired (Platform Administration is PRD-007, a later, unbuilt module). "Platform Billing Executive" was explicitly removed from that enum for Phase-1 per its own code comment (ADR-036), confirming this gap was already anticipated and deliberately deferred at the planning stage, not an oversight now.
+
+**Why accepted for now:** Wiring `PlatformRole` up (a `User.platformRole` field, a new guard, a new controller-level check) is Platform Administration module scope, not Volume-2's — implementing a slice of an unreviewed, unapproved future module inside this one would be exactly the kind of scope creep the phase-discipline process exists to prevent. As an interim, narrower-than-nothing measure, both endpoints require `TenantRole.OWNER` specifically (`PaymentController.ensureOwner()`) — tighter than `BILLING_ACCESS` alone would allow (`PermissionsGuard` is binary NONE-vs-not-NONE, so `BILLING_ACCESS` alone would also let Administrator's `VIEW_ONLY` through), but still a Workspace-side role standing in for a genuine platform-side one.
+
+**Closing this out looks like:** once Platform Administration (PRD-007) is planned and approved, add a `User.platformRole` field (or equivalent), a `PlatformRolesGuard`, and gate `POST /billing/payments`/`POST /billing/refunds` behind `PlatformRole.PLATFORM_SUPER_ADMIN` (or a narrower platform billing role, if one is approved by then) instead of — or in addition to — the current `TenantRole.OWNER` check.
+
+**Trigger to revisit:** Platform Administration module (PRD-007) planning and approval, or a real Payment Gateway Integration volume that removes the need for manual recording (and this interim access model) entirely.
+
+---
+
+## TD-011 — Invoice amount/tax are null pending the same commercial approvals as Plan pricing
+
+**Raised:** 2026-08-07 (Phase-6 Part-2, Billing — Invoices & Payments)
+**Status:** Open
+
+**What:** `InvoiceService.generateForSubscriptionUpgrade()` (`apps/api/src/modules/billing/services/invoice.service.ts`) computes `Invoice.amount` from `Plan.monthlyPrice`/`yearlyPrice` — both currently `null` (TD-009) — and leaves `Invoice.tax` `null` unconditionally, since no tax-rate configuration (e.g. a GST percentage) exists anywhere in this codebase yet. Every Invoice generated today is therefore created with `amount: null, tax: null`.
+
+**Why accepted for now:** Direct consequence of TD-009, plus the same standing instruction applied a second time: do not persist an invented or unapproved commercial value, including `0` — a tax rate of `0` reads as "tax-exempt," a real business assertion, not "not yet configured." Computing `amount` from `Plan` (rather than hardcoding a separate copy) means GTM pricing approval alone is enough to make future-generated Invoices carry a real `amount`, with no code change here.
+
+**Closing this out looks like:** once GTM pricing is approved (closes TD-009), newly generated Invoices will automatically carry a real `amount` — no action needed in this module. `tax` needs its own, separate resolution: a formally approved tax-rate source (a fixed platform-wide GST percentage, or a more elaborate per-state/per-plan rule) has to be designed and approved before `InvoiceService` can compute anything but `null` for it.
+
+**Trigger to revisit:** GTM pricing approval (for `amount`, shared with TD-009) and a formally approved tax-rate decision (for `tax`) — required before production deployment.

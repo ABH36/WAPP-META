@@ -2,14 +2,20 @@ import { Test } from "@nestjs/testing";
 import { VersioningType, type INestApplication } from "@nestjs/common";
 import type { Server } from "http";
 import request from "supertest";
-import type { ApiSuccessResponse } from "@wapp/shared-types";
+import { PaymentStatus, type ApiSuccessResponse } from "@wapp/shared-types";
 import { AppModule } from "../src/app.module.js";
 import { EmailService } from "../src/infrastructure/email/email.service.js";
 import type { SendEmailJob } from "../src/infrastructure/email/email.types.js";
 import type { IssuedTokenPair } from "../src/modules/identity/identity.types.js";
 import type { WorkspaceProfile } from "../src/modules/workspace/workspace.types.js";
 import { SubscriptionService } from "../src/modules/billing/services/subscription.service.js";
-import type { PlanSummary, SubscriptionSummary } from "../src/modules/billing/billing.types.js";
+import { InvoiceService } from "../src/modules/billing/services/invoice.service.js";
+import type {
+  InvoiceSummary,
+  PaymentSummary,
+  PlanSummary,
+  SubscriptionSummary,
+} from "../src/modules/billing/billing.types.js";
 
 /**
  * Covers Phase-6 Part-1 (PRD-005 Volume-1, Subscription & Plans) end-to-end
@@ -373,5 +379,344 @@ describe("Billing — lifecycle sweep against a fresh Workspace (e2e)", () => {
     expect(
       (workspaceAfterSuspendRes.body as ApiSuccessResponse<WorkspaceProfile>).data.status,
     ).toBe("EXPIRED");
+  });
+});
+
+/**
+ * Covers Phase-6 Part-2 (PRD-005 Volume-2, Invoices & Payments) end-to-end
+ * against the real replica-set Mongo: internally-triggered Invoice
+ * generation on SUBSCRIPTION_UPGRADED, manual Payment recording (PAID and
+ * FAILED outcomes), the Owner-only restriction on POST
+ * /billing/payments|refunds (TD-010 — narrower than BILLING_ACCESS alone),
+ * Duplicate/Invalid-Amount/Invalid-Currency/Invalid-Invoice-Status
+ * validation, Refund closing both Payment and Invoice, and the overdue
+ * sweep (invoked directly against the real DB via the DI container, same
+ * "grab a real instance from moduleRef" approach the Subscription lifecycle
+ * sweep tests already use above).
+ */
+describe("Billing — Invoices & Payments (e2e)", () => {
+  let app: INestApplication;
+  let sentEmails: SendEmailJob[];
+  let invoiceService: InvoiceService;
+
+  const runId = Date.now();
+  const ownerEmail = `billing-inv-owner-${runId}@example.com`;
+  const ownerMobile = `+9659${String(runId).slice(-8)}`;
+  const execEmail = `billing-inv-exec-${runId}@example.com`;
+  const execMobile = `+9669${String(runId).slice(-8)}`;
+  const adminEmail = `billing-inv-admin-${runId}@example.com`;
+  const adminMobile = `+9679${String(runId).slice(-8)}`;
+  const password = "Passw0rd1";
+
+  let workspaceId: string;
+  let ownerAccessToken: string;
+  let salesExecutiveAccessToken: string;
+  let administratorAccessToken: string;
+  let plans: PlanSummary[];
+  let firstInvoiceId: string;
+
+  beforeAll(async () => {
+    sentEmails = [];
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(EmailService)
+      .useValue({
+        send: jest.fn((job: SendEmailJob) => {
+          sentEmails.push(job);
+          return Promise.resolve();
+        }),
+      })
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
+    app.setGlobalPrefix("api");
+    await app.init();
+
+    invoiceService = moduleRef.get(InvoiceService);
+
+    await request(server()).post("/api/v1/auth/register").send({
+      fullName: "Billing Invoice Owner",
+      email: ownerEmail,
+      mobileNumber: ownerMobile,
+      password,
+    });
+    const verifyToken = extractToken(extractLink(ownerEmail));
+    const verifyRes = await request(server())
+      .post("/api/v1/auth/verify-email")
+      .send({ token: verifyToken });
+    const tokens = (verifyRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data.tokens;
+
+    const createRes = await request(server())
+      .post("/api/v1/workspaces")
+      .set("Authorization", `Bearer ${tokens.accessToken}`)
+      .send({ name: "Billing Invoice Test Co" });
+    const createBody = createRes.body as ApiSuccessResponse<{
+      workspace: WorkspaceProfile;
+      tokens: IssuedTokenPair;
+    }>;
+    workspaceId = createBody.data.workspace.id;
+    ownerAccessToken = createBody.data.tokens.accessToken;
+
+    salesExecutiveAccessToken = await inviteAndAccept(
+      execEmail,
+      execMobile,
+      "Exec",
+      "SALES_EXECUTIVE",
+    );
+    administratorAccessToken = await inviteAndAccept(
+      adminEmail,
+      adminMobile,
+      "Admin",
+      "ADMINISTRATOR",
+    );
+
+    const plansRes = await authed("get", "/api/v1/billing/plans");
+    plans = (plansRes.body as ApiSuccessResponse<PlanSummary[]>).data;
+
+    // Every successful upgrade() call generates exactly one Invoice
+    // (InvoiceGenerationListener on SUBSCRIPTION_UPGRADED) — this also
+    // converts TRIAL -> ACTIVE, the same path already covered in the
+    // Subscription suite above.
+    const growth = plans.find((p) => p.name === "Growth")!;
+    await authed("post", "/api/v1/billing/subscription/upgrade").send({ planId: growth.id });
+
+    const invoices = await waitForInvoiceCount(1);
+    firstInvoiceId = invoices[0]!.id;
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  function server(): Server {
+    return app.getHttpServer() as Server;
+  }
+
+  function authed(method: "get" | "post" | "patch", path: string, token = ownerAccessToken) {
+    return request(server())[method](path).set("Authorization", `Bearer ${token}`);
+  }
+
+  function extractToken(link: string): string {
+    return new URL(link).searchParams.get("token") ?? "";
+  }
+
+  function extractLink(to: string, category = "email-verification"): string {
+    const job = sentEmails.find((email) => email.to === to && email.category === category);
+    const link = job?.html.match(/href="([^"]+)"/)?.[1];
+    if (!link) {
+      throw new Error(`No ${category} email found for ${to}`);
+    }
+    return link;
+  }
+
+  async function inviteAndAccept(
+    email: string,
+    mobileNumber: string,
+    fullName: string,
+    role: string,
+  ): Promise<string> {
+    await request(server()).post("/api/v1/auth/register").send({
+      fullName,
+      email,
+      mobileNumber,
+      password,
+    });
+    const verifyToken = extractToken(extractLink(email));
+    const verifyRes = await request(server())
+      .post("/api/v1/auth/verify-email")
+      .send({ token: verifyToken });
+    const memberTokens = (verifyRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data
+      .tokens;
+
+    await authed("post", "/api/v1/team/invitations").send({ email, role });
+    const inviteToken = extractToken(extractLink(email, "team-invitation"));
+    const acceptRes = await request(server())
+      .post("/api/v1/team/invitations/accept")
+      .set("Authorization", `Bearer ${memberTokens.accessToken}`)
+      .send({ token: inviteToken });
+    const acceptBody = (acceptRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data;
+
+    return acceptBody.tokens.accessToken;
+  }
+
+  /**
+   * Invoice generation is InvoiceGenerationListener reacting to
+   * SUBSCRIPTION_UPGRADED — eventEmitter.emit() is fire-and-forget (not
+   * emitAsync), same as every other domain event in this codebase (e.g.
+   * WorkspaceCreatedListener's reactive trial creation), so the Invoice
+   * isn't guaranteed to exist the instant the upgrade HTTP response
+   * returns. Polls rather than asserting synchronous completion.
+   */
+  async function waitForInvoiceCount(min: number): Promise<InvoiceSummary[]> {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const res = await authed("get", "/api/v1/billing/invoices");
+      const invoices = (res.body as ApiSuccessResponse<InvoiceSummary[]>).data;
+      if (invoices.length >= min) {
+        return invoices;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error(`Timed out waiting for at least ${min} Invoice(s)`);
+  }
+
+  it("generates an ISSUED Invoice internally on upgrade, with null amount (Plan pricing not yet approved)", async () => {
+    const res = await authed("get", `/api/v1/billing/invoices/${firstInvoiceId}`);
+    expect(res.status).toBe(200);
+    const invoice = (res.body as ApiSuccessResponse<InvoiceSummary>).data;
+    expect(invoice.workspaceId).toBe(workspaceId);
+    expect(invoice.status).toBe("ISSUED");
+    expect(invoice.amount).toBeNull();
+    expect(invoice.invoiceNumber).toMatch(/^INV-/);
+  });
+
+  it("Sales Executive (no BILLING_ACCESS) is forbidden from viewing Invoices; Administrator (VIEW_ONLY) can view", async () => {
+    const execRes = await authed("get", "/api/v1/billing/invoices", salesExecutiveAccessToken);
+    expect(execRes.status).toBe(403);
+
+    const adminRes = await authed("get", "/api/v1/billing/invoices", administratorAccessToken);
+    expect(adminRes.status).toBe(200);
+  });
+
+  it("rejects an unknown Invoice id with 404", async () => {
+    const res = await authed("get", "/api/v1/billing/invoices/000000000000000000000000");
+    expect(res.status).toBe(404);
+  });
+
+  it("Administrator (VIEW_ONLY, not Owner) is forbidden from recording a Payment (TD-010 interim restriction)", async () => {
+    const res = await authed("post", "/api/v1/billing/payments", administratorAccessToken).send({
+      invoiceId: firstInvoiceId,
+      gateway: "BANK_TRANSFER",
+      gatewayReference: "REF-ADMIN-1",
+      amount: 999,
+      currency: "INR",
+      outcome: "PAID",
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects Invalid Amount and Invalid Currency", async () => {
+    const invalidAmountRes = await authed("post", "/api/v1/billing/payments").send({
+      invoiceId: firstInvoiceId,
+      gateway: "BANK_TRANSFER",
+      gatewayReference: "REF-2",
+      amount: 0,
+      currency: "INR",
+      outcome: "PAID",
+    });
+    expect(invalidAmountRes.status).toBe(400);
+
+    const invalidCurrencyRes = await authed("post", "/api/v1/billing/payments").send({
+      invoiceId: firstInvoiceId,
+      gateway: "BANK_TRANSFER",
+      gatewayReference: "REF-3",
+      amount: 999,
+      currency: "USD",
+      outcome: "PAID",
+    });
+    expect(invalidCurrencyRes.status).toBe(400);
+  });
+
+  it("Owner records a PAID Payment, closing the Invoice", async () => {
+    const res = await authed("post", "/api/v1/billing/payments").send({
+      invoiceId: firstInvoiceId,
+      gateway: "BANK_TRANSFER",
+      gatewayReference: "REF-4",
+      amount: 999,
+      currency: "INR",
+      outcome: "PAID",
+    });
+    expect(res.status).toBe(201);
+    const payment = (res.body as ApiSuccessResponse<PaymentSummary>).data;
+    expect(payment.status).toBe("PAID");
+
+    const invoiceRes = await authed("get", `/api/v1/billing/invoices/${firstInvoiceId}`);
+    expect((invoiceRes.body as ApiSuccessResponse<InvoiceSummary>).data.status).toBe("PAID");
+  });
+
+  it("rejects a second Payment attempt against an already-PAID Invoice (Duplicate Payment / Invalid Invoice Status)", async () => {
+    const res = await authed("post", "/api/v1/billing/payments").send({
+      invoiceId: firstInvoiceId,
+      gateway: "BANK_TRANSFER",
+      gatewayReference: "REF-5",
+      amount: 999,
+      currency: "INR",
+      outcome: "PAID",
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("records a FAILED Payment on a fresh Invoice without closing it, allowing a subsequent retry", async () => {
+    // A second upgrade() call generates a second Invoice.
+    const starter = plans.find((p) => p.name === "Starter")!;
+    await authed("post", "/api/v1/billing/subscription/upgrade").send({ planId: starter.id });
+    const invoices = await waitForInvoiceCount(2);
+    const secondInvoice = invoices.find((i) => i.id !== firstInvoiceId)!;
+
+    const failedRes = await authed("post", "/api/v1/billing/payments").send({
+      invoiceId: secondInvoice.id,
+      gateway: "BANK_TRANSFER",
+      gatewayReference: "REF-FAIL-1",
+      amount: 999,
+      currency: "INR",
+      outcome: "FAILED",
+    });
+    expect(failedRes.status).toBe(201);
+    expect((failedRes.body as ApiSuccessResponse<PaymentSummary>).data.status).toBe("FAILED");
+
+    const stillIssuedRes = await authed("get", `/api/v1/billing/invoices/${secondInvoice.id}`);
+    expect((stillIssuedRes.body as ApiSuccessResponse<InvoiceSummary>).data.status).toBe("ISSUED");
+
+    // A retry (new Payment attempt) against the same still-ISSUED Invoice succeeds.
+    const retryRes = await authed("post", "/api/v1/billing/payments").send({
+      invoiceId: secondInvoice.id,
+      gateway: "BANK_TRANSFER",
+      gatewayReference: "REF-RETRY-1",
+      amount: 999,
+      currency: "INR",
+      outcome: "PAID",
+    });
+    expect(retryRes.status).toBe(201);
+    expect((retryRes.body as ApiSuccessResponse<PaymentSummary>).data.status).toBe("PAID");
+  });
+
+  it("refunds a PAID Payment, reverting the Invoice to REFUNDED, and rejects a second refund", async () => {
+    const paymentsRes = await authed("get", "/api/v1/billing/payments");
+    const paidPayment = (paymentsRes.body as ApiSuccessResponse<PaymentSummary[]>).data.find(
+      (p) => p.invoiceId === firstInvoiceId && p.status === PaymentStatus.PAID,
+    )!;
+
+    const refundRes = await authed("post", "/api/v1/billing/refunds").send({
+      paymentId: paidPayment.id,
+    });
+    expect(refundRes.status).toBe(201);
+    expect((refundRes.body as ApiSuccessResponse<PaymentSummary>).data.status).toBe("REFUNDED");
+
+    const invoiceRes = await authed("get", `/api/v1/billing/invoices/${firstInvoiceId}`);
+    expect((invoiceRes.body as ApiSuccessResponse<InvoiceSummary>).data.status).toBe("REFUNDED");
+
+    const secondRefundRes = await authed("post", "/api/v1/billing/refunds").send({
+      paymentId: paidPayment.id,
+    });
+    expect(secondRefundRes.status).toBe(400);
+  });
+
+  it("flags an overdue Invoice exactly once (sweep invoked directly against the real DB)", async () => {
+    // A third upgrade generates a fresh Invoice, due 7 days from issue.
+    const growth = plans.find((p) => p.name === "Growth")!;
+    await authed("post", "/api/v1/billing/subscription/upgrade").send({ planId: growth.id });
+    await waitForInvoiceCount(3);
+
+    const future = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+    const flaggedFirstPass = await invoiceService.flagOverdueInvoices(future);
+    expect(flaggedFirstPass).toBeGreaterThanOrEqual(1);
+
+    // Idempotent: a second pass at the same (or later) time doesn't re-flag it.
+    const flaggedSecondPass = await invoiceService.flagOverdueInvoices(
+      new Date(future.getTime() + 60 * 60 * 1000),
+    );
+    expect(flaggedSecondPass).toBe(0);
   });
 });

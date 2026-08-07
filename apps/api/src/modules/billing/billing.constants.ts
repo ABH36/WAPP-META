@@ -2,3 +2,8 @@
 export const SUBSCRIPTION_LIFECYCLE_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 
 export const SUBSCRIPTION_LIFECYCLE_QUEUE = "subscription-lifecycle";
+
+/** Same hourly cadence — overdue detection doesn't need minute-level precision either. */
+export const INVOICE_LIFECYCLE_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+
+export const INVOICE_LIFECYCLE_QUEUE = "invoice-lifecycle";
