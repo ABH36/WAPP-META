@@ -11,15 +11,18 @@ import { CustomerRepository } from "./repositories/customer.repository.js";
 import { LeadRepository } from "./repositories/lead.repository.js";
 import { DealRepository } from "./repositories/deal.repository.js";
 import { ActivityRepository } from "./repositories/activity.repository.js";
+import { ReportsRepository } from "./repositories/reports.repository.js";
 import { CustomerService } from "./services/customer.service.js";
 import { LeadService } from "./services/lead.service.js";
 import { LeadConversionService } from "./services/lead-conversion.service.js";
 import { DealService } from "./services/deal.service.js";
 import { ActivityService } from "./services/activity.service.js";
+import { ReportsService } from "./services/reports.service.js";
 import { CustomerController } from "./controllers/customer.controller.js";
 import { LeadController } from "./controllers/lead.controller.js";
 import { DealController } from "./controllers/deal.controller.js";
 import { ActivityController } from "./controllers/activity.controller.js";
+import { ReportsController } from "./controllers/reports.controller.js";
 
 /**
  * CRM (Phase-5). Part-1 (PRD-004 Volume-1 — Customer Management,
@@ -65,8 +68,17 @@ import { ActivityController } from "./controllers/activity.controller.js";
  * own; access is inherited from whichever record an Activity references,
  * checked inline in ActivityService rather than via `@RequirePermission`.
  *
- * Part-6 (CRM Reports & Dashboard) remains later scope, reviewed and
- * approved as its own slice.
+ * Part-6 (CRM Reports & Dashboard, PRD-004 Volume-6, 2026-08-07) adds no
+ * new collection — Reports never owns transactional data (§3), it only
+ * reads across Customer/Lead/Deal/Activity's existing models via
+ * aggregation. ReportsRepository injects those four models directly
+ * (already registered above) rather than routing through their own
+ * CRUD-oriented repositories — see
+ * docs/ADR-CRM-019-crm-reporting-strategy.md. `VIEW_REPORTS` (already
+ * pre-scaffolded) gates every route with a plain static
+ * `@RequirePermission`, workspace-wide like every other permission in this
+ * codebase — see docs/ADR-CRM-020-report-visibility-strategy.md. This is
+ * the final part of the approved 6-part Phase-5 CRM sequence.
  */
 @Module({
   imports: [
@@ -80,17 +92,25 @@ import { ActivityController } from "./controllers/activity.controller.js";
       { name: Activity.name, schema: ActivitySchema },
     ]),
   ],
-  controllers: [CustomerController, LeadController, DealController, ActivityController],
+  controllers: [
+    CustomerController,
+    LeadController,
+    DealController,
+    ActivityController,
+    ReportsController,
+  ],
   providers: [
     CustomerRepository,
     LeadRepository,
     DealRepository,
     ActivityRepository,
+    ReportsRepository,
     CustomerService,
     LeadService,
     LeadConversionService,
     DealService,
     ActivityService,
+    ReportsService,
   ],
 })
 export class CrmModule {}
