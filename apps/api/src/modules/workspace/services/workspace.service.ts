@@ -4,10 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { TenantRole, WorkspaceMemberStatus } from "@wapp/shared-types";
-import type { AppConfig } from "../../../config/configuration.js";
 import { DomainEvent } from "../../../common/events/domain-events.js";
 import type {
   WorkspaceCreatedPayload,
@@ -37,7 +35,6 @@ export class WorkspaceService {
     private readonly workspaceRepository: WorkspaceRepository,
     private readonly userRepository: UserRepository,
     private readonly authService: AuthService,
-    private readonly config: ConfigService<AppConfig, true>,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -55,13 +52,9 @@ export class WorkspaceService {
       throw new ConflictException("You already belong to a workspace");
     }
 
-    const { trialDurationDays } = this.config.get("workspace", { infer: true });
-    const trialEndsAt = new Date(Date.now() + trialDurationDays * 86_400_000);
-
     const workspace = await this.workspaceRepository.create({
       name: dto.name,
       ownerId: userId,
-      trialEndsAt,
     });
     const workspaceId = workspace._id.toString();
 

@@ -38,7 +38,6 @@ export function toWorkspaceProfile(workspace: WorkspaceDocument): WorkspaceProfi
     },
     language: workspace.language,
     status: workspace.status,
-    trialEndsAt: workspace.trialEndsAt.toISOString(),
     createdAt: workspace.createdAt.toISOString(),
   };
 }

@@ -8,7 +8,6 @@ import type { BusinessHoursDay, PublicHoliday } from "../schemas/workspace.schem
 export interface CreateWorkspaceInput {
   name: string;
   ownerId: string;
-  trialEndsAt: Date;
 }
 
 @Injectable()
@@ -21,7 +20,6 @@ export class WorkspaceRepository {
     return this.workspaceModel.create({
       name: input.name,
       ownerId: input.ownerId,
-      trialEndsAt: input.trialEndsAt,
     });
   }
 

@@ -115,6 +115,23 @@ export const DomainEvent = {
   FOLLOW_UP_UNASSIGNED: "crm.follow_up_unassigned",
   FOLLOW_UP_COMPLETED: "crm.follow_up_completed",
   NOTE_ADDED: "crm.note_added",
+  // Phase-6 Part-1 (Subscription & Plans, PRD-005 Volume-1 §14/BR-006).
+  // SUBSCRIPTION_ACTIVATED fires only on the TRIAL/GRACE_PERIOD/SUSPENDED
+  // -> ACTIVE transition (a real reactivation), not on every update.
+  // GRACE_PERIOD_STARTED covers both trial-expiry-into-grace and paid-
+  // period-lapse-into-grace (§4's linear diagram is the maximal path, not a
+  // mandatory one through every state — same reasoning already applied to
+  // Lead's LOST/UNQUALIFIED and Deal's LOST reachability) — see
+  // docs/ADR-BILL-002-workspace-billing-synchronization.md.
+  SUBSCRIPTION_CREATED: "billing.subscription_created",
+  TRIAL_STARTED: "billing.trial_started",
+  TRIAL_EXPIRED: "billing.trial_expired",
+  SUBSCRIPTION_ACTIVATED: "billing.subscription_activated",
+  SUBSCRIPTION_UPGRADED: "billing.subscription_upgraded",
+  SUBSCRIPTION_DOWNGRADED: "billing.subscription_downgraded",
+  SUBSCRIPTION_CANCELLED: "billing.subscription_cancelled",
+  GRACE_PERIOD_STARTED: "billing.grace_period_started",
+  SUBSCRIPTION_SUSPENDED: "billing.subscription_suspended",
 } as const;
 
 interface BaseEventPayload {
@@ -384,4 +401,53 @@ export interface FollowUpAssignedPayload extends BaseEventPayload {
 export interface FollowUpCompletedPayload extends BaseEventPayload {
   activityId: string;
   actorId: string;
+}
+
+export interface SubscriptionCreatedPayload extends BaseEventPayload {
+  subscriptionId: string;
+  planId: string;
+}
+
+export interface TrialStartedPayload extends BaseEventPayload {
+  subscriptionId: string;
+  trialEndsAt: string;
+}
+
+export interface TrialExpiredPayload extends BaseEventPayload {
+  subscriptionId: string;
+}
+
+export interface SubscriptionActivatedPayload extends BaseEventPayload {
+  subscriptionId: string;
+  planId: string;
+}
+
+export interface SubscriptionUpgradedPayload extends BaseEventPayload {
+  subscriptionId: string;
+  previousPlanId: string;
+  newPlanId: string;
+  actorId: string;
+}
+
+export interface SubscriptionDowngradedPayload extends BaseEventPayload {
+  subscriptionId: string;
+  previousPlanId: string;
+  /** The downgrade is queued, not yet applied — see effectiveAt. */
+  pendingPlanId: string;
+  effectiveAt: string;
+  actorId: string;
+}
+
+export interface SubscriptionCancelledPayload extends BaseEventPayload {
+  subscriptionId: string;
+  actorId: string;
+}
+
+export interface GracePeriodStartedPayload extends BaseEventPayload {
+  subscriptionId: string;
+  graceEndsAt: string;
+}
+
+export interface SubscriptionSuspendedPayload extends BaseEventPayload {
+  subscriptionId: string;
 }

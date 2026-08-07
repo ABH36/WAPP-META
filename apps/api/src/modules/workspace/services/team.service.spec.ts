@@ -36,7 +36,6 @@ function fakeWorkspace(overrides: Partial<Record<string, unknown>> = {}): Worksp
     },
     language: "en",
     status: WorkspaceStatus.TRIAL,
-    trialEndsAt: new Date(Date.now() + 14 * 86_400_000),
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     ...overrides,
   } as unknown as WorkspaceDocument;

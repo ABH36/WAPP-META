@@ -32,7 +32,6 @@ export interface WorkspaceProfile {
   };
   language: string;
   status: WorkspaceStatus;
-  trialEndsAt: string;
   createdAt: string;
 }
 

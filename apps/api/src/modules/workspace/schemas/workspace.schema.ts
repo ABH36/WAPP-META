@@ -128,13 +128,14 @@ export class Workspace {
   @Prop({ type: String, default: "en" })
   language!: string;
 
+  // PRD-005 Volume-1 — the single, canonical, already-live access-control
+  // gate (WorkspaceStatus's own doc comment: "do not re-derive elsewhere").
+  // Defaults to TRIAL here (unchanged); every subsequent transition is
+  // driven by BillingModule's SubscriptionService via domain events, not
+  // written directly by WorkspaceService — see
+  // docs/ADR-BILL-002-workspace-billing-synchronization.md.
   @Prop({ type: String, enum: WorkspaceStatus, default: WorkspaceStatus.TRIAL })
   status!: WorkspaceStatus;
-
-  // TRIAL-BR-002 — trial clock starts at Workspace creation, not registration.
-  // D007 — 14 days, no credit card.
-  @Prop({ required: true })
-  trialEndsAt!: Date;
 
   @Prop({ type: String, default: null })
   createdBy!: string | null;

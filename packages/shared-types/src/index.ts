@@ -5,6 +5,7 @@ export * from "./enums/deal-stage.enum";
 export * from "./enums/conversation-status.enum";
 export * from "./enums/customer-status.enum";
 export * from "./enums/payment-status.enum";
+export * from "./enums/subscription-status.enum";
 export * from "./enums/role.enum";
 export * from "./enums/workspace-member-status.enum";
 export * from "./enums/invitation-status.enum";

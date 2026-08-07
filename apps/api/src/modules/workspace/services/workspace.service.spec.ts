@@ -1,5 +1,4 @@
 import { Test } from "@nestjs/testing";
-import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { TenantRole, WorkspaceMemberStatus, WorkspaceStatus } from "@wapp/shared-types";
@@ -25,7 +24,6 @@ function fakeWorkspace(overrides: Partial<Record<string, unknown>> = {}): Worksp
     },
     language: "en",
     status: WorkspaceStatus.TRIAL,
-    trialEndsAt: new Date(Date.now() + 14 * 86_400_000),
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     ...overrides,
   };
@@ -77,17 +75,6 @@ describe("WorkspaceService", () => {
         {
           provide: AuthService,
           useValue: { reissueTokens: jest.fn() },
-        },
-        {
-          provide: ConfigService,
-          useValue: {
-            get: (key: string) => {
-              if (key === "workspace") {
-                return { trialDurationDays: 14, invitationTokenTtlDays: 7 };
-              }
-              throw new Error(`Unexpected config key: ${key}`);
-            },
-          },
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
