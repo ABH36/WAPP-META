@@ -77,6 +77,21 @@ export const DomainEvent = {
   LEAD_CONVERTED: "crm.lead_converted",
   DEAL_CREATED_FROM_LEAD: "crm.deal_created_from_lead",
   CUSTOMER_CREATED_FROM_LEAD: "crm.customer_created_from_lead",
+  // Phase-5 Part-4 (Deal Management, PRD-004 Volume-4 §15/BR-010). No
+  // generic DEAL_CREATED — DEAL_CREATED_FROM_LEAD (above) already covers
+  // the only creation path (§3, ADR-CRM-010); a second, more generic event
+  // for the same single path would be redundant. Stage changes follow the
+  // same dual-event shape as Lead's status changes: DEAL_WON/DEAL_LOST are
+  // the named milestones, DEAL_STAGE_CHANGED is the generic fallback for
+  // QUALIFICATION/PROPOSAL/NEGOTIATION — see
+  // docs/ADR-CRM-012-deal-lifecycle-strategy.md.
+  DEAL_UPDATED: "crm.deal_updated",
+  DEAL_ASSIGNED: "crm.deal_assigned",
+  DEAL_UNASSIGNED: "crm.deal_unassigned",
+  DEAL_STAGE_CHANGED: "crm.deal_stage_changed",
+  DEAL_WON: "crm.deal_won",
+  DEAL_LOST: "crm.deal_lost",
+  DEAL_REOPENED: "crm.deal_reopened",
 } as const;
 
 interface BaseEventPayload {
@@ -280,4 +295,28 @@ export interface CustomerCreatedFromLeadPayload extends BaseEventPayload {
   contactId: string;
   sourceLeadId: string;
   createdBy: string;
+}
+
+export interface DealUpdatedPayload extends BaseEventPayload {
+  dealId: string;
+  updatedBy: string;
+}
+
+export interface DealAssignedPayload extends BaseEventPayload {
+  dealId: string;
+  /** null for DEAL_UNASSIGNED. */
+  assignedTo: string | null;
+  actorId: string;
+}
+
+export interface DealStageChangedPayload extends BaseEventPayload {
+  dealId: string;
+  previousStage: string;
+  newStage: string;
+  actorId: string;
+}
+
+export interface DealReopenedPayload extends BaseEventPayload {
+  dealId: string;
+  actorId: string;
 }

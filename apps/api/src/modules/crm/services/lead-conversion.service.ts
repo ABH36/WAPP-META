@@ -123,6 +123,12 @@ export class LeadConversionService {
             contactId: lead.contactId.toString(),
             customerId,
             sourceLeadId: leadId,
+            // §5 — carried forward from the converting Lead (PRD-004
+            // Volume-4, resolved 2026-08-06): the Deal starts with the same
+            // descriptive name and, if the Lead was already assigned, the
+            // same assignee — see docs/ADR-CRM-012-deal-lifecycle-strategy.md.
+            title: lead.leadName,
+            assignedTo: lead.assignedUserId,
             createdBy: actorId,
           },
           session,

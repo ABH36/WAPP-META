@@ -12,8 +12,10 @@ import { DealRepository } from "./repositories/deal.repository.js";
 import { CustomerService } from "./services/customer.service.js";
 import { LeadService } from "./services/lead.service.js";
 import { LeadConversionService } from "./services/lead-conversion.service.js";
+import { DealService } from "./services/deal.service.js";
 import { CustomerController } from "./controllers/customer.controller.js";
 import { LeadController } from "./controllers/lead.controller.js";
+import { DealController } from "./controllers/deal.controller.js";
 
 /**
  * CRM (Phase-5). Part-1 (PRD-004 Volume-1 — Customer Management,
@@ -44,8 +46,14 @@ import { LeadController } from "./controllers/lead.controller.js";
  * WorkspaceModule for WorkspaceRepository (§4's Workspace-Active
  * precondition).
  *
- * Part-4 (Deal Management) through Part-6 (CRM Reports & Dashboard) remain
- * later scope, reviewed and approved as their own slices.
+ * Part-4 (Deal Management, PRD-004 Volume-4, 2026-08-06) owns `deals` from
+ * here on — the full pipeline/commercial lifecycle (query, general update,
+ * assignment, stage transitions, reopen). Lead Conversion (Part-3) remains
+ * the only creation path; DealService never creates a Deal itself — see
+ * docs/ADR-CRM-012-deal-lifecycle-strategy.md.
+ *
+ * Part-5 (Activities, Tasks, Follow-ups & Notes) and Part-6 (CRM Reports &
+ * Dashboard) remain later scope, reviewed and approved as their own slices.
  */
 @Module({
   imports: [
@@ -58,7 +66,7 @@ import { LeadController } from "./controllers/lead.controller.js";
       { name: Deal.name, schema: DealSchema },
     ]),
   ],
-  controllers: [CustomerController, LeadController],
+  controllers: [CustomerController, LeadController, DealController],
   providers: [
     CustomerRepository,
     LeadRepository,
@@ -66,6 +74,7 @@ import { LeadController } from "./controllers/lead.controller.js";
     CustomerService,
     LeadService,
     LeadConversionService,
+    DealService,
   ],
 })
 export class CrmModule {}

@@ -1,4 +1,11 @@
-import type { CustomerSource, CustomerStatus, LeadSource, LeadStatus } from "@wapp/shared-types";
+import type {
+  CustomerSource,
+  CustomerStatus,
+  DealLostReason,
+  DealStage,
+  LeadSource,
+  LeadStatus,
+} from "@wapp/shared-types";
 
 export interface CustomerSummary {
   id: string;
@@ -18,6 +25,29 @@ export interface CustomerSummary {
   website: string | null;
   industry: string | null;
   notes: string | null;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DealSummary {
+  id: string;
+  workspaceId: string;
+  contactId: string;
+  customerId: string;
+  sourceLeadId: string;
+  title: string;
+  description: string | null;
+  value: number;
+  currency: string;
+  probability: number;
+  expectedCloseDate: string | null;
+  assignedTo: string | null;
+  stage: DealStage;
+  wonAt: string | null;
+  lostAt: string | null;
+  lostReason: DealLostReason | null;
   createdBy: string;
   updatedBy: string;
   createdAt: string;

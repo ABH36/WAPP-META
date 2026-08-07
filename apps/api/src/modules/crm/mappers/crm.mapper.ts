@@ -1,6 +1,7 @@
 import type { CustomerDocument } from "../schemas/customer.schema.js";
 import type { LeadDocument } from "../schemas/lead.schema.js";
-import type { CustomerSummary, LeadSummary } from "../crm.types.js";
+import type { DealDocument } from "../schemas/deal.schema.js";
+import type { CustomerSummary, DealSummary, LeadSummary } from "../crm.types.js";
 
 export function toCustomerSummary(customer: CustomerDocument): CustomerSummary {
   return {
@@ -51,5 +52,30 @@ export function toLeadSummary(lead: LeadDocument): LeadSummary {
     updatedBy: lead.updatedBy,
     createdAt: lead.createdAt.toISOString(),
     updatedAt: lead.updatedAt.toISOString(),
+  };
+}
+
+export function toDealSummary(deal: DealDocument): DealSummary {
+  return {
+    id: deal._id.toString(),
+    workspaceId: deal.workspaceId,
+    contactId: deal.contactId.toString(),
+    customerId: deal.customerId.toString(),
+    sourceLeadId: deal.sourceLeadId.toString(),
+    title: deal.title,
+    description: deal.description,
+    value: deal.value,
+    currency: deal.currency,
+    probability: deal.probability,
+    expectedCloseDate: deal.expectedCloseDate ? deal.expectedCloseDate.toISOString() : null,
+    assignedTo: deal.assignedTo,
+    stage: deal.stage,
+    wonAt: deal.wonAt ? deal.wonAt.toISOString() : null,
+    lostAt: deal.lostAt ? deal.lostAt.toISOString() : null,
+    lostReason: deal.lostReason,
+    createdBy: deal.createdBy,
+    updatedBy: deal.updatedBy,
+    createdAt: deal.createdAt.toISOString(),
+    updatedAt: deal.updatedAt.toISOString(),
   };
 }
