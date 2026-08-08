@@ -57,6 +57,9 @@ describe("SubscriptionService", () => {
             findLapsedActiveSubscriptions: jest.fn(),
             findExpiredGracePeriods: jest.fn(),
             findDuePendingDowngrades: jest.fn(),
+            extendTrial: jest.fn(),
+            listAllForPlatform: jest.fn(),
+            countByStatus: jest.fn(),
           },
         },
         {
@@ -345,6 +348,196 @@ describe("SubscriptionService", () => {
 
       expect(count).toBe(1);
       expect(subscriptionRepository.applyPendingDowngrade).toHaveBeenCalledWith("subscription-1");
+    });
+  });
+
+  describe("extendTrial (PRD-007 Volume-2 §4.4)", () => {
+    it("extends trialEndsAt/renewalDate and emits TRIAL_EXTENDED", async () => {
+      subscriptionRepository.findById.mockResolvedValue(baseSubscription as never);
+      const newTrialEndsAt = new Date("2026-09-14T00:00:00.000Z");
+      subscriptionRepository.extendTrial.mockResolvedValue({
+        ...baseSubscription,
+        trialEndsAt: newTrialEndsAt,
+        renewalDate: newTrialEndsAt,
+      } as never);
+
+      const result = await service.extendTrial("subscription-1", 30, "Goodwill extension", "op-1");
+
+      expect(subscriptionRepository.extendTrial).toHaveBeenCalledWith(
+        "subscription-1",
+        expect.any(Date),
+        "op-1",
+      );
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        DomainEvent.TRIAL_EXTENDED,
+        expect.objectContaining({
+          workspaceId: "workspace-1",
+          subscriptionId: "subscription-1",
+          reason: "Goodwill extension",
+          actorId: "op-1",
+        }),
+      );
+      expect(result.trialEndsAt).toBe(newTrialEndsAt.toISOString());
+    });
+
+    it("rejects extending a non-TRIAL Subscription", async () => {
+      subscriptionRepository.findById.mockResolvedValue({
+        ...baseSubscription,
+        status: SubscriptionStatus.ACTIVE,
+      } as never);
+
+      await expect(service.extendTrial("subscription-1", 30, "reason", "op-1")).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(subscriptionRepository.extendTrial).not.toHaveBeenCalled();
+    });
+
+    it("rejects an extension beyond 90 days", async () => {
+      await expect(service.extendTrial("subscription-1", 91, "reason", "op-1")).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(subscriptionRepository.findById).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("operatorSetStatus (PRD-007 Volume-2 §4.1)", () => {
+    it("delegates CANCELLED to cancel()", async () => {
+      subscriptionRepository.findById.mockResolvedValue({
+        ...baseSubscription,
+        status: SubscriptionStatus.ACTIVE,
+      } as never);
+      subscriptionRepository.findByWorkspace.mockResolvedValue({
+        ...baseSubscription,
+        status: SubscriptionStatus.ACTIVE,
+      } as never);
+      subscriptionRepository.cancel.mockResolvedValue({
+        ...baseSubscription,
+        status: SubscriptionStatus.CANCELLED,
+      } as never);
+
+      const result = await service.operatorSetStatus(
+        "subscription-1",
+        SubscriptionStatus.CANCELLED,
+        "op-1",
+      );
+
+      expect(result.status).toBe(SubscriptionStatus.CANCELLED);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        DomainEvent.SUBSCRIPTION_CANCELLED,
+        expect.anything(),
+      );
+    });
+
+    it("activates a SUSPENDED Subscription (Resume) and syncs Workspace to ACTIVE", async () => {
+      subscriptionRepository.findById.mockResolvedValue({
+        ...baseSubscription,
+        status: SubscriptionStatus.SUSPENDED,
+      } as never);
+      subscriptionRepository.updateStatus.mockResolvedValue({
+        ...baseSubscription,
+        status: SubscriptionStatus.ACTIVE,
+      } as never);
+
+      const result = await service.operatorSetStatus(
+        "subscription-1",
+        SubscriptionStatus.ACTIVE,
+        "op-1",
+      );
+
+      expect(subscriptionRepository.updateStatus).toHaveBeenCalledWith(
+        "subscription-1",
+        SubscriptionStatus.ACTIVE,
+        "op-1",
+      );
+      expect(workspaceRepository.updateStatus).toHaveBeenCalledWith(
+        "workspace-1",
+        WorkspaceStatus.ACTIVE,
+      );
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        DomainEvent.SUBSCRIPTION_ACTIVATED,
+        expect.anything(),
+      );
+      expect(result.status).toBe(SubscriptionStatus.ACTIVE);
+    });
+
+    it("rejects activating an already-ACTIVE Subscription", async () => {
+      subscriptionRepository.findById.mockResolvedValue({
+        ...baseSubscription,
+        status: SubscriptionStatus.ACTIVE,
+      } as never);
+
+      await expect(
+        service.operatorSetStatus("subscription-1", SubscriptionStatus.ACTIVE, "op-1"),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("rejects activating a CANCELLED (terminal) Subscription", async () => {
+      subscriptionRepository.findById.mockResolvedValue({
+        ...baseSubscription,
+        status: SubscriptionStatus.CANCELLED,
+      } as never);
+
+      await expect(
+        service.operatorSetStatus("subscription-1", SubscriptionStatus.ACTIVE, "op-1"),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("suspends an ACTIVE Subscription and syncs Workspace to EXPIRED (billing-cause, not WorkspaceStatus.SUSPENDED)", async () => {
+      subscriptionRepository.findById.mockResolvedValue({
+        ...baseSubscription,
+        status: SubscriptionStatus.ACTIVE,
+      } as never);
+      subscriptionRepository.updateStatus.mockResolvedValue({
+        ...baseSubscription,
+        status: SubscriptionStatus.SUSPENDED,
+      } as never);
+
+      const result = await service.operatorSetStatus(
+        "subscription-1",
+        SubscriptionStatus.SUSPENDED,
+        "op-1",
+      );
+
+      expect(workspaceRepository.updateStatus).toHaveBeenCalledWith(
+        "workspace-1",
+        WorkspaceStatus.EXPIRED,
+      );
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        DomainEvent.SUBSCRIPTION_SUSPENDED,
+        expect.anything(),
+      );
+      expect(result.status).toBe(SubscriptionStatus.SUSPENDED);
+    });
+
+    it("rejects suspending a TRIAL Subscription", async () => {
+      subscriptionRepository.findById.mockResolvedValue(baseSubscription as never);
+
+      await expect(
+        service.operatorSetStatus("subscription-1", SubscriptionStatus.SUSPENDED, "op-1"),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe("listAllForPlatform / countByStatusForPlatform (PRD-007 Volume-2 §4.1/§4.7)", () => {
+    it("maps repository results to summaries", async () => {
+      subscriptionRepository.listAllForPlatform.mockResolvedValue({
+        items: [baseSubscription as never],
+        total: 1,
+      });
+
+      const result = await service.listAllForPlatform({ workspaceId: "workspace-1" }, 1, 20);
+
+      expect(result.total).toBe(1);
+      expect(result.items[0]?.id).toBe("subscription-1");
+    });
+
+    it("delegates the cross-tenant status count", async () => {
+      subscriptionRepository.countByStatus.mockResolvedValue(5);
+
+      const count = await service.countByStatusForPlatform(SubscriptionStatus.ACTIVE);
+
+      expect(subscriptionRepository.countByStatus).toHaveBeenCalledWith(SubscriptionStatus.ACTIVE);
+      expect(count).toBe(5);
     });
   });
 });

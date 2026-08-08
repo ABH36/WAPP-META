@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
+import { FilterQuery, Model } from "mongoose";
 import { SubscriptionStatus } from "@wapp/shared-types";
 import { Subscription, SubscriptionDocument } from "../schemas/subscription.schema.js";
 
@@ -13,6 +13,17 @@ export interface CreateSubscriptionInput {
   trialEndsAt: Date | null;
   billingCycle: Subscription["billingCycle"];
   createdBy: string;
+}
+
+/** PRD-007 Volume-2 §4.1/§9 — Platform Subscription Operations list filters. */
+export interface ListSubscriptionsForPlatformFilter {
+  workspaceId?: string;
+  status?: SubscriptionStatus;
+}
+
+export interface ListSubscriptionsForPlatformResult {
+  items: SubscriptionDocument[];
+  total: number;
 }
 
 @Injectable()
@@ -140,5 +151,52 @@ export class SubscriptionRepository {
     return this.subscriptionModel
       .find({ pendingPlanId: { $ne: null }, renewalDate: { $lt: now } })
       .exec();
+  }
+
+  /** PRD-007 Volume-2 §4.4 — trialEndsAt/renewalDate stay mirrored while TRIAL, same invariant createTrialForWorkspace() establishes. */
+  async extendTrial(
+    id: string,
+    trialEndsAt: Date,
+    updatedBy: string,
+  ): Promise<SubscriptionDocument | null> {
+    return this.subscriptionModel
+      .findOneAndUpdate(
+        { _id: id },
+        { $set: { trialEndsAt, renewalDate: trialEndsAt, updatedBy } },
+        { new: true },
+      )
+      .exec();
+  }
+
+  /** PRD-007 Volume-2 §4.7 (Billing Dashboard, Total Active Subscriptions) — cross-tenant, deliberately no workspaceId filter. */
+  async countByStatus(status: SubscriptionStatus): Promise<number> {
+    return this.subscriptionModel.countDocuments({ status }).exec();
+  }
+
+  /** PRD-007 Volume-2 §4.1/§9 — cross-tenant list, deliberately no default workspaceId scope. */
+  async listAllForPlatform(
+    filter: ListSubscriptionsForPlatformFilter,
+    page: number,
+    limit: number,
+  ): Promise<ListSubscriptionsForPlatformResult> {
+    const query: FilterQuery<SubscriptionDocument> = {};
+    if (filter.workspaceId) {
+      query.workspaceId = filter.workspaceId;
+    }
+    if (filter.status) {
+      query.status = filter.status;
+    }
+
+    const [items, total] = await Promise.all([
+      this.subscriptionModel
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip((Math.max(page, 1) - 1) * limit)
+        .limit(limit)
+        .exec(),
+      this.subscriptionModel.countDocuments(query).exec(),
+    ]);
+
+    return { items, total };
   }
 }

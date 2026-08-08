@@ -57,6 +57,36 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.NONE,
     [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.NONE,
   },
+  // PRD-007 Volume-2 (Platform Billing Operations & Customer Support) —
+  // Architecture Review, 2026-08-08: every money-touching action
+  // (MANAGE_SUBSCRIPTIONS/MANAGE_PAYMENTS/MANAGE_TRIALS) stays
+  // PLATFORM_SUPER_ADMIN-only; Support roles get VIEW_PLATFORM_BILLING and
+  // MANAGE_SUPPORT (tickets) only.
+  [PlatformPermission.VIEW_PLATFORM_BILLING]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.FULL,
+  },
+  [PlatformPermission.MANAGE_SUBSCRIPTIONS]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.NONE,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.NONE,
+  },
+  [PlatformPermission.MANAGE_PAYMENTS]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.NONE,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.NONE,
+  },
+  [PlatformPermission.MANAGE_TRIALS]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.NONE,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.NONE,
+  },
+  [PlatformPermission.MANAGE_SUPPORT]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.FULL,
+  },
 };
 
 export function getPlatformPermissionLevel(

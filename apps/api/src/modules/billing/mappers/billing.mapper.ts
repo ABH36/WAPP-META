@@ -3,7 +3,9 @@ import type { SubscriptionDocument } from "../schemas/subscription.schema.js";
 import type { InvoiceDocument } from "../schemas/invoice.schema.js";
 import type { PaymentDocument } from "../schemas/payment.schema.js";
 import type { PlanLimitsDocument } from "../schemas/plan-limits.schema.js";
+import type { BillingHistoryEntryDocument } from "../schemas/billing-history-entry.schema.js";
 import type {
+  BillingHistoryEntrySummary,
   InvoiceSummary,
   PaymentSummary,
   PlanLimitsSummary,
@@ -78,8 +80,24 @@ export function toPaymentSummary(payment: PaymentDocument): PaymentSummary {
     paidAt: payment.paidAt ? payment.paidAt.toISOString() : null,
     refundedAt: payment.refundedAt ? payment.refundedAt.toISOString() : null,
     recordedBy: payment.recordedBy,
+    verified: payment.verified,
+    evidenceUrl: payment.evidenceUrl,
     createdAt: payment.createdAt.toISOString(),
     updatedAt: payment.updatedAt.toISOString(),
+  };
+}
+
+export function toBillingHistoryEntrySummary(
+  entry: BillingHistoryEntryDocument,
+): BillingHistoryEntrySummary {
+  return {
+    id: entry._id.toString(),
+    workspaceId: entry.workspaceId,
+    eventType: entry.eventType,
+    description: entry.description,
+    metadata: entry.metadata,
+    occurredAt: entry.occurredAt.toISOString(),
+    createdAt: entry.createdAt.toISOString(),
   };
 }
 

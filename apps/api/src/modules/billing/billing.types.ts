@@ -68,6 +68,9 @@ export interface PaymentSummary {
   paidAt: string | null;
   refundedAt: string | null;
   recordedBy: string;
+  // PRD-007 Volume-2 §4.3 — only ever set by a platform operator's manual recording; always false/null for tenant-recorded Payments.
+  verified: boolean;
+  evidenceUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -118,6 +121,17 @@ export interface CounterUsageSummary {
 export interface UsageSummary {
   workspaceId: string;
   counters: CounterUsageSummary[];
+}
+
+/** PRD-007 Volume-2 §4.5 — Customer Support's "Recent Activity" read. */
+export interface BillingHistoryEntrySummary {
+  id: string;
+  workspaceId: string;
+  eventType: string;
+  description: string;
+  metadata: Record<string, unknown>;
+  occurredAt: string;
+  createdAt: string;
 }
 
 export interface UsageHistoryEntrySummary {

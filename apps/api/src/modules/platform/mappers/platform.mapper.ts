@@ -1,10 +1,12 @@
 import type { WorkspaceDocument } from "../../workspace/schemas/workspace.schema.js";
 import type { UserDocument } from "../../identity/schemas/user.schema.js";
 import type { PlatformAnnouncementDocument } from "../schemas/platform-announcement.schema.js";
+import type { SupportTicketDocument } from "../schemas/support-ticket.schema.js";
 import type {
   PlatformAnnouncementSummary,
   PlatformSearchUserSummary,
   PlatformWorkspaceSummary,
+  SupportTicketSummary,
 } from "../platform.types.js";
 
 export function toPlatformWorkspaceSummary(workspace: WorkspaceDocument): PlatformWorkspaceSummary {
@@ -43,5 +45,21 @@ export function toPlatformSearchUserSummary(user: UserDocument): PlatformSearchU
     email: user.email,
     workspaceId: user.workspaceId,
     createdAt: user.createdAt.toISOString(),
+  };
+}
+
+export function toSupportTicketSummary(ticket: SupportTicketDocument): SupportTicketSummary {
+  return {
+    id: ticket._id.toString(),
+    workspaceId: ticket.workspaceId,
+    title: ticket.title,
+    category: ticket.category,
+    priority: ticket.priority,
+    status: ticket.status,
+    assignedOperator: ticket.assignedOperator,
+    resolution: ticket.resolution,
+    createdBy: ticket.createdBy,
+    createdAt: ticket.createdAt.toISOString(),
+    updatedAt: ticket.updatedAt.toISOString(),
   };
 }

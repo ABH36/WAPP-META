@@ -13,7 +13,10 @@ describe("BillingHistoryService", () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         BillingHistoryService,
-        { provide: BillingHistoryRepository, useValue: { record: jest.fn() } },
+        {
+          provide: BillingHistoryRepository,
+          useValue: { record: jest.fn(), findByWorkspace: jest.fn(), countByEventType: jest.fn() },
+        },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
@@ -38,5 +41,37 @@ describe("BillingHistoryService", () => {
       DomainEvent.BILLING_HISTORY_RECORDED,
       expect.objectContaining({ entryId: "entry-1", eventType: DomainEvent.TRIAL_STARTED }),
     );
+  });
+
+  describe("listRecentForWorkspace / countByEventTypeForPlatform (PRD-007 Volume-2 §4.5/§4.7)", () => {
+    it("maps repository results to summaries", async () => {
+      billingHistoryRepository.findByWorkspace.mockResolvedValue([
+        {
+          _id: { toString: () => "entry-1" },
+          workspaceId: "workspace-1",
+          eventType: DomainEvent.TRIAL_STARTED,
+          description: "Trial Started",
+          metadata: {},
+          occurredAt: new Date("2026-08-01T00:00:00.000Z"),
+          createdAt: new Date("2026-08-01T00:00:00.000Z"),
+        } as never,
+      ]);
+
+      const result = await service.listRecentForWorkspace("workspace-1", 20);
+
+      expect(billingHistoryRepository.findByWorkspace).toHaveBeenCalledWith("workspace-1", 20);
+      expect(result[0]?.id).toBe("entry-1");
+    });
+
+    it("delegates the cross-tenant event-type count", async () => {
+      billingHistoryRepository.countByEventType.mockResolvedValue(7);
+
+      const count = await service.countByEventTypeForPlatform(DomainEvent.TRIAL_EXTENDED);
+
+      expect(billingHistoryRepository.countByEventType).toHaveBeenCalledWith(
+        DomainEvent.TRIAL_EXTENDED,
+      );
+      expect(count).toBe(7);
+    });
   });
 });

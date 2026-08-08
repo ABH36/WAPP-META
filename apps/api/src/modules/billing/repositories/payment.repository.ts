@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
+import { FilterQuery, Model } from "mongoose";
 import { PaymentStatus } from "@wapp/shared-types";
 import { Payment, PaymentDocument } from "../schemas/payment.schema.js";
 
@@ -12,6 +12,19 @@ export interface CreatePaymentInput {
   amount: number;
   currency: string;
   recordedBy: string;
+  verified?: boolean;
+  evidenceUrl?: string | null;
+}
+
+/** PRD-007 Volume-2 §4.1/§9 — Platform Payment Operations list filters. */
+export interface ListPaymentsForPlatformFilter {
+  workspaceId?: string;
+  status?: PaymentStatus;
+}
+
+export interface ListPaymentsForPlatformResult {
+  items: PaymentDocument[];
+  total: number;
 }
 
 @Injectable()
@@ -25,6 +38,8 @@ export class PaymentRepository {
   async create(input: CreatePaymentInput): Promise<PaymentDocument> {
     return this.paymentModel.create({
       ...input,
+      verified: input.verified ?? false,
+      evidenceUrl: input.evidenceUrl ?? null,
       status: PaymentStatus.PENDING,
       paidAt: null,
       refundedAt: null,
@@ -72,5 +87,42 @@ export class PaymentRepository {
         { new: true },
       )
       .exec();
+  }
+
+  /** PRD-007 Volume-2 §4.7 (Billing Dashboard, Refund Requests/Failed Payments) — cross-tenant, deliberately no workspaceId filter. */
+  async countByStatus(status: PaymentStatus): Promise<number> {
+    return this.paymentModel.countDocuments({ status }).exec();
+  }
+
+  /** PRD-007 Volume-2 §4.7 (Billing Dashboard, Manual Payments) — a platform operator's own recorded Payments (verified=true is only ever set by the platform manual-recording flow, never tenant self-service). */
+  async countVerified(): Promise<number> {
+    return this.paymentModel.countDocuments({ verified: true }).exec();
+  }
+
+  /** PRD-007 Volume-2 §4.1/§9 — cross-tenant list, deliberately no default workspaceId scope. */
+  async listAllForPlatform(
+    filter: ListPaymentsForPlatformFilter,
+    page: number,
+    limit: number,
+  ): Promise<ListPaymentsForPlatformResult> {
+    const query: FilterQuery<PaymentDocument> = {};
+    if (filter.workspaceId) {
+      query.workspaceId = filter.workspaceId;
+    }
+    if (filter.status) {
+      query.status = filter.status;
+    }
+
+    const [items, total] = await Promise.all([
+      this.paymentModel
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip((Math.max(page, 1) - 1) * limit)
+        .limit(limit)
+        .exec(),
+      this.paymentModel.countDocuments(query).exec(),
+    ]);
+
+    return { items, total };
   }
 }

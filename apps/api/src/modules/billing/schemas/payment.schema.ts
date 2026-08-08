@@ -52,6 +52,18 @@ export class Payment {
   @Prop({ type: String, required: true })
   recordedBy!: string;
 
+  // PRD-007 Volume-2 §4.3 — "Mark Payment Verified"/"Attach Payment
+  // Evidence" are folded into recording itself (Architecture Review,
+  // 2026-08-08) rather than separate actions: a platform operator manually
+  // recording a Payment can mark it verified and attach evidence in the
+  // same call. Always false/null for tenant-recorded Payments (the
+  // existing POST /billing/payments never sets these).
+  @Prop({ type: Boolean, default: false })
+  verified!: boolean;
+
+  @Prop({ type: String, default: null })
+  evidenceUrl!: string | null;
+
   createdAt!: Date;
   updatedAt!: Date;
 }

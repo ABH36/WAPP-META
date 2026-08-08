@@ -1,19 +1,29 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
-import { BillingCycle } from "@wapp/shared-types";
+import { BillingCycle, InvoiceStatus } from "@wapp/shared-types";
 import { DomainEvent } from "../../../common/events/domain-events.js";
 import type {
   InvoiceGeneratedPayload,
   InvoiceOverduePayload,
   InvoicePaidPayload,
+  InvoiceVoidedPayload,
 } from "../../../common/events/domain-events.js";
-import { InvoiceRepository } from "../repositories/invoice.repository.js";
+import {
+  InvoiceRepository,
+  ListInvoicesForPlatformFilter,
+  ListInvoicesForPlatformResult as RepositoryListInvoicesResult,
+} from "../repositories/invoice.repository.js";
 import { InvoiceCounterRepository } from "../repositories/invoice-counter.repository.js";
 import { PlanRepository } from "../repositories/plan.repository.js";
 import { SubscriptionRepository } from "../repositories/subscription.repository.js";
 import { toInvoiceSummary } from "../mappers/billing.mapper.js";
 import type { InvoiceSummary } from "../billing.types.js";
 import type { InvoiceDocument } from "../schemas/invoice.schema.js";
+
+export interface ListInvoicesForPlatformResult {
+  items: InvoiceSummary[];
+  total: number;
+}
 
 /**
  * Invoice due window: 7 days from issue. Not a PRD-005 §7 field — an
@@ -155,8 +165,61 @@ export class InvoiceService {
     return this.findOrThrow(invoiceId, workspaceId);
   }
 
+  /** PRD-007 Volume-2 §4.2/§9 — the first real consumer of InvoiceStatus.VOID; only an ISSUED Invoice can be voided (a PAID/REFUNDED one has real money attached, VOID is for a mistaken/duplicate/no-longer-owed ISSUED Invoice). */
+  async void(invoiceId: string, reason: string, actorId: string): Promise<InvoiceSummary> {
+    const invoice = await this.findByIdOrThrow(invoiceId);
+    if (invoice.status !== InvoiceStatus.ISSUED) {
+      throw new BadRequestException(`Cannot void an Invoice that is ${invoice.status}`);
+    }
+
+    const updated = await this.invoiceRepository.void(invoiceId);
+    if (!updated) {
+      throw new NotFoundException("Invoice not found");
+    }
+
+    this.eventEmitter.emit(DomainEvent.INVOICE_VOIDED, {
+      workspaceId: invoice.workspaceId,
+      invoiceId,
+      reason,
+      actorId,
+      occurredAt: new Date().toISOString(),
+    } satisfies InvoiceVoidedPayload);
+
+    return toInvoiceSummary(updated);
+  }
+
+  /** PRD-007 Volume-2 §4.1/§9 — cross-tenant read by id, no workspace scoping required. */
+  async getById(invoiceId: string): Promise<InvoiceSummary> {
+    const invoice = await this.findByIdOrThrow(invoiceId);
+    return toInvoiceSummary(invoice);
+  }
+
+  /** PRD-007 Volume-2 §4.1/§9 — cross-tenant list (also composes §4.5's Customer Support view when filtered by workspaceId). */
+  async listAllForPlatform(
+    filter: ListInvoicesForPlatformFilter,
+    page: number,
+    limit: number,
+  ): Promise<ListInvoicesForPlatformResult> {
+    const { items, total }: RepositoryListInvoicesResult =
+      await this.invoiceRepository.listAllForPlatform(filter, page, limit);
+    return { items: items.map(toInvoiceSummary), total };
+  }
+
+  /** PRD-007 Volume-2 §4.7 (Billing Dashboard, Outstanding Invoices). */
+  async countByStatusForPlatform(status: InvoiceStatus): Promise<number> {
+    return this.invoiceRepository.countByStatus(status);
+  }
+
   private async findOrThrow(invoiceId: string, workspaceId: string): Promise<InvoiceDocument> {
     const invoice = await this.invoiceRepository.findByIdForWorkspace(invoiceId, workspaceId);
+    if (!invoice) {
+      throw new NotFoundException("Invoice not found");
+    }
+    return invoice;
+  }
+
+  private async findByIdOrThrow(invoiceId: string): Promise<InvoiceDocument> {
+    const invoice = await this.invoiceRepository.findById(invoiceId);
     if (!invoice) {
       throw new NotFoundException("Invoice not found");
     }

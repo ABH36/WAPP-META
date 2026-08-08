@@ -1,5 +1,10 @@
 import type { PlatformRole, WorkspaceStatus } from "@wapp/shared-types";
 import type { AnnouncementTargetType } from "./schemas/platform-announcement.schema.js";
+import type {
+  SupportTicketCategory,
+  SupportTicketPriority,
+  SupportTicketStatus,
+} from "./schemas/support-ticket.schema.js";
 
 /** PRD-007 Volume-1 — a distinct `type` discriminator from the tenant AccessTokenPayload's `"access"`, on top of the already-separate signing secret. */
 export interface PlatformAccessTokenPayload {
@@ -66,4 +71,19 @@ export interface PlatformSearchUserSummary {
   email: string;
   workspaceId: string | null;
   createdAt: string;
+}
+
+/** PRD-007 Volume-2 §4.6. */
+export interface SupportTicketSummary {
+  id: string;
+  workspaceId: string;
+  title: string;
+  category: SupportTicketCategory;
+  priority: SupportTicketPriority;
+  status: SupportTicketStatus;
+  assignedOperator: string | null;
+  resolution: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
 }

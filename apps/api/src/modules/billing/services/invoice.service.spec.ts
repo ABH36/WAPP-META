@@ -1,6 +1,6 @@
 import { Test } from "@nestjs/testing";
 import { EventEmitter2 } from "@nestjs/event-emitter";
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { BillingCycle, InvoiceStatus } from "@wapp/shared-types";
 import { InvoiceService } from "./invoice.service.js";
 import { InvoiceRepository } from "../repositories/invoice.repository.js";
@@ -61,6 +61,9 @@ describe("InvoiceService", () => {
             markRefunded: jest.fn(),
             findOverdueCandidates: jest.fn(),
             markOverdueNotified: jest.fn(),
+            void: jest.fn(),
+            listAllForPlatform: jest.fn(),
+            countByStatus: jest.fn(),
           },
         },
         { provide: InvoiceCounterRepository, useValue: { next: jest.fn() } },
@@ -188,6 +191,71 @@ describe("InvoiceService", () => {
         DomainEvent.INVOICE_OVERDUE,
         expect.objectContaining({ invoiceId: "invoice-1" }),
       );
+    });
+  });
+
+  describe("void (PRD-007 Volume-2 §4.2)", () => {
+    it("voids an ISSUED Invoice and emits INVOICE_VOIDED", async () => {
+      invoiceRepository.findById.mockResolvedValue(baseInvoice as never);
+      invoiceRepository.void.mockResolvedValue({
+        ...baseInvoice,
+        status: InvoiceStatus.VOID,
+      } as never);
+
+      const result = await service.void("invoice-1", "Duplicate invoice", "op-1");
+
+      expect(invoiceRepository.void).toHaveBeenCalledWith("invoice-1");
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        DomainEvent.INVOICE_VOIDED,
+        expect.objectContaining({
+          workspaceId: "workspace-1",
+          invoiceId: "invoice-1",
+          reason: "Duplicate invoice",
+          actorId: "op-1",
+        }),
+      );
+      expect(result.status).toBe(InvoiceStatus.VOID);
+    });
+
+    it("rejects voiding a PAID Invoice", async () => {
+      invoiceRepository.findById.mockResolvedValue({
+        ...baseInvoice,
+        status: InvoiceStatus.PAID,
+      } as never);
+
+      await expect(service.void("invoice-1", "reason", "op-1")).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(invoiceRepository.void).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException for a missing Invoice", async () => {
+      invoiceRepository.findById.mockResolvedValue(null);
+
+      await expect(service.void("missing", "reason", "op-1")).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe("listAllForPlatform / countByStatusForPlatform (PRD-007 Volume-2 §4.1/§4.7)", () => {
+    it("maps repository results to summaries", async () => {
+      invoiceRepository.listAllForPlatform.mockResolvedValue({
+        items: [baseInvoice as never],
+        total: 1,
+      });
+
+      const result = await service.listAllForPlatform({ workspaceId: "workspace-1" }, 1, 20);
+
+      expect(result.total).toBe(1);
+      expect(result.items[0]?.id).toBe("invoice-1");
+    });
+
+    it("delegates the cross-tenant status count", async () => {
+      invoiceRepository.countByStatus.mockResolvedValue(3);
+
+      const count = await service.countByStatusForPlatform(InvoiceStatus.ISSUED);
+
+      expect(invoiceRepository.countByStatus).toHaveBeenCalledWith(InvoiceStatus.ISSUED);
+      expect(count).toBe(3);
     });
   });
 });

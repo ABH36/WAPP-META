@@ -6,10 +6,12 @@ import type {
   InvoiceGeneratedPayload,
   InvoiceOverduePayload,
   InvoicePaidPayload,
+  InvoiceVoidedPayload,
   PaymentFailedPayload,
   PaymentInitiatedPayload,
   PaymentPaidPayload,
   PaymentRefundedPayload,
+  PaymentVerifiedPayload,
   SubscriptionActivatedPayload,
   SubscriptionCancelledPayload,
   SubscriptionCreatedPayload,
@@ -17,6 +19,7 @@ import type {
   SubscriptionSuspendedPayload,
   SubscriptionUpgradedPayload,
   TrialExpiredPayload,
+  TrialExtendedPayload,
   TrialStartedPayload,
 } from "../../../common/events/domain-events.js";
 import { BillingHistoryService } from "../services/billing-history.service.js";
@@ -122,6 +125,29 @@ export class BillingHistoryListener {
   @OnEvent(DomainEvent.PAYMENT_REFUNDED)
   async onPaymentRefunded(payload: PaymentRefundedPayload): Promise<void> {
     await this.record(payload, DomainEvent.PAYMENT_REFUNDED, "Refund Issued");
+  }
+
+  // PRD-007 Volume-2 §4/BR-001 — every operator action must generate
+  // Billing History. PLAN_CHANGED_BY_OPERATOR deliberately has no handler
+  // here (the underlying SUBSCRIPTION_UPGRADED/DOWNGRADED it accompanies is
+  // already covered above — a second entry would duplicate it).
+  // SUPPORT_TICKET_CREATED/RESOLVED deliberately have no handler either —
+  // BR-005, tickets never touch business entities, so they never touch
+  // Billing History.
+
+  @OnEvent(DomainEvent.TRIAL_EXTENDED)
+  async onTrialExtended(payload: TrialExtendedPayload): Promise<void> {
+    await this.record(payload, DomainEvent.TRIAL_EXTENDED, `Trial Extended (${payload.reason})`);
+  }
+
+  @OnEvent(DomainEvent.PAYMENT_VERIFIED)
+  async onPaymentVerified(payload: PaymentVerifiedPayload): Promise<void> {
+    await this.record(payload, DomainEvent.PAYMENT_VERIFIED, "Payment Verified");
+  }
+
+  @OnEvent(DomainEvent.INVOICE_VOIDED)
+  async onInvoiceVoided(payload: InvoiceVoidedPayload): Promise<void> {
+    await this.record(payload, DomainEvent.INVOICE_VOIDED, `Invoice Voided (${payload.reason})`);
   }
 
   private async record(

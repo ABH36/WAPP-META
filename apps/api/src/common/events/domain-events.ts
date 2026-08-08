@@ -225,6 +225,29 @@ export const DomainEvent = {
   PLATFORM_FEATURE_UPDATED: "platform.feature_updated",
   PLATFORM_MAINTENANCE_ENABLED: "platform.maintenance_enabled",
   PLATFORM_MAINTENANCE_DISABLED: "platform.maintenance_disabled",
+  // PRD-007 Volume-2 (Platform Billing Operations & Customer Support, §8).
+  // Workspace-scoped (a real workspaceId, BaseEventPayload fits) — every
+  // one of these is an operator action against a specific tenant's Billing
+  // data. TRIAL_EXTENDED/PAYMENT_VERIFIED/INVOICE_VOIDED all get a
+  // BillingHistoryListener handler (BR-001 — every operator action must
+  // generate Billing History). PLAN_CHANGED_BY_OPERATOR deliberately does
+  // NOT get one — it's a pure operator-audit signal layered on top of the
+  // SUBSCRIPTION_UPGRADED/DOWNGRADED event upgrade()/downgrade() already
+  // emits (with actorId = the operator's platformUserId), which is already
+  // covered by BillingHistoryListener's existing handlers — a second entry
+  // for the same change would be a duplicate. SUPPORT_TICKET_CREATED/
+  // RESOLVED never reach Billing History at all — BR-005, tickets are
+  // operational only, never business-entity-touching.
+  // INVOICE_VOIDED isn't in §8's literal 5-event list but is added for
+  // consistency — same reasoning WORKSPACE_ARCHIVED used in Volume-1: Void
+  // is a real, auditable, BR-001-covered operator action with no other
+  // event to hook a Billing History entry onto.
+  TRIAL_EXTENDED: "platform.trial_extended",
+  PLAN_CHANGED_BY_OPERATOR: "platform.plan_changed_by_operator",
+  PAYMENT_VERIFIED: "platform.payment_verified",
+  INVOICE_VOIDED: "platform.invoice_voided",
+  SUPPORT_TICKET_CREATED: "platform.support_ticket_created",
+  SUPPORT_TICKET_RESOLVED: "platform.support_ticket_resolved",
 } as const;
 
 interface BaseEventPayload {
@@ -584,6 +607,10 @@ export interface PaymentRefundedPayload extends BaseEventPayload {
   paymentId: string;
   invoiceId: string;
   actorId: string;
+  // PRD-007 Volume-2 §10 — required for a platform operator's Refund
+  // (§4.3), always null for the pre-existing tenant-side POST /billing/
+  // refunds, which has no reason field.
+  reason: string | null;
 }
 
 export interface BillingHistoryRecordedPayload extends BaseEventPayload {
@@ -734,5 +761,45 @@ export interface PlatformMaintenanceEnabledPayload extends BasePlatformEventPayl
 }
 
 export interface PlatformMaintenanceDisabledPayload extends BasePlatformEventPayload {
+  actorId: string;
+}
+
+/** PRD-007 Volume-2 — every field below is workspace-scoped (extends BaseEventPayload), unlike the platform-wide events above. */
+export interface TrialExtendedPayload extends BaseEventPayload {
+  subscriptionId: string;
+  previousTrialEndsAt: string;
+  newTrialEndsAt: string;
+  reason: string;
+  actorId: string;
+}
+
+export interface PlanChangedByOperatorPayload extends BaseEventPayload {
+  subscriptionId: string;
+  previousPlanId: string;
+  newPlanId: string;
+  immediate: boolean;
+  actorId: string;
+}
+
+export interface PaymentVerifiedPayload extends BaseEventPayload {
+  paymentId: string;
+  actorId: string;
+}
+
+export interface InvoiceVoidedPayload extends BaseEventPayload {
+  invoiceId: string;
+  reason: string;
+  actorId: string;
+}
+
+export interface SupportTicketCreatedPayload extends BaseEventPayload {
+  ticketId: string;
+  category: string;
+  priority: string;
+  actorId: string;
+}
+
+export interface SupportTicketResolvedPayload extends BaseEventPayload {
+  ticketId: string;
   actorId: string;
 }

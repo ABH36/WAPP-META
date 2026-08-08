@@ -3,6 +3,8 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { DomainEvent } from "../../../common/events/domain-events.js";
 import type { BillingHistoryRecordedPayload } from "../../../common/events/domain-events.js";
 import { BillingHistoryRepository } from "../repositories/billing-history.repository.js";
+import { toBillingHistoryEntrySummary } from "../mappers/billing.mapper.js";
+import type { BillingHistoryEntrySummary } from "../billing.types.js";
 
 /**
  * §6/§10 — writes one immutable entry per Billing domain event, then emits
@@ -39,5 +41,19 @@ export class BillingHistoryService {
       eventType,
       occurredAt: occurredAt.toISOString(),
     } satisfies BillingHistoryRecordedPayload);
+  }
+
+  /** PRD-007 Volume-2 §4.5 — Customer Support's "Recent Activity." */
+  async listRecentForWorkspace(
+    workspaceId: string,
+    limit: number,
+  ): Promise<BillingHistoryEntrySummary[]> {
+    const entries = await this.billingHistoryRepository.findByWorkspace(workspaceId, limit);
+    return entries.map(toBillingHistoryEntrySummary);
+  }
+
+  /** PRD-007 Volume-2 §4.7 (Billing Dashboard, Trial Extensions). */
+  async countByEventTypeForPlatform(eventType: string): Promise<number> {
+    return this.billingHistoryRepository.countByEventType(eventType);
   }
 }

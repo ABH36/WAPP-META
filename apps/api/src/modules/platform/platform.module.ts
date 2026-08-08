@@ -21,11 +21,13 @@ import {
   PlatformMaintenanceState,
   PlatformMaintenanceStateSchema,
 } from "./schemas/platform-maintenance-state.schema.js";
+import { SupportTicket, SupportTicketSchema } from "./schemas/support-ticket.schema.js";
 import { PlatformUserRepository } from "./repositories/platform-user.repository.js";
 import { PlatformSessionRepository } from "./repositories/platform-session.repository.js";
 import { PlatformAnnouncementRepository } from "./repositories/platform-announcement.repository.js";
 import { PlatformFeatureFlagOverrideRepository } from "./repositories/platform-feature-flag-override.repository.js";
 import { PlatformMaintenanceStateRepository } from "./repositories/platform-maintenance-state.repository.js";
+import { SupportTicketRepository } from "./repositories/support-ticket.repository.js";
 import { PlatformPasswordService } from "./services/platform-password.service.js";
 import { PlatformTokenService } from "./services/platform-token.service.js";
 import { PlatformAuthService } from "./services/platform-auth.service.js";
@@ -36,6 +38,11 @@ import { PlatformDashboardService } from "./services/platform-dashboard.service.
 import { PlatformFeatureFlagsService } from "./services/platform-feature-flags.service.js";
 import { PlatformMaintenanceService } from "./services/platform-maintenance.service.js";
 import { PlatformSearchService } from "./services/platform-search.service.js";
+import { PlatformSubscriptionsService } from "./services/platform-subscriptions.service.js";
+import { PlatformInvoicesService } from "./services/platform-invoices.service.js";
+import { PlatformPaymentsService } from "./services/platform-payments.service.js";
+import { PlatformBillingDashboardService } from "./services/platform-billing-dashboard.service.js";
+import { PlatformSupportTicketsService } from "./services/platform-support-tickets.service.js";
 import { PlatformAuthGuard } from "./guards/platform-auth.guard.js";
 import { PlatformPermissionsGuard } from "./guards/platform-permissions.guard.js";
 import { PlatformAuthController } from "./controllers/platform-auth.controller.js";
@@ -46,6 +53,11 @@ import { PlatformAnnouncementsController } from "./controllers/platform-announce
 import { PlatformFeatureFlagsController } from "./controllers/platform-feature-flags.controller.js";
 import { PlatformMaintenanceController } from "./controllers/platform-maintenance.controller.js";
 import { PlatformSearchController } from "./controllers/platform-search.controller.js";
+import { PlatformSubscriptionsController } from "./controllers/platform-subscriptions.controller.js";
+import { PlatformInvoicesController } from "./controllers/platform-invoices.controller.js";
+import { PlatformPaymentsController } from "./controllers/platform-payments.controller.js";
+import { PlatformBillingDashboardController } from "./controllers/platform-billing-dashboard.controller.js";
+import { PlatformSupportTicketsController } from "./controllers/platform-support-tickets.controller.js";
 
 /**
  * Platform Administration & Tenant Management (PRD-007 Volume-1) — the
@@ -71,6 +83,7 @@ import { PlatformSearchController } from "./controllers/platform-search.controll
       { name: PlatformAnnouncement.name, schema: PlatformAnnouncementSchema },
       { name: PlatformFeatureFlagOverride.name, schema: PlatformFeatureFlagOverrideSchema },
       { name: PlatformMaintenanceState.name, schema: PlatformMaintenanceStateSchema },
+      { name: SupportTicket.name, schema: SupportTicketSchema },
     ]),
     WorkspaceModule,
     IdentityModule,
@@ -88,6 +101,11 @@ import { PlatformSearchController } from "./controllers/platform-search.controll
     PlatformFeatureFlagsController,
     PlatformMaintenanceController,
     PlatformSearchController,
+    PlatformSubscriptionsController,
+    PlatformInvoicesController,
+    PlatformPaymentsController,
+    PlatformBillingDashboardController,
+    PlatformSupportTicketsController,
   ],
   providers: [
     PlatformUserRepository,
@@ -95,6 +113,7 @@ import { PlatformSearchController } from "./controllers/platform-search.controll
     PlatformAnnouncementRepository,
     PlatformFeatureFlagOverrideRepository,
     PlatformMaintenanceStateRepository,
+    SupportTicketRepository,
     PlatformPasswordService,
     PlatformTokenService,
     PlatformAuthService,
@@ -105,6 +124,11 @@ import { PlatformSearchController } from "./controllers/platform-search.controll
     PlatformFeatureFlagsService,
     PlatformMaintenanceService,
     PlatformSearchService,
+    PlatformSubscriptionsService,
+    PlatformInvoicesService,
+    PlatformPaymentsService,
+    PlatformBillingDashboardService,
+    PlatformSupportTicketsService,
     PlatformAuthGuard,
     PlatformPermissionsGuard,
   ],

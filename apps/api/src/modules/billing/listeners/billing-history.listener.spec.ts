@@ -56,4 +56,64 @@ describe("BillingHistoryListener", () => {
       new Date(occurredAt),
     );
   });
+
+  describe("PRD-007 Volume-2 §4/BR-001 handlers", () => {
+    it("records TRIAL_EXTENDED with the reason in the description", async () => {
+      const occurredAt = new Date().toISOString();
+      await listener.onTrialExtended({
+        workspaceId: "workspace-1",
+        subscriptionId: "subscription-1",
+        previousTrialEndsAt: occurredAt,
+        newTrialEndsAt: occurredAt,
+        reason: "Goodwill extension",
+        actorId: "op-1",
+        occurredAt,
+      });
+
+      expect(billingHistoryService.record).toHaveBeenCalledWith(
+        "workspace-1",
+        DomainEvent.TRIAL_EXTENDED,
+        expect.stringContaining("Goodwill extension"),
+        expect.anything(),
+        new Date(occurredAt),
+      );
+    });
+
+    it("records PAYMENT_VERIFIED", async () => {
+      const occurredAt = new Date().toISOString();
+      await listener.onPaymentVerified({
+        workspaceId: "workspace-1",
+        paymentId: "payment-1",
+        actorId: "op-1",
+        occurredAt,
+      });
+
+      expect(billingHistoryService.record).toHaveBeenCalledWith(
+        "workspace-1",
+        DomainEvent.PAYMENT_VERIFIED,
+        "Payment Verified",
+        expect.anything(),
+        new Date(occurredAt),
+      );
+    });
+
+    it("records INVOICE_VOIDED with the reason in the description", async () => {
+      const occurredAt = new Date().toISOString();
+      await listener.onInvoiceVoided({
+        workspaceId: "workspace-1",
+        invoiceId: "invoice-1",
+        reason: "Duplicate invoice",
+        actorId: "op-1",
+        occurredAt,
+      });
+
+      expect(billingHistoryService.record).toHaveBeenCalledWith(
+        "workspace-1",
+        DomainEvent.INVOICE_VOIDED,
+        expect.stringContaining("Duplicate invoice"),
+        expect.anything(),
+        new Date(occurredAt),
+      );
+    });
+  });
 });

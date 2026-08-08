@@ -148,7 +148,19 @@ import { BillingReportsController } from "./controllers/billing-reports.controll
   ],
   // BillingReportsService exported for PRD-006 Volume-4 — Settings' Data
   // Export reuses its exportReport() rather than duplicating CSV/Excel
-  // generation for Invoice data a third time.
-  exports: [UsageService, BillingReportsService],
+  // generation for Invoice data a third time. Subscription/Invoice/Payment/
+  // BillingHistoryService exported for PRD-007 Volume-2 — Platform Billing
+  // Operations delegates every commercial action to these (BR-006/§11: no
+  // duplicate invoice/payment/subscription logic) rather than reaching into
+  // their repositories directly. See
+  // docs/ADR-PLAT-003-platform-billing-operations-boundary.md.
+  exports: [
+    UsageService,
+    BillingReportsService,
+    SubscriptionService,
+    InvoiceService,
+    PaymentService,
+    BillingHistoryService,
+  ],
 })
 export class BillingModule {}
