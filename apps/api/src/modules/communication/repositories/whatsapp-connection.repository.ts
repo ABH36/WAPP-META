@@ -66,4 +66,26 @@ export class WhatsAppConnectionRepository {
       )
       .exec();
   }
+
+  /** PRD-006 Volume-3 §4.1 — Test Connection / Refresh Metadata success path: clears any prior error and marks the connection healthy again. */
+  async recordSuccess(workspaceId: string, businessName: string | null): Promise<void> {
+    await this.connectionModel
+      .updateOne(
+        { workspaceId },
+        {
+          $set: {
+            status: WhatsAppConnectionStatus.CONNECTED,
+            businessName,
+            lastError: null,
+            lastErrorAt: null,
+          },
+        },
+      )
+      .exec();
+  }
+
+  /** PRD-006 Volume-3 §4.1 — Disconnect. BR-004: never deletes phone numbers/messages, only flips status. */
+  async setStatus(workspaceId: string, status: WhatsAppConnectionStatus): Promise<void> {
+    await this.connectionModel.updateOne({ workspaceId }, { $set: { status } }).exec();
+  }
 }

@@ -188,6 +188,16 @@ export const DomainEvent = {
   USER_PREFERENCES_UPDATED: "settings.user_preferences_updated",
   THEME_CHANGED: "settings.theme_changed",
   NOTIFICATION_PREFERENCES_UPDATED: "settings.notification_preferences_updated",
+  // Phase-7 Part-3 (Integrations & External Services, PRD-006 Volume-3 §8).
+  // Workspace-scope, like SETTINGS_UPDATED — `integrationType` distinguishes
+  // which integration changed rather than adding a new event per type,
+  // matching Volume-1's `section` field convention on SETTINGS_UPDATED.
+  INTEGRATION_CONNECTED: "settings.integration_connected",
+  INTEGRATION_DISCONNECTED: "settings.integration_disconnected",
+  WEBHOOK_CREATED: "settings.webhook_created",
+  WEBHOOK_UPDATED: "settings.webhook_updated",
+  API_KEY_CREATED: "settings.api_key_created",
+  API_KEY_REVOKED: "settings.api_key_revoked",
 } as const;
 
 interface BaseEventPayload {
@@ -605,4 +615,36 @@ export interface ThemeChangedPayload extends BaseEventPayload {
 
 export interface NotificationPreferencesUpdatedPayload extends BaseEventPayload {
   userId: string;
+}
+
+export type IntegrationType = "WHATSAPP" | "EMAIL" | "THIRD_PARTY_APP";
+
+export interface IntegrationConnectedPayload extends BaseEventPayload {
+  integrationType: IntegrationType;
+  actorId: string;
+}
+
+export interface IntegrationDisconnectedPayload extends BaseEventPayload {
+  integrationType: IntegrationType;
+  actorId: string;
+}
+
+export interface WebhookCreatedPayload extends BaseEventPayload {
+  webhookId: string;
+  actorId: string;
+}
+
+export interface WebhookUpdatedPayload extends BaseEventPayload {
+  webhookId: string;
+  actorId: string;
+}
+
+export interface ApiKeyCreatedPayload extends BaseEventPayload {
+  apiKeyId: string;
+  actorId: string;
+}
+
+export interface ApiKeyRevokedPayload extends BaseEventPayload {
+  apiKeyId: string;
+  actorId: string;
 }

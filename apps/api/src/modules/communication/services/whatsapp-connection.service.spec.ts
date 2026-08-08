@@ -22,7 +22,13 @@ describe("WhatsAppConnectionService", () => {
         WhatsAppConnectionService,
         {
           provide: WhatsAppConnectionRepository,
-          useValue: { upsertForWorkspace: jest.fn(), findByWorkspace: jest.fn() },
+          useValue: {
+            upsertForWorkspace: jest.fn(),
+            findByWorkspace: jest.fn(),
+            recordSuccess: jest.fn(),
+            recordError: jest.fn(),
+            setStatus: jest.fn(),
+          },
         },
         {
           provide: PhoneNumberRepository,
@@ -115,5 +121,146 @@ describe("WhatsAppConnectionService", () => {
   it("returns null when the workspace has no connection", async () => {
     connectionRepository.findByWorkspace.mockResolvedValue(null);
     await expect(service.getConnection("workspace-1")).resolves.toBeNull();
+  });
+
+  describe("testConnection", () => {
+    it("records success and returns CONNECTED when Meta confirms the WABA", async () => {
+      connectionRepository.findByWorkspace.mockResolvedValue({
+        wabaId: "waba-1",
+        accessTokenEncrypted: "encrypted-token",
+      } as never);
+      tokenEncryption.decrypt.mockReturnValue("raw-access-token");
+      metaApiClient.getWabaName.mockResolvedValue("Acme Trading Co");
+
+      const result = await service.testConnection("workspace-1");
+
+      expect(metaApiClient.getWabaName).toHaveBeenCalledWith("waba-1", "raw-access-token");
+      expect(connectionRepository.recordSuccess).toHaveBeenCalledWith(
+        "workspace-1",
+        "Acme Trading Co",
+      );
+      expect(result).toEqual({
+        status: WhatsAppConnectionStatus.CONNECTED,
+        verifiedName: "Acme Trading Co",
+        error: null,
+      });
+    });
+
+    it("never throws — records the error and reports ERROR when Meta rejects the call (BR-005)", async () => {
+      connectionRepository.findByWorkspace.mockResolvedValue({
+        wabaId: "waba-1",
+        accessTokenEncrypted: "encrypted-token",
+      } as never);
+      tokenEncryption.decrypt.mockReturnValue("raw-access-token");
+      metaApiClient.getWabaName.mockRejectedValue(new Error("token expired"));
+
+      const result = await service.testConnection("workspace-1");
+
+      expect(connectionRepository.recordError).toHaveBeenCalledWith("workspace-1", "token expired");
+      expect(result).toEqual({
+        status: WhatsAppConnectionStatus.ERROR,
+        verifiedName: null,
+        error: "token expired",
+      });
+    });
+
+    it("throws NotFoundException when no connection exists", async () => {
+      connectionRepository.findByWorkspace.mockResolvedValue(null);
+      await expect(service.testConnection("workspace-1")).rejects.toThrow(
+        "No WhatsApp connection exists",
+      );
+    });
+  });
+
+  describe("disconnect", () => {
+    it("flips status to DISCONNECTED without touching phone numbers (BR-004)", async () => {
+      connectionRepository.findByWorkspace
+        .mockResolvedValueOnce({ wabaId: "waba-1" } as never)
+        .mockResolvedValueOnce({
+          _id: { toString: () => "connection-1" },
+          wabaId: "waba-1",
+          businessName: "Acme Trading Co",
+          status: WhatsAppConnectionStatus.DISCONNECTED,
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        } as never);
+
+      const result = await service.disconnect("workspace-1");
+
+      expect(connectionRepository.setStatus).toHaveBeenCalledWith(
+        "workspace-1",
+        WhatsAppConnectionStatus.DISCONNECTED,
+      );
+      expect(phoneNumberRepository.upsert).not.toHaveBeenCalled();
+      expect(result.status).toBe(WhatsAppConnectionStatus.DISCONNECTED);
+    });
+
+    it("throws NotFoundException when no connection exists", async () => {
+      connectionRepository.findByWorkspace.mockResolvedValue(null);
+      await expect(service.disconnect("workspace-1")).rejects.toThrow(
+        "No WhatsApp connection exists",
+      );
+    });
+  });
+
+  describe("refreshMetadata", () => {
+    it("re-pulls the WABA name and every synced phone number's details from Meta", async () => {
+      connectionRepository.findByWorkspace
+        .mockResolvedValueOnce({
+          _id: { toString: () => "connection-1" },
+          wabaId: "waba-1",
+          accessTokenEncrypted: "encrypted-token",
+        } as never)
+        .mockResolvedValueOnce({
+          _id: { toString: () => "connection-1" },
+          wabaId: "waba-1",
+          businessName: "Acme Trading Co",
+          status: WhatsAppConnectionStatus.CONNECTED,
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        } as never);
+      tokenEncryption.decrypt.mockReturnValue("raw-access-token");
+      metaApiClient.getWabaName.mockResolvedValue("Acme Trading Co");
+      phoneNumberRepository.findByWorkspace.mockResolvedValue([
+        { phoneNumberId: "meta-phone-1" } as never,
+      ]);
+      metaApiClient.getPhoneNumberDetails.mockResolvedValue({
+        displayPhoneNumber: "+91 98765 43210",
+        verifiedName: "Acme Trading Co",
+        qualityRating: "GREEN",
+        messagingLimitTier: "TIER_1K",
+      });
+      phoneNumberRepository.upsert.mockResolvedValue({
+        _id: { toString: () => "phone-1" },
+        phoneNumberId: "meta-phone-1",
+        displayPhoneNumber: "+91 98765 43210",
+        verifiedName: "Acme Trading Co",
+        qualityRating: QualityRating.GREEN,
+        messagingLimitTier: "TIER_1K",
+      } as never);
+
+      const result = await service.refreshMetadata("workspace-1");
+
+      expect(connectionRepository.recordSuccess).toHaveBeenCalledWith(
+        "workspace-1",
+        "Acme Trading Co",
+      );
+      expect(metaApiClient.getPhoneNumberDetails).toHaveBeenCalledWith(
+        "meta-phone-1",
+        "raw-access-token",
+      );
+      expect(result.phoneNumbers).toHaveLength(1);
+      expect(result.phoneNumbers[0]?.phoneNumberId).toBe("meta-phone-1");
+    });
+
+    it("records the error and rethrows on Meta failure — unlike testConnection, a failed refresh must not look like success", async () => {
+      connectionRepository.findByWorkspace.mockResolvedValue({
+        wabaId: "waba-1",
+        accessTokenEncrypted: "encrypted-token",
+      } as never);
+      tokenEncryption.decrypt.mockReturnValue("raw-access-token");
+      metaApiClient.getWabaName.mockRejectedValue(new Error("token expired"));
+
+      await expect(service.refreshMetadata("workspace-1")).rejects.toThrow("token expired");
+      expect(connectionRepository.recordError).toHaveBeenCalledWith("workspace-1", "token expired");
+    });
   });
 });

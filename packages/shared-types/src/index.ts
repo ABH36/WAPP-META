@@ -14,6 +14,7 @@ export * from "./enums/workspace-member-status.enum";
 export * from "./enums/invitation-status.enum";
 export * from "./enums/activity.enum";
 export * from "./enums/communication.enum";
+export * from "./enums/integrations.enum";
 
 // API contract
 export * from "./api/api-response.type";

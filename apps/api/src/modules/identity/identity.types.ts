@@ -1,4 +1,5 @@
 import type { TenantRole, WorkspaceMemberStatus } from "@wapp/shared-types";
+import type { ApiKeyScope, ApiKeyStatus } from "./schemas/api-key.schema.js";
 
 /** Access token payload (TokenService.signAccessToken / verifyAccessToken). */
 export interface AccessTokenPayload {
@@ -64,5 +65,18 @@ export interface LoginHistorySummary {
   reason: string | null;
   ipAddress: string | null;
   userAgent: string | null;
+  createdAt: string;
+}
+
+/** PRD-006 Volume-3 §4.4 — never includes keyHash or the raw secret. */
+export interface ApiKeySummary {
+  id: string;
+  name: string;
+  prefix: string;
+  scope: ApiKeyScope;
+  status: ApiKeyStatus;
+  createdBy: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
   createdAt: string;
 }

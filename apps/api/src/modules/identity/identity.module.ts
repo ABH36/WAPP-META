@@ -10,16 +10,20 @@ import {
   LoginHistoryEntry,
   LoginHistoryEntrySchema,
 } from "./schemas/login-history-entry.schema.js";
+import { ApiKey, ApiKeySchema } from "./schemas/api-key.schema.js";
 import { UserRepository } from "./repositories/user.repository.js";
 import { AuthTokenRepository } from "./repositories/auth-token.repository.js";
 import { SessionRepository } from "./repositories/session.repository.js";
 import { LoginHistoryRepository } from "./repositories/login-history.repository.js";
+import { ApiKeyRepository } from "./repositories/api-key.repository.js";
 import { PasswordService } from "./services/password.service.js";
 import { TokenService } from "./services/token.service.js";
 import { AuthService } from "./services/auth.service.js";
+import { ApiKeyService } from "./services/api-key.service.js";
 import { AuthController } from "./controllers/auth.controller.js";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard.js";
 import { PermissionsGuard } from "./guards/permissions.guard.js";
+import { ApiKeyGuard } from "./guards/api-key.guard.js";
 
 /**
  * Identity & Authentication (SDP-001 Module Development Order — first domain
@@ -42,6 +46,7 @@ import { PermissionsGuard } from "./guards/permissions.guard.js";
       { name: AuthToken.name, schema: AuthTokenSchema },
       { name: Session.name, schema: SessionSchema },
       { name: LoginHistoryEntry.name, schema: LoginHistoryEntrySchema },
+      { name: ApiKey.name, schema: ApiKeySchema },
     ]),
     InfrastructureModule,
   ],
@@ -51,9 +56,12 @@ import { PermissionsGuard } from "./guards/permissions.guard.js";
     AuthTokenRepository,
     SessionRepository,
     LoginHistoryRepository,
+    ApiKeyRepository,
     PasswordService,
     TokenService,
     AuthService,
+    ApiKeyService,
+    ApiKeyGuard,
     // Order matters: JwtAuthGuard must populate request.user before
     // PermissionsGuard reads it — both declared in this same array/module so
     // Nest's global-guard registration order is guaranteed.
@@ -62,7 +70,10 @@ import { PermissionsGuard } from "./guards/permissions.guard.js";
   ],
   // AuthService exported for reissueTokens() — the Workspace module calls it
   // after workspace creation / invitation acceptance so the acting user gets
-  // an immediately-accurate token without a manual re-login.
-  exports: [TokenService, UserRepository, AuthService],
+  // an immediately-accurate token without a manual re-login. ApiKeyService
+  // exported for PRD-006 Volume-3 — Settings' ApiKeysController is a thin
+  // proxy over it (ADR-SET-005), same shape as SecuritySettingsService ->
+  // AuthService.
+  exports: [TokenService, UserRepository, AuthService, ApiKeyService],
 })
 export class IdentityModule {}

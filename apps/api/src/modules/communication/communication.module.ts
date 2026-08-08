@@ -159,6 +159,10 @@ import { AutomationSettingsController } from "./controllers/automation-settings.
     BroadcastExecutionProcessor,
     SlaEscalationProcessor,
   ],
-  exports: [ContactRepository],
+  // WhatsAppConnectionService exported for PRD-006 Volume-3 — Settings
+  // orchestrates WhatsApp Test Connection/Disconnect/Refresh Metadata
+  // through it rather than owning any connection state itself (same
+  // orchestration-not-ownership pattern as ADR-SET-004).
+  exports: [ContactRepository, WhatsAppConnectionService],
 })
 export class CommunicationModule {}
