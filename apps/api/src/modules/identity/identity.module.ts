@@ -11,15 +11,21 @@ import {
   LoginHistoryEntrySchema,
 } from "./schemas/login-history-entry.schema.js";
 import { ApiKey, ApiKeySchema } from "./schemas/api-key.schema.js";
+import {
+  WorkspaceMaintenanceState,
+  WorkspaceMaintenanceStateSchema,
+} from "./schemas/workspace-maintenance-state.schema.js";
 import { UserRepository } from "./repositories/user.repository.js";
 import { AuthTokenRepository } from "./repositories/auth-token.repository.js";
 import { SessionRepository } from "./repositories/session.repository.js";
 import { LoginHistoryRepository } from "./repositories/login-history.repository.js";
 import { ApiKeyRepository } from "./repositories/api-key.repository.js";
+import { WorkspaceMaintenanceStateRepository } from "./repositories/workspace-maintenance-state.repository.js";
 import { PasswordService } from "./services/password.service.js";
 import { TokenService } from "./services/token.service.js";
 import { AuthService } from "./services/auth.service.js";
 import { ApiKeyService } from "./services/api-key.service.js";
+import { MaintenanceModeListener } from "./listeners/maintenance-mode.listener.js";
 import { AuthController } from "./controllers/auth.controller.js";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard.js";
 import { PermissionsGuard } from "./guards/permissions.guard.js";
@@ -47,6 +53,7 @@ import { ApiKeyGuard } from "./guards/api-key.guard.js";
       { name: Session.name, schema: SessionSchema },
       { name: LoginHistoryEntry.name, schema: LoginHistoryEntrySchema },
       { name: ApiKey.name, schema: ApiKeySchema },
+      { name: WorkspaceMaintenanceState.name, schema: WorkspaceMaintenanceStateSchema },
     ]),
     InfrastructureModule,
   ],
@@ -57,11 +64,13 @@ import { ApiKeyGuard } from "./guards/api-key.guard.js";
     SessionRepository,
     LoginHistoryRepository,
     ApiKeyRepository,
+    WorkspaceMaintenanceStateRepository,
     PasswordService,
     TokenService,
     AuthService,
     ApiKeyService,
     ApiKeyGuard,
+    MaintenanceModeListener,
     // Order matters: JwtAuthGuard must populate request.user before
     // PermissionsGuard reads it — both declared in this same array/module so
     // Nest's global-guard registration order is guaranteed.

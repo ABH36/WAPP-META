@@ -281,6 +281,8 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 
 **Closing this out looks like:** a dedicated MFA/Security initiative that adds, to Identity: TOTP-based Two-Factor Authentication (secret generation, QR enrollment, verification on login), single-use Recovery Codes, a Trusted Devices list (skip 2FA on remembered devices), WebAuthn/Passkey support, and Authenticator App enrollment — each surfaced through Settings the same way Password/Sessions/Login History are in this volume (thin orchestration, Identity remains sole owner, `docs/ADR-SET-004-identity-orchestration-strategy.md`'s pattern extends directly).
 
+**Trigger to revisit:** MFA/Security initiative planning and approval — likely prioritized by a real customer security requirement (enterprise SSO/compliance ask) rather than a fixed date.
+
 ---
 
 ## TD-019 — OAuth Integration Initiative (Google, Microsoft, Slack, Zoom connections)
@@ -296,4 +298,17 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 
 **Trigger to revisit:** OAuth Integrations initiative planning and approval — the natural moment a concrete need for one of these four providers (e.g. a specific customer requesting Slack notifications or Google Calendar sync) makes the build cost worth it.
 
-**Trigger to revisit:** MFA/Security initiative planning and approval — likely prioritized by a real customer security requirement (enterprise SSO/compliance ask) rather than a fixed date.
+---
+
+## TD-020 — Audit Storage Strategy (retention, indexing, partitioning, archival)
+
+**Raised:** 2026-08-08 (Phase-7 Part-4, Settings — Audit Logs, Data Management & System Administration; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** `audit_log_entries` (`apps/api/src/modules/settings/schemas/audit-log-entry.schema.ts`) is a new, write-amplifying collection — every covered domain event (20 today, see `docs/ADR-SET-007-audit-strategy.md`) now also writes an audit row, in addition to whatever the emitting module itself persists. A compound `(workspaceId, createdAt)` index exists from day one, and `RetentionPolicy`'s configurable `auditLogRetentionDays` (§4.4, 30-3650 days) plus the hourly `RetentionCleanupProcessor` sweep are the only caps on this collection's growth. No caching, no read replicas, no partitioning/sharding strategy, and no archival-before-delete path (expired entries are hard-deleted by the retention sweep, not moved to cold storage) exist yet.
+
+**Why accepted for now:** This is a brand-new collection with zero production data — premature to design partitioning/archival/caching for a write volume that hasn't been observed yet. The retention sweep (a real, working deletion mechanism, not a stub) is the one piece that couldn't be deferred, since BR-007 ("retention policies affect future cleanup only") is an explicit business rule from the relayed document itself, not an optimization.
+
+**Closing this out looks like:** once real usage data exists, revisit (a) whether `audit_log_entries` needs time-based partitioning or a separate cold-storage tier for entries past some age but not yet past their retention cutoff, (b) whether high-traffic workspaces need audit writes queued/batched rather than synchronous per-event inserts (mirroring the already-queued webhook delivery pattern), and (c) whether an archival export (not just deletion) should happen automatically when the retention sweep would otherwise hard-delete entries, for workspaces that want a permanent record outside the platform.
+
+**Trigger to revisit:** a real, measured write-latency or storage-growth concern on `audit_log_entries` specifically, or a customer request for audit data retention beyond what deletion-only cleanup supports (i.e., they want an archive, not just a longer `auditLogRetentionDays`).

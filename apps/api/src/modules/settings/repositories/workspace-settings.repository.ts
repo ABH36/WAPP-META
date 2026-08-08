@@ -5,6 +5,7 @@ import {
   WorkspaceSettings,
   WorkspaceSettingsDocument,
 } from "../schemas/workspace-settings.schema.js";
+import type { ExportFormat } from "../schemas/export-job.schema.js";
 
 export interface UpdatePreferencesInput {
   currency?: string;
@@ -15,6 +16,12 @@ export interface UpdatePreferencesInput {
 export interface UpdateLogoInput {
   logoUrl: string | null;
   logoPublicId: string | null;
+}
+
+export interface UpdateSystemPreferencesInput {
+  defaultPagination?: number;
+  exportFormat?: ExportFormat;
+  dashboardRefreshInterval?: number;
 }
 
 @Injectable()
@@ -62,6 +69,40 @@ export class WorkspaceSettingsRepository {
       .findOneAndUpdate(
         { workspaceId },
         { $set: input },
+        { new: true, upsert: true, setDefaultsOnInsert: true },
+      )
+      .exec();
+  }
+
+  /** PRD-006 Volume-4 §4.6. */
+  async updateMaintenanceMode(
+    workspaceId: string,
+    maintenanceMode: boolean,
+  ): Promise<WorkspaceSettingsDocument> {
+    return this.workspaceSettingsModel
+      .findOneAndUpdate(
+        { workspaceId },
+        { $set: { maintenanceMode } },
+        { new: true, upsert: true, setDefaultsOnInsert: true },
+      )
+      .exec();
+  }
+
+  /** PRD-006 Volume-4 §4.8. */
+  async updateSystemPreferences(
+    workspaceId: string,
+    input: UpdateSystemPreferencesInput,
+  ): Promise<WorkspaceSettingsDocument> {
+    const update: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (value !== undefined) {
+        update[key] = value;
+      }
+    }
+    return this.workspaceSettingsModel
+      .findOneAndUpdate(
+        { workspaceId },
+        { $set: update },
         { new: true, upsert: true, setDefaultsOnInsert: true },
       )
       .exec();

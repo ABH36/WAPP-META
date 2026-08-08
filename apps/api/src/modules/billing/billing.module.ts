@@ -146,6 +146,9 @@ import { BillingReportsController } from "./controllers/billing-reports.controll
     SubscriptionLifecycleProcessor,
     InvoiceLifecycleProcessor,
   ],
-  exports: [UsageService],
+  // BillingReportsService exported for PRD-006 Volume-4 — Settings' Data
+  // Export reuses its exportReport() rather than duplicating CSV/Excel
+  // generation for Invoice data a third time.
+  exports: [UsageService, BillingReportsService],
 })
 export class BillingModule {}

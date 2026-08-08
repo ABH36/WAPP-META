@@ -2,6 +2,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  ServiceUnavailableException,
   UnauthorizedException,
   BadRequestException,
 } from "@nestjs/common";
@@ -13,6 +14,7 @@ import { UserRepository } from "../repositories/user.repository.js";
 import { AuthTokenRepository } from "../repositories/auth-token.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
 import { LoginHistoryRepository } from "../repositories/login-history.repository.js";
+import { WorkspaceMaintenanceStateRepository } from "../repositories/workspace-maintenance-state.repository.js";
 import { PasswordService } from "./password.service.js";
 import { TokenService } from "./token.service.js";
 import { AuthTokenType } from "../schemas/auth-token.schema.js";
@@ -51,6 +53,7 @@ export class AuthService {
     private readonly authTokenRepository: AuthTokenRepository,
     private readonly sessionRepository: SessionRepository,
     private readonly loginHistoryRepository: LoginHistoryRepository,
+    private readonly maintenanceStateRepository: WorkspaceMaintenanceStateRepository,
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
     private readonly emailService: EmailService,
@@ -180,6 +183,22 @@ export class AuthService {
     if (user.workspaceMemberStatus === WorkspaceMemberStatus.REMOVED) {
       await this.recordLoginAttempt(userId, false, "WORKSPACE_ACCESS_REMOVED", meta);
       throw new ForbiddenException("Your access to this workspace has been removed.");
+    }
+
+    // PRD-006 Volume-4 §4.6 — blocks new sessions only; refresh()/
+    // reissueTokens() are separate code paths, unaffected, so an
+    // already-logged-in user's session keeps working (§4.6 "Existing
+    // sessions continue"). See docs/ADR-SET-008-maintenance-mode-strategy.md.
+    if (user.workspaceId) {
+      const inMaintenance = await this.maintenanceStateRepository.isMaintenanceMode(
+        user.workspaceId,
+      );
+      if (inMaintenance) {
+        await this.recordLoginAttempt(userId, false, "WORKSPACE_MAINTENANCE_MODE", meta);
+        throw new ServiceUnavailableException(
+          "This workspace is currently under maintenance. Please try again shortly.",
+        );
+      }
     }
 
     await this.userRepository.recordSuccessfulLogin(userId);
@@ -337,6 +356,33 @@ export class AuthService {
   async getLoginHistory(userId: string): Promise<LoginHistorySummary[]> {
     const entries = await this.loginHistoryRepository.findRecentByUser(userId);
     return entries.map(toLoginHistorySummary);
+  }
+
+  /**
+   * PRD-006 Volume-4 §4.1 — workspace-wide Authentication audit visibility.
+   * `LoginHistoryEntry` is keyed by `userId`, not `workspaceId`, so this
+   * resolves every member of the workspace first. Settings' Audit Log
+   * presentation calls this rather than re-persisting login attempts a
+   * second time (§8's "no duplicate persistence" rule).
+   */
+  async getWorkspaceLoginHistory(workspaceId: string): Promise<LoginHistorySummary[]> {
+    const members = await this.userRepository.findWorkspaceMembers(workspaceId);
+    const userIds = members.map((member) => member._id.toString());
+    if (userIds.length === 0) {
+      return [];
+    }
+    const entries = await this.loginHistoryRepository.findByUsers(userIds);
+    return entries.map(toLoginHistorySummary);
+  }
+
+  /** PRD-006 Volume-4 §4.4 (Data Retention) — bulk-deletes Login History older than `cutoffDate` for this workspace's members. Returns the number of entries removed. */
+  async cleanupLoginHistory(workspaceId: string, cutoffDate: Date): Promise<number> {
+    const members = await this.userRepository.findWorkspaceMembers(workspaceId);
+    const userIds = members.map((member) => member._id.toString());
+    if (userIds.length === 0) {
+      return 0;
+    }
+    return this.loginHistoryRepository.deleteOlderThan(userIds, cutoffDate);
   }
 
   async forgotPassword(dto: ForgotPasswordDto): Promise<void> {

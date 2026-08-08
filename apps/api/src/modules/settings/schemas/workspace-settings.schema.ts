@@ -1,7 +1,11 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { HydratedDocument } from "mongoose";
+import { ExportFormat } from "./export-job.schema.js";
 
 export type WorkspaceSettingsDocument = HydratedDocument<WorkspaceSettings>;
+
+const DEFAULT_PAGINATION = 25;
+const DEFAULT_DASHBOARD_REFRESH_INTERVAL_SECONDS = 60;
 
 /**
  * Traces to: PRD-006 Volume-1 §4 (Branding, Workspace Logo, Currency, Date
@@ -44,6 +48,25 @@ export class WorkspaceSettings {
 
   @Prop({ type: String, required: true, default: "24h" })
   timeFormat!: string;
+
+  /**
+   * PRD-006 Volume-4 §4.6 — Settings owns this config; Identity keeps its
+   * own small read-model (`WorkspaceMaintenanceState`) in sync via
+   * `MAINTENANCE_MODE_ENABLED`/`DISABLED`, checked at login. See
+   * docs/ADR-SET-008-maintenance-mode-strategy.md.
+   */
+  @Prop({ type: Boolean, required: true, default: false })
+  maintenanceMode!: boolean;
+
+  /** §4.8 System Preferences — workspace-level operational preferences, extending this same collection rather than a new one (same shape/scope as currency/dateFormat/timeFormat above). */
+  @Prop({ type: Number, required: true, default: DEFAULT_PAGINATION })
+  defaultPagination!: number;
+
+  @Prop({ type: String, enum: ExportFormat, required: true, default: ExportFormat.CSV })
+  exportFormat!: ExportFormat;
+
+  @Prop({ type: Number, required: true, default: DEFAULT_DASHBOARD_REFRESH_INTERVAL_SECONDS })
+  dashboardRefreshInterval!: number;
 
   createdAt!: Date;
   updatedAt!: Date;

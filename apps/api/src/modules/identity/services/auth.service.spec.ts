@@ -12,6 +12,7 @@ import { UserRepository } from "../repositories/user.repository.js";
 import { AuthTokenRepository } from "../repositories/auth-token.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
 import { LoginHistoryRepository } from "../repositories/login-history.repository.js";
+import { WorkspaceMaintenanceStateRepository } from "../repositories/workspace-maintenance-state.repository.js";
 import { PasswordService } from "./password.service.js";
 import { TokenService } from "./token.service.js";
 import { EmailService } from "../../../infrastructure/email/email.service.js";
@@ -60,6 +61,7 @@ describe("AuthService", () => {
   let authTokenRepository: jest.Mocked<AuthTokenRepository>;
   let sessionRepository: jest.Mocked<SessionRepository>;
   let loginHistoryRepository: jest.Mocked<LoginHistoryRepository>;
+  let maintenanceStateRepository: jest.Mocked<WorkspaceMaintenanceStateRepository>;
   let passwordService: jest.Mocked<PasswordService>;
   let tokenService: jest.Mocked<TokenService>;
   let emailService: jest.Mocked<EmailService>;
@@ -81,6 +83,7 @@ describe("AuthService", () => {
             findById: jest.fn(),
             findByIdWithPasswordHistory: jest.fn(),
             updatePasswordAndHistory: jest.fn(),
+            findWorkspaceMembers: jest.fn(),
           },
         },
         {
@@ -105,7 +108,16 @@ describe("AuthService", () => {
         },
         {
           provide: LoginHistoryRepository,
-          useValue: { record: jest.fn(), findRecentByUser: jest.fn() },
+          useValue: {
+            record: jest.fn(),
+            findRecentByUser: jest.fn(),
+            findByUsers: jest.fn(),
+            deleteOlderThan: jest.fn(),
+          },
+        },
+        {
+          provide: WorkspaceMaintenanceStateRepository,
+          useValue: { isMaintenanceMode: jest.fn(), setMaintenanceMode: jest.fn() },
         },
         {
           provide: PasswordService,
@@ -151,12 +163,14 @@ describe("AuthService", () => {
     authTokenRepository = moduleRef.get(AuthTokenRepository);
     sessionRepository = moduleRef.get(SessionRepository);
     loginHistoryRepository = moduleRef.get(LoginHistoryRepository);
+    maintenanceStateRepository = moduleRef.get(WorkspaceMaintenanceStateRepository);
     passwordService = moduleRef.get(PasswordService);
     tokenService = moduleRef.get(TokenService);
     emailService = moduleRef.get(EmailService);
 
     // Sensible defaults shared by most tests.
     tokenService.generateOpaqueToken.mockReturnValue("raw-opaque-token");
+    maintenanceStateRepository.isMaintenanceMode.mockResolvedValue(false);
     tokenService.hashOpaqueToken.mockReturnValue("hashed-opaque-token");
     tokenService.signAccessToken.mockReturnValue({ token: "access-token", expiresIn: 900 });
     tokenService.signRefreshToken.mockReturnValue({
@@ -576,6 +590,7 @@ describe("AuthService", () => {
       loginHistoryRepository.findRecentByUser.mockResolvedValue([
         {
           _id: { toString: () => "entry-1" },
+          userId: { toString: () => "user-1" },
           success: true,
           reason: null,
           ipAddress: "127.0.0.1",
@@ -590,6 +605,7 @@ describe("AuthService", () => {
       expect(result).toEqual([
         {
           id: "entry-1",
+          userId: "user-1",
           success: true,
           reason: null,
           ipAddress: "127.0.0.1",
@@ -597,6 +613,91 @@ describe("AuthService", () => {
           createdAt: "2026-08-07T00:00:00.000Z",
         },
       ]);
+    });
+  });
+
+  describe("getWorkspaceLoginHistory", () => {
+    it("resolves workspace member ids first, then queries login history across all of them", async () => {
+      userRepository.findWorkspaceMembers.mockResolvedValue([
+        fakeUser({ _id: { toString: () => "user-1" } }),
+        fakeUser({ _id: { toString: () => "user-2" } }),
+      ]);
+      loginHistoryRepository.findByUsers.mockResolvedValue([
+        {
+          _id: { toString: () => "entry-1" },
+          userId: { toString: () => "user-1" },
+          success: true,
+          reason: null,
+          ipAddress: null,
+          userAgent: null,
+          createdAt: new Date("2026-08-08T00:00:00.000Z"),
+        } as never,
+      ]);
+
+      const result = await service.getWorkspaceLoginHistory("workspace-1");
+
+      expect(userRepository.findWorkspaceMembers).toHaveBeenCalledWith("workspace-1");
+      expect(loginHistoryRepository.findByUsers).toHaveBeenCalledWith(["user-1", "user-2"]);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.userId).toBe("user-1");
+    });
+
+    it("returns an empty array without querying login history when the workspace has no members", async () => {
+      userRepository.findWorkspaceMembers.mockResolvedValue([]);
+
+      const result = await service.getWorkspaceLoginHistory("workspace-1");
+
+      expect(loginHistoryRepository.findByUsers).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("cleanupLoginHistory", () => {
+    it("deletes login history older than the cutoff for every workspace member", async () => {
+      userRepository.findWorkspaceMembers.mockResolvedValue([
+        fakeUser({ _id: { toString: () => "user-1" } }),
+      ]);
+      loginHistoryRepository.deleteOlderThan.mockResolvedValue(3);
+
+      const cutoff = new Date("2026-01-01T00:00:00.000Z");
+      const result = await service.cleanupLoginHistory("workspace-1", cutoff);
+
+      expect(loginHistoryRepository.deleteOlderThan).toHaveBeenCalledWith(["user-1"], cutoff);
+      expect(result).toBe(3);
+    });
+  });
+
+  describe("login — maintenance mode (PRD-006 Volume-4 §4.6)", () => {
+    it("blocks a new login when the user's workspace is in maintenance mode", async () => {
+      userRepository.findByEmail.mockResolvedValue(fakeUser({ workspaceId: "workspace-1" }));
+      passwordService.compare.mockResolvedValue(true);
+      maintenanceStateRepository.isMaintenanceMode.mockResolvedValue(true);
+
+      await expect(
+        service.login(
+          { email: "jane@example.com", password: "Passw0rd1" },
+          { userAgent: null, ipAddress: null },
+        ),
+      ).rejects.toThrow("maintenance");
+      expect(userRepository.recordSuccessfulLogin).not.toHaveBeenCalled();
+    });
+
+    it("does not check maintenance mode for a user with no workspace yet", async () => {
+      userRepository.findByEmail.mockResolvedValue(fakeUser({ workspaceId: null }));
+      passwordService.compare.mockResolvedValue(true);
+      tokenService.signRefreshToken.mockReturnValue({
+        token: "refresh-token",
+        jti: "jti-1",
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+      tokenService.signAccessToken.mockReturnValue({ token: "access-token", expiresIn: 900 });
+
+      await service.login(
+        { email: "jane@example.com", password: "Passw0rd1" },
+        { userAgent: null, ipAddress: null },
+      );
+
+      expect(maintenanceStateRepository.isMaintenanceMode).not.toHaveBeenCalled();
     });
   });
 });

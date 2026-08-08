@@ -58,9 +58,16 @@ export interface SessionSummary {
   expiresAt: string;
 }
 
-/** PRD-006 Volume-2 §4.7 — read-only, immutable (BR-007). */
+/**
+ * PRD-006 Volume-2 §4.7 — read-only, immutable (BR-007). `userId` added in
+ * Volume-4 §4.1 (Audit Logs) — the per-user history endpoint
+ * (`getLoginHistory`) doesn't need it (caller already knows whose history
+ * they asked for), but the workspace-wide view (`getWorkspaceLoginHistory`)
+ * does, to attribute each attempt to an actor.
+ */
 export interface LoginHistorySummary {
   id: string;
+  userId: string;
   success: boolean;
   reason: string | null;
   ipAddress: string | null;

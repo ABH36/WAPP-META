@@ -18,7 +18,12 @@ export interface RecordDeliveryInput {
 
 const DEFAULT_HISTORY_LIMIT = 20;
 
-/** Insert-only — same immutable-audit-log shape as LoginHistoryRepository. No update or delete method exists here by design. */
+/**
+ * Insert-only — same immutable-audit-log shape as LoginHistoryRepository.
+ * No update method exists. `deleteOlderThan` (PRD-006 Volume-4 §4.4, Data
+ * Retention) is the one sanctioned bulk-delete exception, never an
+ * individual/manual delete.
+ */
 @Injectable()
 export class WebhookDeliveryLogRepository {
   constructor(
@@ -35,5 +40,12 @@ export class WebhookDeliveryLogRepository {
     limit = DEFAULT_HISTORY_LIMIT,
   ): Promise<WebhookDeliveryLogDocument[]> {
     return this.deliveryLogModel.find({ webhookId }).sort({ createdAt: -1 }).limit(limit).exec();
+  }
+
+  async deleteOlderThan(workspaceId: string, cutoffDate: Date): Promise<number> {
+    const result = await this.deliveryLogModel
+      .deleteMany({ workspaceId, createdAt: { $lt: cutoffDate } })
+      .exec();
+    return result.deletedCount;
   }
 }

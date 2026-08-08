@@ -67,11 +67,13 @@ describe("WebhookDeliveryProcessor", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://example.com/hooks/wapp",
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({ "X-WAPP-Event": WebhookEventType.LEAD_CREATED }),
-      }),
+      expect.objectContaining({ method: "POST" }),
     );
+    const [, requestInit] = fetchMock.mock.calls[0] as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    expect(requestInit.headers["X-WAPP-Event"]).toBe(WebhookEventType.LEAD_CREATED);
     expect(deliveryLogRepository.record).toHaveBeenCalledWith(
       expect.objectContaining({ success: true, statusCode: 200, error: null }),
     );

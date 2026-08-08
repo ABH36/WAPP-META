@@ -15,6 +15,7 @@ import type {
   ThirdPartyAppSummary,
   WebhookSummary,
 } from "../src/modules/settings/settings.types.js";
+import { ThirdPartyAppKey } from "../src/modules/settings/schemas/third-party-app.schema.js";
 
 // Real registrations (real bcrypt hashing) in beforeAll — same reasoning as
 // settings.e2e-spec.ts's jest.setTimeout override.
@@ -351,8 +352,8 @@ describe("Settings — Integrations & External Services (e2e)", () => {
 
       const listRes = await authed("get", "/api/v1/settings/integrations/apps");
       const list = (listRes.body as ApiSuccessResponse<ThirdPartyAppSummary[]>).data;
-      expect(list.find((app) => app.appKey === "ZAPIER")?.enabled).toBe(true);
-      expect(list.find((app) => app.appKey === "MAKE")?.enabled).toBe(false);
+      expect(list.find((app) => app.appKey === ThirdPartyAppKey.ZAPIER)?.enabled).toBe(true);
+      expect(list.find((app) => app.appKey === ThirdPartyAppKey.MAKE)?.enabled).toBe(false);
     });
 
     it("rejects an unknown app key", async () => {

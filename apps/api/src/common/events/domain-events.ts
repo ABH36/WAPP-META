@@ -198,6 +198,17 @@ export const DomainEvent = {
   WEBHOOK_UPDATED: "settings.webhook_updated",
   API_KEY_CREATED: "settings.api_key_created",
   API_KEY_REVOKED: "settings.api_key_revoked",
+  // Phase-7 Part-4 (Audit Logs, Data Management & System Administration,
+  // PRD-006 Volume-4 §8). Audit Logs (§4.1) and Configuration History (§4.2)
+  // are deliberately NOT new emitters here — they consume the existing
+  // catalog above (WORKSPACE_UPDATED, SETTINGS_UPDATED, WEBHOOK_CREATED/
+  // UPDATED, etc.) rather than adding parallel events for data that's
+  // already published, per §8's own "no duplicate persistence" rule.
+  FEATURE_FLAG_UPDATED: "settings.feature_flag_updated",
+  MAINTENANCE_MODE_ENABLED: "settings.maintenance_mode_enabled",
+  MAINTENANCE_MODE_DISABLED: "settings.maintenance_mode_disabled",
+  RETENTION_POLICY_UPDATED: "settings.retention_policy_updated",
+  SYSTEM_PREFERENCE_UPDATED: "settings.system_preference_updated",
 } as const;
 
 interface BaseEventPayload {
@@ -646,5 +657,27 @@ export interface ApiKeyCreatedPayload extends BaseEventPayload {
 
 export interface ApiKeyRevokedPayload extends BaseEventPayload {
   apiKeyId: string;
+  actorId: string;
+}
+
+export interface FeatureFlagUpdatedPayload extends BaseEventPayload {
+  flagKey: string;
+  enabled: boolean;
+  actorId: string;
+}
+
+export interface MaintenanceModeEnabledPayload extends BaseEventPayload {
+  actorId: string;
+}
+
+export interface MaintenanceModeDisabledPayload extends BaseEventPayload {
+  actorId: string;
+}
+
+export interface RetentionPolicyUpdatedPayload extends BaseEventPayload {
+  actorId: string;
+}
+
+export interface SystemPreferenceUpdatedPayload extends BaseEventPayload {
   actorId: string;
 }

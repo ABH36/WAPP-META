@@ -112,5 +112,11 @@ import { ReportsController } from "./controllers/reports.controller.js";
     ActivityService,
     ReportsService,
   ],
+  // CustomerRepository + ReportsService exported for PRD-006 Volume-4 —
+  // Settings' Data Export orchestrates CRM's own export logic (Leads/Deals/
+  // Activities via ReportsService.exportReport; Customers via
+  // CustomerRepository.findAllForWorkspace) rather than duplicating it,
+  // same reuse-not-rebuild posture as every other Settings orchestration.
+  exports: [ReportsService, CustomerRepository],
 })
 export class CrmModule {}

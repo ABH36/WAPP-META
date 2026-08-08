@@ -1,7 +1,6 @@
 import { Controller, Get, Version, VERSION_NEUTRAL } from "@nestjs/common";
-import { InjectConnection } from "@nestjs/mongoose";
-import { ConnectionStates, type Connection } from "mongoose";
 import { Public } from "../common/decorators/public.decorator.js";
+import { HealthCheckService } from "./health-check.service.js";
 
 /**
  * Unauthenticated liveness/readiness endpoint — required by the Docker/Nginx
@@ -15,15 +14,24 @@ import { Public } from "../common/decorators/public.decorator.js";
  * moves to v2 — confirmed by actually curling the endpoint and finding the
  * default URI-versioned route wasn't where any deployment tooling would expect it.
  */
+interface HealthResponse {
+  status: "ok" | "degraded";
+  database: string;
+  timestamp: string;
+}
+
 @Controller("health")
 export class HealthController {
-  constructor(@InjectConnection() private readonly mongoConnection: Connection) {}
+  constructor(private readonly healthCheckService: HealthCheckService) {}
 
+  // Database-only, same shape as before this volume — infra/container
+  // probes depend on this exact response, extended checks live behind
+  // authenticated /settings/diagnostics instead (PRD-006 Volume-4 §4.7).
   @Public()
   @Version(VERSION_NEUTRAL)
   @Get()
-  check(): { status: "ok" | "degraded"; database: string; timestamp: string } {
-    const isConnected = this.mongoConnection.readyState === ConnectionStates.connected;
+  check(): HealthResponse {
+    const isConnected = this.healthCheckService.checkDatabase();
 
     return {
       status: isConnected ? "ok" : "degraded",

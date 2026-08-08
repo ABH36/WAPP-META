@@ -3,6 +3,14 @@ import type { WhatsAppConnectionStatus } from "../communication/schemas/whatsapp
 import type { EmailEncryption, EmailProvider } from "./schemas/email-integration.schema.js";
 import type { IntegrationConnectionStatus } from "./schemas/integration-status.enum.js";
 import type { ThirdPartyAppKey } from "./schemas/third-party-app.schema.js";
+import type { AuditCategory, AuditResult } from "./schemas/audit-log-entry.schema.js";
+import type { ConfigHistoryArea } from "./schemas/config-history-entry.schema.js";
+import type {
+  ExportEntityType,
+  ExportFormat,
+  ExportJobStatus,
+} from "./schemas/export-job.schema.js";
+import type { FeatureFlagKey } from "./schemas/feature-flag-state.schema.js";
 
 export interface LogoUploadSignature {
   signature: string;
@@ -169,4 +177,83 @@ export interface IntegrationHealthEntry {
 export interface IntegrationHealthSummary {
   workspaceId: string;
   entries: IntegrationHealthEntry[];
+}
+
+/**
+ * PRD-006 Volume-4 §4.1. AUTHENTICATION-category entries are composed from
+ * Identity's `LoginHistoryEntry` at read time (`AuthService.
+ * getWorkspaceLoginHistory`), never a second persisted copy — same shape,
+ * different source, so the API surface doesn't leak that distinction.
+ */
+export interface AuditLogEntrySummary {
+  id: string;
+  category: AuditCategory;
+  actorId: string | null;
+  module: string;
+  entity: string | null;
+  entityId: string | null;
+  action: string;
+  result: AuditResult;
+  ipAddress: string | null;
+  userAgent: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AuditLogPage {
+  items: AuditLogEntrySummary[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/** §4.2 — `previousValue` is the prior entry's `newValue` for the same (workspaceId, area), or null on the first change ever recorded. */
+export interface ConfigHistoryEntrySummary {
+  id: string;
+  area: ConfigHistoryArea;
+  previousValue: Record<string, unknown> | null;
+  newValue: Record<string, unknown>;
+  changedBy: string;
+  createdAt: string;
+}
+
+export interface ExportJobSummary {
+  id: string;
+  entityType: ExportEntityType;
+  format: ExportFormat;
+  status: ExportJobStatus;
+  resultUrl: string | null;
+  error: string | null;
+  createdAt: string;
+}
+
+/** §4.4 — days, 30-3650 (§10). */
+export interface RetentionPolicySummary {
+  auditLogRetentionDays: number;
+  loginHistoryRetentionDays: number;
+  notificationHistoryRetentionDays: number;
+  webhookDeliveryLogRetentionDays: number;
+}
+
+export interface FeatureFlagSummary {
+  flagKey: FeatureFlagKey;
+  enabled: boolean;
+}
+
+export interface SystemPreferencesSummary {
+  defaultPagination: number;
+  exportFormat: ExportFormat;
+  dashboardRefreshInterval: number;
+}
+
+export interface DiagnosticCheck {
+  name: string;
+  status: "UP" | "DOWN";
+}
+
+/** §4.7 — read-only. Platform-level checks (database/redis/queue/storage/email) are the same for every workspace; whatsapp is workspace-specific, reusing Volume-3's IntegrationHealthService. */
+export interface DiagnosticsSummary {
+  workspaceId: string;
+  checks: DiagnosticCheck[];
+  checkedAt: string;
 }

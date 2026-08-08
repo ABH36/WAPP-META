@@ -37,6 +37,7 @@ export function toSessionSummary(session: SessionDocument): SessionSummary {
 export function toLoginHistorySummary(entry: LoginHistoryEntryDocument): LoginHistorySummary {
   return {
     id: entry._id.toString(),
+    userId: entry.userId.toString(),
     success: entry.success,
     reason: entry.reason,
     ipAddress: entry.ipAddress,

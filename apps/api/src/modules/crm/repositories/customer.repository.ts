@@ -128,6 +128,11 @@ export class CustomerRepository {
     return { items, total };
   }
 
+  /** PRD-006 Volume-4 §4.3 (Data Export) — unpaginated, for the async export job only; never used on a request-response hot path. */
+  async findAllForWorkspace(workspaceId: string): Promise<CustomerDocument[]> {
+    return this.customerModel.find({ workspaceId }).sort({ createdAt: 1 }).exec();
+  }
+
   async update(
     workspaceId: string,
     id: string,
