@@ -20,6 +20,11 @@ export interface AppConfig {
     // such in the Phase-2 completion report.
     maxFailedLoginAttempts: number;
     accountLockoutMinutes: number;
+    // PRD-006 Volume-2 §4.5 (Password History) — how many previous password
+    // hashes to keep and reject reuse against. Not pinned by a specific
+    // approved figure; a defensible security default (same "not yet pinned,
+    // documented as such" treatment already given to the two settings above).
+    passwordHistoryLimit: number;
   };
   workspace: {
     trialDurationDays: number;
@@ -76,6 +81,7 @@ export default (): AppConfig => ({
     passwordResetTokenTtlMinutes: parseInt(process.env.PASSWORD_RESET_TOKEN_TTL ?? "30", 10),
     maxFailedLoginAttempts: parseInt(process.env.MAX_FAILED_LOGIN_ATTEMPTS ?? "5", 10),
     accountLockoutMinutes: parseInt(process.env.ACCOUNT_LOCKOUT_MINUTES ?? "15", 10),
+    passwordHistoryLimit: parseInt(process.env.PASSWORD_HISTORY_LIMIT ?? "5", 10),
   },
   workspace: {
     trialDurationDays: parseInt(process.env.TRIAL_DURATION_DAYS ?? "14", 10),

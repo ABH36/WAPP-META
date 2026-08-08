@@ -41,6 +41,13 @@ export class User {
   @Prop({ required: true, select: false })
   passwordHash!: string;
 
+  // PRD-006 Volume-2 §4.5 (Password History) — never selected by default,
+  // same reasoning as passwordHash itself. Capped at `passwordHistoryLimit`
+  // (config, default 5) by AuthService.changePassword(), oldest dropped
+  // first — see docs/ADR-SET-004-identity-orchestration-strategy.md.
+  @Prop({ type: [String], default: [], select: false })
+  previousPasswordHashes!: string[];
+
   @Prop({ type: String, default: null })
   workspaceId!: string | null;
 

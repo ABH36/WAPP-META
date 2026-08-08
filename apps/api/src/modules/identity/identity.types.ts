@@ -56,3 +56,13 @@ export interface SessionSummary {
   createdAt: string;
   expiresAt: string;
 }
+
+/** PRD-006 Volume-2 §4.7 — read-only, immutable (BR-007). */
+export interface LoginHistorySummary {
+  id: string;
+  success: boolean;
+  reason: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}

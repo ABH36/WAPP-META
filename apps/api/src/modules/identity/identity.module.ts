@@ -6,9 +6,14 @@ import { InfrastructureModule } from "../../infrastructure/infrastructure.module
 import { User, UserSchema } from "./schemas/user.schema.js";
 import { AuthToken, AuthTokenSchema } from "./schemas/auth-token.schema.js";
 import { Session, SessionSchema } from "./schemas/session.schema.js";
+import {
+  LoginHistoryEntry,
+  LoginHistoryEntrySchema,
+} from "./schemas/login-history-entry.schema.js";
 import { UserRepository } from "./repositories/user.repository.js";
 import { AuthTokenRepository } from "./repositories/auth-token.repository.js";
 import { SessionRepository } from "./repositories/session.repository.js";
+import { LoginHistoryRepository } from "./repositories/login-history.repository.js";
 import { PasswordService } from "./services/password.service.js";
 import { TokenService } from "./services/token.service.js";
 import { AuthService } from "./services/auth.service.js";
@@ -36,6 +41,7 @@ import { PermissionsGuard } from "./guards/permissions.guard.js";
       { name: User.name, schema: UserSchema },
       { name: AuthToken.name, schema: AuthTokenSchema },
       { name: Session.name, schema: SessionSchema },
+      { name: LoginHistoryEntry.name, schema: LoginHistoryEntrySchema },
     ]),
     InfrastructureModule,
   ],
@@ -44,6 +50,7 @@ import { PermissionsGuard } from "./guards/permissions.guard.js";
     UserRepository,
     AuthTokenRepository,
     SessionRepository,
+    LoginHistoryRepository,
     PasswordService,
     TokenService,
     AuthService,

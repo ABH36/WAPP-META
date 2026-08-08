@@ -267,3 +267,18 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** a dedicated Localization/i18n initiative that adds: a real `PATCH` endpoint to change `Workspace.language` away from `"en"`, translation resource files/tooling for the supported language set (already named in `ADR-027`'s own comment: Hindi/Gujarati/Marathi/Tamil/Telugu/Kannada/Malayalam), locale-aware date/number formatting (which may end up related to — but is distinct from — Settings' own `dateFormat`/`timeFormat` display preferences), and a decision on whether changing language affects existing data (a question §6 of PRD-006 Volume-1 itself already flagged and explicitly deferred).
 
 **Trigger to revisit:** Localization/i18n initiative planning and approval — the natural moment `ADR-027`'s own anticipated "additive change" actually happens.
+
+---
+
+## TD-018 — Future MFA Configuration (2FA, passkeys, trusted devices, recovery codes, authenticator apps)
+
+**Raised:** 2026-08-08 (Phase-7 Part-2, Settings — User Preferences & Security Settings; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** §4.8 (Security Preferences) names Two-Factor Authentication, Recovery Codes, Trusted Devices, Passkeys, and Authenticator Apps as "Future Ready" — explicitly "Read Only. Not Configurable" for this volume. None of these exist anywhere in Identity today: `User` has no MFA-related fields (no `mfaEnabled`, `mfaSecret`, recovery codes, trusted-device list, or passkey credentials), and no endpoint surfaces even a read-only stub for any of them — consistent with §4.8's own scope limit and §13's literal API surface, which lists no route for this section at all.
+
+**Why accepted for now:** Explicitly out of scope per the relayed PRD-006 Volume-2 document itself (§4.8/§10) — building any of this now would be implementing a slice of a future, unapproved capability, the same reasoning already applied to TD-012 (Payment Gateway Integration) and TD-013 (deferred Usage counters). §4.8 frames this section as forward-looking scaffolding for the _concept_, not a request to build even a stub this volume.
+
+**Closing this out looks like:** a dedicated MFA/Security initiative that adds, to Identity: TOTP-based Two-Factor Authentication (secret generation, QR enrollment, verification on login), single-use Recovery Codes, a Trusted Devices list (skip 2FA on remembered devices), WebAuthn/Passkey support, and Authenticator App enrollment — each surfaced through Settings the same way Password/Sessions/Login History are in this volume (thin orchestration, Identity remains sole owner, `docs/ADR-SET-004-identity-orchestration-strategy.md`'s pattern extends directly).
+
+**Trigger to revisit:** MFA/Security initiative planning and approval — likely prioritized by a real customer security requirement (enterprise SSO/compliance ask) rather than a fixed date.

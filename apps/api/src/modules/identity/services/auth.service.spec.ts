@@ -11,6 +11,7 @@ import { AuthService } from "./auth.service.js";
 import { UserRepository } from "../repositories/user.repository.js";
 import { AuthTokenRepository } from "../repositories/auth-token.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
+import { LoginHistoryRepository } from "../repositories/login-history.repository.js";
 import { PasswordService } from "./password.service.js";
 import { TokenService } from "./token.service.js";
 import { EmailService } from "../../../infrastructure/email/email.service.js";
@@ -31,6 +32,7 @@ function fakeUser(overrides: Partial<Record<string, unknown>> = {}): UserDocumen
     isActive: true,
     failedLoginAttempts: 0,
     lockedUntil: null,
+    previousPasswordHashes: [] as string[],
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     ...overrides,
   };
@@ -57,6 +59,7 @@ describe("AuthService", () => {
   let userRepository: jest.Mocked<UserRepository>;
   let authTokenRepository: jest.Mocked<AuthTokenRepository>;
   let sessionRepository: jest.Mocked<SessionRepository>;
+  let loginHistoryRepository: jest.Mocked<LoginHistoryRepository>;
   let passwordService: jest.Mocked<PasswordService>;
   let tokenService: jest.Mocked<TokenService>;
   let emailService: jest.Mocked<EmailService>;
@@ -76,6 +79,8 @@ describe("AuthService", () => {
             recordSuccessfulLogin: jest.fn(),
             registerFailedLogin: jest.fn(),
             findById: jest.fn(),
+            findByIdWithPasswordHistory: jest.fn(),
+            updatePasswordAndHistory: jest.fn(),
           },
         },
         {
@@ -97,6 +102,10 @@ describe("AuthService", () => {
             revokeAllForUser: jest.fn(),
             revokeByIdForUser: jest.fn(),
           },
+        },
+        {
+          provide: LoginHistoryRepository,
+          useValue: { record: jest.fn(), findRecentByUser: jest.fn() },
         },
         {
           provide: PasswordService,
@@ -124,6 +133,7 @@ describe("AuthService", () => {
                   passwordResetTokenTtlMinutes: 30,
                   maxFailedLoginAttempts: 5,
                   accountLockoutMinutes: 15,
+                  passwordHistoryLimit: 5,
                 };
               }
               if (key === "urls") {
@@ -140,6 +150,7 @@ describe("AuthService", () => {
     userRepository = moduleRef.get(UserRepository);
     authTokenRepository = moduleRef.get(AuthTokenRepository);
     sessionRepository = moduleRef.get(SessionRepository);
+    loginHistoryRepository = moduleRef.get(LoginHistoryRepository);
     passwordService = moduleRef.get(PasswordService);
     tokenService = moduleRef.get(TokenService);
     emailService = moduleRef.get(EmailService);
@@ -221,6 +232,9 @@ describe("AuthService", () => {
 
       expect(result.tokens.accessToken).toBe("access-token");
       expect(userRepository.recordSuccessfulLogin).toHaveBeenCalledWith("user-1");
+      expect(loginHistoryRepository.record).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user-1", success: true, reason: null }),
+      );
     });
 
     it("rejects an unknown email without revealing that it doesn't exist", async () => {
@@ -271,6 +285,13 @@ describe("AuthService", () => {
         ),
       ).rejects.toThrow(UnauthorizedException);
       expect(userRepository.registerFailedLogin).toHaveBeenCalledWith("user-1", 5, 15);
+      expect(loginHistoryRepository.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-1",
+          success: false,
+          reason: "INVALID_CREDENTIALS",
+        }),
+      );
     });
 
     it("blocks login for an unverified account (LOGIN-BR-001)", async () => {
@@ -501,6 +522,81 @@ describe("AuthService", () => {
         throw new UnauthorizedException();
       });
       await expect(service.logout("garbage")).resolves.toBeUndefined();
+    });
+  });
+
+  describe("changePassword", () => {
+    it("rejects the wrong current password without touching history or sessions", async () => {
+      userRepository.findByIdWithPasswordHistory.mockResolvedValue(fakeUser());
+      passwordService.compare.mockResolvedValue(false);
+
+      await expect(service.changePassword("user-1", "wrong", "NewPassw0rd")).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(userRepository.updatePasswordAndHistory).not.toHaveBeenCalled();
+      expect(sessionRepository.revokeAllForUser).not.toHaveBeenCalled();
+    });
+
+    it("rejects reuse of the current password or a historical one", async () => {
+      userRepository.findByIdWithPasswordHistory.mockResolvedValue(
+        fakeUser({ previousPasswordHashes: ["old-hash-1", "old-hash-2"] }),
+      );
+      // First compare (against current passwordHash) is the "is this really your current password" check and must succeed;
+      // the loop that follows re-compares the *new* password against passwordHash + history — make the first of those match too.
+      passwordService.compare.mockResolvedValue(true);
+
+      await expect(
+        service.changePassword("user-1", "CurrentPassw0rd", "ReusedPassw0rd"),
+      ).rejects.toThrow(BadRequestException);
+      expect(userRepository.updatePasswordAndHistory).not.toHaveBeenCalled();
+    });
+
+    it("updates the password, prepends the old hash to history, and revokes every session", async () => {
+      userRepository.findByIdWithPasswordHistory.mockResolvedValue(
+        fakeUser({ passwordHash: "current-hash", previousPasswordHashes: ["old-hash-1"] }),
+      );
+      passwordService.compare
+        .mockResolvedValueOnce(true) // current password matches
+        .mockResolvedValueOnce(false) // new password vs current hash
+        .mockResolvedValueOnce(false); // new password vs old-hash-1
+      passwordService.hash.mockResolvedValue("new-hash");
+
+      await service.changePassword("user-1", "CurrentPassw0rd", "NewPassw0rd1");
+
+      expect(userRepository.updatePasswordAndHistory).toHaveBeenCalledWith("user-1", "new-hash", [
+        "current-hash",
+        "old-hash-1",
+      ]);
+      expect(sessionRepository.revokeAllForUser).toHaveBeenCalledWith("user-1");
+    });
+  });
+
+  describe("getLoginHistory", () => {
+    it("maps recent entries for the given user", async () => {
+      loginHistoryRepository.findRecentByUser.mockResolvedValue([
+        {
+          _id: { toString: () => "entry-1" },
+          success: true,
+          reason: null,
+          ipAddress: "127.0.0.1",
+          userAgent: "jest",
+          createdAt: new Date("2026-08-07T00:00:00.000Z"),
+        } as never,
+      ]);
+
+      const result = await service.getLoginHistory("user-1");
+
+      expect(loginHistoryRepository.findRecentByUser).toHaveBeenCalledWith("user-1");
+      expect(result).toEqual([
+        {
+          id: "entry-1",
+          success: true,
+          reason: null,
+          ipAddress: "127.0.0.1",
+          userAgent: "jest",
+          createdAt: "2026-08-07T00:00:00.000Z",
+        },
+      ]);
     });
   });
 });

@@ -177,6 +177,17 @@ export const DomainEvent = {
   // WORKSPACE_UPDATED unchanged, since Settings orchestrates that data
   // rather than owning it (docs/ADR-SET-001-settings-ownership-strategy.md).
   SETTINGS_UPDATED: "settings.updated",
+  // Phase-7 Part-2 (User Preferences & Security Settings, PRD-006 Volume-2
+  // §7). Personal-scope events, distinct from SETTINGS_UPDATED (workspace
+  // -scope, Volume-1) — resolved 2026-08-07, Architecture Review: Settings
+  // does NOT consume Identity's own events (PASSWORD_CHANGED/
+  // SESSION_REVOKED/LOGIN_SUCCESS/LOGIN_FAILED were never added — Settings
+  // orchestrates Identity via direct service calls, not event projection).
+  // These three are named individually per §7's own literal event names,
+  // not folded into one generic event with a section field.
+  USER_PREFERENCES_UPDATED: "settings.user_preferences_updated",
+  THEME_CHANGED: "settings.theme_changed",
+  NOTIFICATION_PREFERENCES_UPDATED: "settings.notification_preferences_updated",
 } as const;
 
 interface BaseEventPayload {
@@ -575,4 +586,23 @@ export interface WorkspaceUnlockedPayload extends BaseEventPayload {
 export interface SettingsUpdatedPayload extends BaseEventPayload {
   section: "branding" | "preferences";
   updatedBy: string;
+}
+
+/**
+ * Personal-scope events (Volume-2) key by `userId`, not `workspaceId` —
+ * `workspaceId` is still included since `BaseEventPayload` requires it
+ * (every event in this catalog is workspace-scoped for isolation/routing
+ * purposes) and a Phase-1 user has exactly one Workspace anyway.
+ */
+export interface UserPreferencesUpdatedPayload extends BaseEventPayload {
+  userId: string;
+  section: "preferences" | "dashboard";
+}
+
+export interface ThemeChangedPayload extends BaseEventPayload {
+  userId: string;
+}
+
+export interface NotificationPreferencesUpdatedPayload extends BaseEventPayload {
+  userId: string;
 }

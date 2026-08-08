@@ -12,6 +12,7 @@ import { EmailService } from "../../../infrastructure/email/email.service.js";
 import { UserRepository } from "../repositories/user.repository.js";
 import { AuthTokenRepository } from "../repositories/auth-token.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
+import { LoginHistoryRepository } from "../repositories/login-history.repository.js";
 import { PasswordService } from "./password.service.js";
 import { TokenService } from "./token.service.js";
 import { AuthTokenType } from "../schemas/auth-token.schema.js";
@@ -20,8 +21,13 @@ import {
   buildPasswordResetEmail,
   buildVerificationEmail,
 } from "../emails/identity-email.templates.js";
-import { toSessionSummary, toUserProfile } from "../mappers/user.mapper.js";
-import type { IssuedTokenPair, SessionSummary, UserProfile } from "../identity.types.js";
+import { toLoginHistorySummary, toSessionSummary, toUserProfile } from "../mappers/user.mapper.js";
+import type {
+  IssuedTokenPair,
+  LoginHistorySummary,
+  SessionSummary,
+  UserProfile,
+} from "../identity.types.js";
 import type { RegisterDto } from "../dto/register.dto.js";
 import type { LoginDto } from "../dto/login.dto.js";
 import type { ForgotPasswordDto } from "../dto/forgot-password.dto.js";
@@ -44,6 +50,7 @@ export class AuthService {
     private readonly userRepository: UserRepository,
     private readonly authTokenRepository: AuthTokenRepository,
     private readonly sessionRepository: SessionRepository,
+    private readonly loginHistoryRepository: LoginHistoryRepository,
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
     private readonly emailService: EmailService,
@@ -130,7 +137,10 @@ export class AuthService {
       infer: true,
     });
 
+    const userId = user._id.toString();
+
     if (user.lockedUntil && user.lockedUntil > new Date()) {
+      await this.recordLoginAttempt(userId, false, "ACCOUNT_LOCKED", meta);
       throw new ForbiddenException(
         "This account is temporarily locked due to multiple failed login attempts. Please try again later.",
       );
@@ -139,19 +149,22 @@ export class AuthService {
     const passwordMatches = await this.passwordService.compare(dto.password, user.passwordHash);
     if (!passwordMatches) {
       await this.userRepository.registerFailedLogin(
-        user._id.toString(),
+        userId,
         maxFailedLoginAttempts,
         accountLockoutMinutes,
       );
+      await this.recordLoginAttempt(userId, false, "INVALID_CREDENTIALS", meta);
       throw new UnauthorizedException("Invalid email or password");
     }
 
     if (!user.isActive) {
+      await this.recordLoginAttempt(userId, false, "ACCOUNT_INACTIVE", meta);
       throw new ForbiddenException("This account has been disabled. Please contact support.");
     }
 
     // LOGIN-BR-001 — only verified accounts may log in.
     if (!user.isEmailVerified) {
+      await this.recordLoginAttempt(userId, false, "EMAIL_NOT_VERIFIED", meta);
       throw new ForbiddenException("Please verify your email address before logging in");
     }
 
@@ -159,15 +172,18 @@ export class AuthService {
     // Belt-and-suspenders: TeamService also revokes all of their sessions on
     // suspend/remove, but this is the direct gate for a *new* login attempt.
     if (user.workspaceMemberStatus === WorkspaceMemberStatus.SUSPENDED) {
+      await this.recordLoginAttempt(userId, false, "WORKSPACE_ACCESS_SUSPENDED", meta);
       throw new ForbiddenException(
         "Your access to this workspace has been suspended. Please contact your workspace administrator.",
       );
     }
     if (user.workspaceMemberStatus === WorkspaceMemberStatus.REMOVED) {
+      await this.recordLoginAttempt(userId, false, "WORKSPACE_ACCESS_REMOVED", meta);
       throw new ForbiddenException("Your access to this workspace has been removed.");
     }
 
-    await this.userRepository.recordSuccessfulLogin(user._id.toString());
+    await this.userRepository.recordSuccessfulLogin(userId);
+    await this.recordLoginAttempt(userId, true, null, meta);
     const tokens = await this.issueTokenPair(user, meta);
     return { tokens, user: toUserProfile(user) };
   }
@@ -272,6 +288,57 @@ export class AuthService {
     }
   }
 
+  /**
+   * PRD-006 Volume-2 §4.5. Settings exposes this via POST
+   * /settings/security/change-password — Identity remains the sole owner of
+   * the mutation (§11). Rejects reuse of the current password or any of the
+   * last `passwordHistoryLimit` passwords, then revokes every session
+   * (including the one making this request) — the same
+   * "credential change invalidates all sessions" posture `resetPassword()`
+   * already established, so this isn't a new security stance, just the same
+   * one applied to the authenticated path. See
+   * docs/ADR-SET-004-identity-orchestration-strategy.md.
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.userRepository.findByIdWithPasswordHistory(userId);
+    if (!user) {
+      throw new UnauthorizedException("User not found");
+    }
+
+    const currentMatches = await this.passwordService.compare(currentPassword, user.passwordHash);
+    if (!currentMatches) {
+      throw new BadRequestException("Current password is incorrect");
+    }
+
+    const { passwordHistoryLimit } = this.config.get("auth", { infer: true });
+    const candidateHashes = [user.passwordHash, ...user.previousPasswordHashes];
+    for (const oldHash of candidateHashes) {
+      if (await this.passwordService.compare(newPassword, oldHash)) {
+        throw new BadRequestException(
+          `You cannot reuse one of your last ${passwordHistoryLimit} passwords`,
+        );
+      }
+    }
+
+    const newPasswordHash = await this.passwordService.hash(newPassword);
+    const updatedHistory = [user.passwordHash, ...user.previousPasswordHashes].slice(
+      0,
+      passwordHistoryLimit,
+    );
+    await this.userRepository.updatePasswordAndHistory(userId, newPasswordHash, updatedHistory);
+    await this.sessionRepository.revokeAllForUser(userId);
+  }
+
+  /** PRD-006 Volume-2 §4.7 — read-only, immutable (BR-007). */
+  async getLoginHistory(userId: string): Promise<LoginHistorySummary[]> {
+    const entries = await this.loginHistoryRepository.findRecentByUser(userId);
+    return entries.map(toLoginHistorySummary);
+  }
+
   async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
     const user = await this.userRepository.findByEmail(dto.email);
     // Same enumeration-safety rule as resendVerification — always no-op silently.
@@ -373,6 +440,22 @@ export class AuthService {
       emailVerified: user.isEmailVerified,
     });
     return { accessToken, refreshToken: session.token, expiresIn };
+  }
+
+  /** Not called for an unknown email — there's no userId to attribute the attempt to. */
+  private async recordLoginAttempt(
+    userId: string,
+    success: boolean,
+    reason: string | null,
+    meta: RequestMeta,
+  ): Promise<void> {
+    await this.loginHistoryRepository.record({
+      userId,
+      success,
+      reason,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
   }
 
   private async createSession(

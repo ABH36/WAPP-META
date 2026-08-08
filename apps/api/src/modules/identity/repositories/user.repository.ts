@@ -62,6 +62,35 @@ export class UserRepository {
       .exec();
   }
 
+  /** PRD-006 Volume-2 §4.5 — used by AuthService.changePassword() to check current password and reuse history. */
+  async findByIdWithPasswordHistory(userId: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findOne({ _id: userId, isDeleted: false })
+      .select("+passwordHash +previousPasswordHashes")
+      .exec();
+  }
+
+  /** `previousPasswordHashes` is the caller's already-computed, already-capped next history array (AuthService owns the cap/trim logic, this just persists it). */
+  async updatePasswordAndHistory(
+    userId: string,
+    passwordHash: string,
+    previousPasswordHashes: string[],
+  ): Promise<void> {
+    await this.userModel
+      .updateOne(
+        { _id: userId },
+        {
+          $set: {
+            passwordHash,
+            previousPasswordHashes,
+            failedLoginAttempts: 0,
+            lockedUntil: null,
+          },
+        },
+      )
+      .exec();
+  }
+
   async recordSuccessfulLogin(userId: string): Promise<void> {
     await this.userModel
       .updateOne(

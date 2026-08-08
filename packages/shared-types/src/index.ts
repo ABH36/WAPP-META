@@ -8,6 +8,7 @@ export * from "./enums/payment-status.enum";
 export * from "./enums/subscription-status.enum";
 export * from "./enums/invoice-status.enum";
 export * from "./enums/usage.enum";
+export * from "./enums/user-preferences.enum";
 export * from "./enums/role.enum";
 export * from "./enums/workspace-member-status.enum";
 export * from "./enums/invitation-status.enum";
