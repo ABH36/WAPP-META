@@ -15,17 +15,24 @@ import {
   WorkspaceMaintenanceState,
   WorkspaceMaintenanceStateSchema,
 } from "./schemas/workspace-maintenance-state.schema.js";
+import {
+  PlatformMaintenanceGate,
+  PlatformMaintenanceGateSchema,
+} from "./schemas/platform-maintenance-gate.schema.js";
 import { UserRepository } from "./repositories/user.repository.js";
 import { AuthTokenRepository } from "./repositories/auth-token.repository.js";
 import { SessionRepository } from "./repositories/session.repository.js";
 import { LoginHistoryRepository } from "./repositories/login-history.repository.js";
 import { ApiKeyRepository } from "./repositories/api-key.repository.js";
 import { WorkspaceMaintenanceStateRepository } from "./repositories/workspace-maintenance-state.repository.js";
+import { PlatformMaintenanceGateRepository } from "./repositories/platform-maintenance-gate.repository.js";
 import { PasswordService } from "./services/password.service.js";
 import { TokenService } from "./services/token.service.js";
 import { AuthService } from "./services/auth.service.js";
 import { ApiKeyService } from "./services/api-key.service.js";
 import { MaintenanceModeListener } from "./listeners/maintenance-mode.listener.js";
+import { WorkspaceStatusGateListener } from "./listeners/workspace-status-gate.listener.js";
+import { PlatformMaintenanceGateListener } from "./listeners/platform-maintenance-gate.listener.js";
 import { AuthController } from "./controllers/auth.controller.js";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard.js";
 import { PermissionsGuard } from "./guards/permissions.guard.js";
@@ -54,6 +61,7 @@ import { ApiKeyGuard } from "./guards/api-key.guard.js";
       { name: LoginHistoryEntry.name, schema: LoginHistoryEntrySchema },
       { name: ApiKey.name, schema: ApiKeySchema },
       { name: WorkspaceMaintenanceState.name, schema: WorkspaceMaintenanceStateSchema },
+      { name: PlatformMaintenanceGate.name, schema: PlatformMaintenanceGateSchema },
     ]),
     InfrastructureModule,
   ],
@@ -65,12 +73,15 @@ import { ApiKeyGuard } from "./guards/api-key.guard.js";
     LoginHistoryRepository,
     ApiKeyRepository,
     WorkspaceMaintenanceStateRepository,
+    PlatformMaintenanceGateRepository,
     PasswordService,
     TokenService,
     AuthService,
     ApiKeyService,
     ApiKeyGuard,
     MaintenanceModeListener,
+    WorkspaceStatusGateListener,
+    PlatformMaintenanceGateListener,
     // Order matters: JwtAuthGuard must populate request.user before
     // PermissionsGuard reads it — both declared in this same array/module so
     // Nest's global-guard registration order is guaranteed.

@@ -163,6 +163,8 @@ import { AutomationSettingsController } from "./controllers/automation-settings.
   // orchestrates WhatsApp Test Connection/Disconnect/Refresh Metadata
   // through it rather than owning any connection state itself (same
   // orchestration-not-ownership pattern as ADR-SET-004).
-  exports: [ContactRepository, WhatsAppConnectionService],
+  // MessageRepository exported for PRD-007 Volume-1 — Platform Dashboard's
+  // cross-tenant "Total Messages" count.
+  exports: [ContactRepository, WhatsAppConnectionService, MessageRepository],
 })
 export class CommunicationModule {}

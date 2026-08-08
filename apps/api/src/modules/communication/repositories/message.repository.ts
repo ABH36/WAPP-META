@@ -71,4 +71,9 @@ export class MessageRepository {
       .limit(limit)
       .exec();
   }
+
+  /** PRD-007 Volume-1 §4.2 (Platform Dashboard, Total Messages) — cross-tenant, deliberately no workspaceId filter. */
+  async countAll(): Promise<number> {
+    return this.messageModel.countDocuments().exec();
+  }
 }

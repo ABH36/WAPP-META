@@ -15,6 +15,7 @@ import { AuthTokenRepository } from "../repositories/auth-token.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
 import { LoginHistoryRepository } from "../repositories/login-history.repository.js";
 import { WorkspaceMaintenanceStateRepository } from "../repositories/workspace-maintenance-state.repository.js";
+import { PlatformMaintenanceGateRepository } from "../repositories/platform-maintenance-gate.repository.js";
 import { PasswordService } from "./password.service.js";
 import { TokenService } from "./token.service.js";
 import { AuthTokenType } from "../schemas/auth-token.schema.js";
@@ -54,6 +55,7 @@ export class AuthService {
     private readonly sessionRepository: SessionRepository,
     private readonly loginHistoryRepository: LoginHistoryRepository,
     private readonly maintenanceStateRepository: WorkspaceMaintenanceStateRepository,
+    private readonly platformMaintenanceGateRepository: PlatformMaintenanceGateRepository,
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
     private readonly emailService: EmailService,
@@ -171,6 +173,19 @@ export class AuthService {
       throw new ForbiddenException("Please verify your email address before logging in");
     }
 
+    // PRD-007 Volume-1 §4.7 — a platform-wide Maintenance toggle blocks new
+    // tenant logins entirely, checked before any per-workspace state since
+    // it applies regardless of which workspace the user belongs to. Platform
+    // Administration staff use the separate PlatformAuthService and are
+    // unaffected. See docs/ADR-PLAT-001-platform-administration-boundary.md.
+    const platformMaintenanceEnabled = await this.platformMaintenanceGateRepository.isEnabled();
+    if (platformMaintenanceEnabled) {
+      await this.recordLoginAttempt(userId, false, "PLATFORM_MAINTENANCE_MODE", meta);
+      throw new ServiceUnavailableException(
+        "The platform is currently under maintenance. Please try again shortly.",
+      );
+    }
+
     // PRD-002 Part 3B — a suspended/removed workspace member cannot log in.
     // Belt-and-suspenders: TeamService also revokes all of their sessions on
     // suspend/remove, but this is the direct gate for a *new* login attempt.
@@ -183,6 +198,20 @@ export class AuthService {
     if (user.workspaceMemberStatus === WorkspaceMemberStatus.REMOVED) {
       await this.recordLoginAttempt(userId, false, "WORKSPACE_ACCESS_REMOVED", meta);
       throw new ForbiddenException("Your access to this workspace has been removed.");
+    }
+
+    // PRD-007 Volume-1 §4.1 — a workspace a Platform Administrator has
+    // Suspended or Archived blocks login entirely (harder than maintenance,
+    // which is temporary/systemic). See
+    // docs/ADR-PLAT-001-platform-administration-boundary.md.
+    if (user.workspaceId) {
+      const isLoginBlocked = await this.maintenanceStateRepository.isLoginBlocked(user.workspaceId);
+      if (isLoginBlocked) {
+        await this.recordLoginAttempt(userId, false, "WORKSPACE_SUSPENDED_OR_ARCHIVED", meta);
+        throw new ForbiddenException(
+          "This workspace's access has been suspended. Please contact support.",
+        );
+      }
     }
 
     // PRD-006 Volume-4 §4.6 — blocks new sessions only; refresh()/

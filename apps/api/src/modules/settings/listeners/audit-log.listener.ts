@@ -20,7 +20,10 @@ import type {
   TeamOwnershipTransferredPayload,
   WebhookCreatedPayload,
   WhatsAppConnectedPayload,
+  WorkspaceArchivedPayload,
   WorkspaceCreatedPayload,
+  WorkspaceReactivatedPayload,
+  WorkspaceSuspendedPayload,
   WorkspaceUpdatedPayload,
 } from "../../../common/events/domain-events.js";
 import { AuditLogRepository } from "../repositories/audit-log.repository.js";
@@ -94,6 +97,35 @@ export class AuditLogListener {
         action: "Ownership Transferred",
       },
     );
+  }
+
+  // PRD-007 Volume-1 — actor is a platformUserId, not a tenant userId;
+  // `actorId` has no FK constraint at the schema level, so this is a safe,
+  // additive extension.
+  @OnEvent(DomainEvent.WORKSPACE_SUSPENDED)
+  async onWorkspaceSuspended(payload: WorkspaceSuspendedPayload): Promise<void> {
+    await this.record(payload.workspaceId, AuditCategory.WORKSPACE, payload.actorId, "Workspace", {
+      entityId: payload.workspaceId,
+      action: "Workspace Suspended",
+      metadata: { reason: payload.reason },
+    });
+  }
+
+  @OnEvent(DomainEvent.WORKSPACE_REACTIVATED)
+  async onWorkspaceReactivated(payload: WorkspaceReactivatedPayload): Promise<void> {
+    await this.record(payload.workspaceId, AuditCategory.WORKSPACE, payload.actorId, "Workspace", {
+      entityId: payload.workspaceId,
+      action: "Workspace Reactivated",
+    });
+  }
+
+  @OnEvent(DomainEvent.WORKSPACE_ARCHIVED)
+  async onWorkspaceArchived(payload: WorkspaceArchivedPayload): Promise<void> {
+    await this.record(payload.workspaceId, AuditCategory.WORKSPACE, payload.actorId, "Workspace", {
+      entityId: payload.workspaceId,
+      action: "Workspace Archived",
+      metadata: { reason: payload.reason },
+    });
   }
 
   // ---- CRM ----

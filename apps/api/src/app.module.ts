@@ -18,6 +18,7 @@ import { CommunicationModule } from "./modules/communication/communication.modul
 import { CrmModule } from "./modules/crm/crm.module.js";
 import { BillingModule } from "./modules/billing/billing.module.js";
 import { SettingsModule } from "./modules/settings/settings.module.js";
+import { PlatformModule } from "./modules/platform/platform.module.js";
 
 /**
  * Root module — Modular Monolith composition root (SAD-001 Volume-1 §4).
@@ -73,6 +74,7 @@ import { SettingsModule } from "./modules/settings/settings.module.js";
     CrmModule,
     BillingModule,
     SettingsModule,
+    PlatformModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

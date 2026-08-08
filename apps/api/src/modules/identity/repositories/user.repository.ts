@@ -183,4 +183,18 @@ export class UserRepository {
       .sort({ createdAt: 1 })
       .exec();
   }
+
+  /** PRD-007 Volume-1 §4.2 (Platform Dashboard, Total Users) — cross-tenant, deliberately no workspaceId filter. */
+  async countAll(): Promise<number> {
+    return this.userModel.countDocuments({ isDeleted: false }).exec();
+  }
+
+  /** PRD-007 Volume-1 §4.6 (Workspace Search) — cross-tenant name/email search, capped, deliberately no workspaceId filter. */
+  async searchAcrossWorkspaces(q: string, limit: number): Promise<UserDocument[]> {
+    const pattern = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    return this.userModel
+      .find({ isDeleted: false, $or: [{ fullName: pattern }, { email: pattern }] })
+      .limit(limit)
+      .exec();
+  }
 }

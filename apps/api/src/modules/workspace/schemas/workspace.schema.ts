@@ -137,6 +137,23 @@ export class Workspace {
   @Prop({ type: String, enum: WorkspaceStatus, default: WorkspaceStatus.TRIAL })
   status!: WorkspaceStatus;
 
+  // PRD-007 Volume-1 §4.1/§10 — populated only by a Platform Administrator's
+  // Suspend/Reactivate/Archive action (§10: Suspension requires a reason).
+  // Left null for every billing-lifecycle-driven transition (Trial->Active,
+  // Expired, Cancelled) — those are automated, not admin actions, and have
+  // nothing to attribute a "reason" to.
+  @Prop({ type: String, default: null })
+  statusReason!: string | null;
+
+  @Prop({ type: Date, default: null })
+  statusChangedAt!: Date | null;
+
+  // A platformUserId (PlatformUser, not tenant User) when set — deliberately
+  // untyped/unref'd here since Platform Administration is a completely
+  // separate identity collection Workspace has no relationship to.
+  @Prop({ type: String, default: null })
+  statusChangedBy!: string | null;
+
   @Prop({ type: String, default: null })
   createdBy!: string | null;
 

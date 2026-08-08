@@ -23,3 +23,5 @@ export * from "./api/base-entity.type";
 // Permissions
 export * from "./permissions/permission.enum";
 export * from "./permissions/permission-matrix";
+export * from "./permissions/platform-permission.enum";
+export * from "./permissions/platform-permission-matrix";

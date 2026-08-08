@@ -49,6 +49,17 @@ class EnvironmentVariables {
   @IsNotEmpty()
   JWT_REFRESH_SECRET!: string;
 
+  // PRD-007 Volume-1 — required and distinct from JWT_ACCESS_SECRET/
+  // JWT_REFRESH_SECRET; must never be equal to either at deploy time (not
+  // enforced here structurally, but documented as a hard operational rule).
+  @IsString()
+  @IsNotEmpty()
+  PLATFORM_JWT_ACCESS_SECRET!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  PLATFORM_JWT_REFRESH_SECRET!: string;
+
   @IsString()
   @IsNotEmpty()
   RESEND_API_KEY!: string;

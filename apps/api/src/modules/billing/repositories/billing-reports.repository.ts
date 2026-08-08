@@ -84,6 +84,23 @@ export class BillingReportsRepository {
     return rows[0]?.total ?? 0;
   }
 
+  /**
+   * PRD-007 Volume-1 §4.2 (Platform Dashboard, Total Revenue) — the one
+   * deliberate cross-tenant exception to this repository's own
+   * workspace-scoped-throughout rule (docs/ADR-BILL-010-billing-reporting-boundary.md
+   * still governs every other method here). Same shape as
+   * `sumAllPaidPayments`, just without the `workspaceId` match stage.
+   */
+  async sumAllPaidPaymentsAcrossWorkspaces(): Promise<number> {
+    const rows = await this.paymentModel
+      .aggregate<{ total: number }>([
+        { $match: { status: PaymentStatus.PAID } },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ])
+      .exec();
+    return rows[0]?.total ?? 0;
+  }
+
   /** Standard calendar-month grouping (resolved the same way CRM Reports' groupForecastByPeriod already does). */
   async monthlyRevenueBreakdown(workspaceId: string, from: Date): Promise<MonthlyRevenueEntry[]> {
     const rows = await this.paymentModel

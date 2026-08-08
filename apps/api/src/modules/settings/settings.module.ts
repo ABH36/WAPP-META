@@ -28,6 +28,10 @@ import {
 import { ExportJob, ExportJobSchema } from "./schemas/export-job.schema.js";
 import { RetentionPolicy, RetentionPolicySchema } from "./schemas/retention-policy.schema.js";
 import { FeatureFlagState, FeatureFlagStateSchema } from "./schemas/feature-flag-state.schema.js";
+import {
+  PlatformFeatureOverrideState,
+  PlatformFeatureOverrideStateSchema,
+} from "./schemas/platform-feature-override-state.schema.js";
 import { WorkspaceSettingsRepository } from "./repositories/workspace-settings.repository.js";
 import { UserPreferencesRepository } from "./repositories/user-preferences.repository.js";
 import { EmailIntegrationRepository } from "./repositories/email-integration.repository.js";
@@ -39,6 +43,7 @@ import { ConfigHistoryRepository } from "./repositories/config-history.repositor
 import { ExportJobRepository } from "./repositories/export-job.repository.js";
 import { RetentionPolicyRepository } from "./repositories/retention-policy.repository.js";
 import { FeatureFlagRepository } from "./repositories/feature-flag.repository.js";
+import { PlatformFeatureOverrideRepository } from "./repositories/platform-feature-override.repository.js";
 import { SettingsService } from "./services/settings.service.js";
 import { UserPreferencesService } from "./services/user-preferences.service.js";
 import { SecuritySettingsService } from "./services/security-settings.service.js";
@@ -67,6 +72,7 @@ import { RetentionCleanupProcessor } from "./queue/retention-cleanup.processor.j
 import { WebhookEventListener } from "./listeners/webhook-event.listener.js";
 import { AuditLogListener } from "./listeners/audit-log.listener.js";
 import { ConfigHistoryListener } from "./listeners/config-history.listener.js";
+import { PlatformFeatureOverrideListener } from "./listeners/platform-feature-override.listener.js";
 import { SettingsController } from "./controllers/settings.controller.js";
 import { UserPreferencesController } from "./controllers/user-preferences.controller.js";
 import { SecuritySettingsController } from "./controllers/security-settings.controller.js";
@@ -121,6 +127,7 @@ import { SystemAdminController } from "./controllers/system-admin.controller.js"
       { name: ExportJob.name, schema: ExportJobSchema },
       { name: RetentionPolicy.name, schema: RetentionPolicySchema },
       { name: FeatureFlagState.name, schema: FeatureFlagStateSchema },
+      { name: PlatformFeatureOverrideState.name, schema: PlatformFeatureOverrideStateSchema },
     ]),
     BullModule.registerQueue(
       { name: WEBHOOK_DELIVERY_QUEUE },
@@ -151,6 +158,7 @@ import { SystemAdminController } from "./controllers/system-admin.controller.js"
     ExportJobRepository,
     RetentionPolicyRepository,
     FeatureFlagRepository,
+    PlatformFeatureOverrideRepository,
     SettingsService,
     UserPreferencesService,
     SecuritySettingsService,
@@ -176,6 +184,7 @@ import { SystemAdminController } from "./controllers/system-admin.controller.js"
     WebhookEventListener,
     AuditLogListener,
     ConfigHistoryListener,
+    PlatformFeatureOverrideListener,
   ],
 })
 export class SettingsModule {}

@@ -363,4 +363,9 @@ export class BillingReportsService {
   private round2(value: number): number {
     return Math.round(value * 100) / 100;
   }
+
+  /** PRD-007 Volume-1 §4.2 (Platform Dashboard, Total Revenue) — cross-tenant, deliberately outside this service's usual workspace-scoped methods. */
+  async getPlatformRevenueTotal(): Promise<number> {
+    return this.billingReportsRepository.sumAllPaidPaymentsAcrossWorkspaces();
+  }
 }

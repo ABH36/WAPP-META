@@ -27,4 +27,20 @@ export class WorkspaceMaintenanceStateRepository {
       )
       .exec();
   }
+
+  /** PRD-007 Volume-1 §4.1 — reflects a platform-admin Suspend/Archive action. */
+  async isLoginBlocked(workspaceId: string): Promise<boolean> {
+    const state = await this.maintenanceStateModel.findOne({ workspaceId }).exec();
+    return state?.loginBlocked ?? false;
+  }
+
+  async setLoginBlocked(workspaceId: string, loginBlocked: boolean): Promise<void> {
+    await this.maintenanceStateModel
+      .findOneAndUpdate(
+        { workspaceId },
+        { $set: { loginBlocked } },
+        { upsert: true, setDefaultsOnInsert: true },
+      )
+      .exec();
+  }
 }

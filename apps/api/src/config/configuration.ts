@@ -10,6 +10,16 @@ export interface AppConfig {
     accessTtl: string;
     refreshTtl: string;
   };
+  // PRD-007 Volume-1 — a genuinely separate secret pair from tenant `jwt`,
+  // so a leaked tenant secret can never be used to forge a Platform
+  // Administration session, and vice versa. See
+  // docs/ADR-PLAT-002-platform-identity-strategy.md.
+  platformJwt: {
+    accessSecret: string;
+    refreshSecret: string;
+    accessTtl: string;
+    refreshTtl: string;
+  };
   auth: {
     bcryptSaltRounds: number;
     // Minutes — TAD-001 §11 AUTH-004 (email verification), AUTH-005 (password reset).
@@ -71,6 +81,12 @@ export default (): AppConfig => ({
     // Access tokens short-lived per TAD-001 AUTH-002; refresh tokens longer-lived per AUTH-003.
     accessTtl: process.env.JWT_ACCESS_TTL ?? "15m",
     refreshTtl: process.env.JWT_REFRESH_TTL ?? "30d",
+  },
+  platformJwt: {
+    accessSecret: process.env.PLATFORM_JWT_ACCESS_SECRET ?? "",
+    refreshSecret: process.env.PLATFORM_JWT_REFRESH_SECRET ?? "",
+    accessTtl: process.env.PLATFORM_JWT_ACCESS_TTL ?? "15m",
+    refreshTtl: process.env.PLATFORM_JWT_REFRESH_TTL ?? "30d",
   },
   auth: {
     bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS ?? "12", 10),

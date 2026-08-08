@@ -117,6 +117,8 @@ import { ReportsController } from "./controllers/reports.controller.js";
   // Activities via ReportsService.exportReport; Customers via
   // CustomerRepository.findAllForWorkspace) rather than duplicating it,
   // same reuse-not-rebuild posture as every other Settings orchestration.
-  exports: [ReportsService, CustomerRepository],
+  // LeadRepository + DealRepository additionally exported for PRD-007
+  // Volume-1 — Platform Dashboard's cross-tenant "Total CRM Records" count.
+  exports: [ReportsService, CustomerRepository, LeadRepository, DealRepository],
 })
 export class CrmModule {}

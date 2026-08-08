@@ -209,6 +209,22 @@ export const DomainEvent = {
   MAINTENANCE_MODE_DISABLED: "settings.maintenance_mode_disabled",
   RETENTION_POLICY_UPDATED: "settings.retention_policy_updated",
   SYSTEM_PREFERENCE_UPDATED: "settings.system_preference_updated",
+  // PRD-007 Volume-1 (Platform Administration & Tenant Management, §8).
+  // WORKSPACE_SUSPENDED/REACTIVATED/ARCHIVED are workspace-scoped (a real
+  // workspaceId, fits the existing BaseEventPayload shape, and is picked up
+  // by Settings' AuditLogListener as new WORKSPACE-category entries).
+  // WORKSPACE_ARCHIVED itself isn't in §8's literal list but is added for
+  // consistency — Archive is a real, auditable admin action just like
+  // Suspend/Reactivate. The remaining four are genuinely platform-scoped
+  // (no single workspace), so they deliberately do NOT extend
+  // BaseEventPayload — see BasePlatformEventPayload below.
+  WORKSPACE_SUSPENDED: "platform.workspace_suspended",
+  WORKSPACE_REACTIVATED: "platform.workspace_reactivated",
+  WORKSPACE_ARCHIVED: "platform.workspace_archived",
+  GLOBAL_ANNOUNCEMENT_CREATED: "platform.global_announcement_created",
+  PLATFORM_FEATURE_UPDATED: "platform.feature_updated",
+  PLATFORM_MAINTENANCE_ENABLED: "platform.maintenance_enabled",
+  PLATFORM_MAINTENANCE_DISABLED: "platform.maintenance_disabled",
 } as const;
 
 interface BaseEventPayload {
@@ -679,5 +695,44 @@ export interface RetentionPolicyUpdatedPayload extends BaseEventPayload {
 }
 
 export interface SystemPreferenceUpdatedPayload extends BaseEventPayload {
+  actorId: string;
+}
+
+export interface WorkspaceSuspendedPayload extends BaseEventPayload {
+  reason: string;
+  actorId: string;
+}
+
+export interface WorkspaceReactivatedPayload extends BaseEventPayload {
+  actorId: string;
+}
+
+export interface WorkspaceArchivedPayload extends BaseEventPayload {
+  reason: string;
+  actorId: string;
+}
+
+/** PRD-007 Volume-1 — genuinely platform-scoped events have no single workspaceId, so they deliberately do not extend BaseEventPayload. */
+interface BasePlatformEventPayload {
+  occurredAt: string;
+}
+
+export interface GlobalAnnouncementCreatedPayload extends BasePlatformEventPayload {
+  announcementId: string;
+  targetType: string;
+  actorId: string;
+}
+
+export interface PlatformFeatureUpdatedPayload extends BasePlatformEventPayload {
+  flagKey: string;
+  enabled: boolean;
+  actorId: string;
+}
+
+export interface PlatformMaintenanceEnabledPayload extends BasePlatformEventPayload {
+  actorId: string;
+}
+
+export interface PlatformMaintenanceDisabledPayload extends BasePlatformEventPayload {
   actorId: string;
 }

@@ -13,6 +13,7 @@ import { AuthTokenRepository } from "../repositories/auth-token.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
 import { LoginHistoryRepository } from "../repositories/login-history.repository.js";
 import { WorkspaceMaintenanceStateRepository } from "../repositories/workspace-maintenance-state.repository.js";
+import { PlatformMaintenanceGateRepository } from "../repositories/platform-maintenance-gate.repository.js";
 import { PasswordService } from "./password.service.js";
 import { TokenService } from "./token.service.js";
 import { EmailService } from "../../../infrastructure/email/email.service.js";
@@ -62,6 +63,7 @@ describe("AuthService", () => {
   let sessionRepository: jest.Mocked<SessionRepository>;
   let loginHistoryRepository: jest.Mocked<LoginHistoryRepository>;
   let maintenanceStateRepository: jest.Mocked<WorkspaceMaintenanceStateRepository>;
+  let platformMaintenanceGateRepository: jest.Mocked<PlatformMaintenanceGateRepository>;
   let passwordService: jest.Mocked<PasswordService>;
   let tokenService: jest.Mocked<TokenService>;
   let emailService: jest.Mocked<EmailService>;
@@ -117,7 +119,16 @@ describe("AuthService", () => {
         },
         {
           provide: WorkspaceMaintenanceStateRepository,
-          useValue: { isMaintenanceMode: jest.fn(), setMaintenanceMode: jest.fn() },
+          useValue: {
+            isMaintenanceMode: jest.fn(),
+            setMaintenanceMode: jest.fn(),
+            isLoginBlocked: jest.fn(),
+            setLoginBlocked: jest.fn(),
+          },
+        },
+        {
+          provide: PlatformMaintenanceGateRepository,
+          useValue: { isEnabled: jest.fn(), setEnabled: jest.fn() },
         },
         {
           provide: PasswordService,
@@ -164,6 +175,7 @@ describe("AuthService", () => {
     sessionRepository = moduleRef.get(SessionRepository);
     loginHistoryRepository = moduleRef.get(LoginHistoryRepository);
     maintenanceStateRepository = moduleRef.get(WorkspaceMaintenanceStateRepository);
+    platformMaintenanceGateRepository = moduleRef.get(PlatformMaintenanceGateRepository);
     passwordService = moduleRef.get(PasswordService);
     tokenService = moduleRef.get(TokenService);
     emailService = moduleRef.get(EmailService);
@@ -171,6 +183,8 @@ describe("AuthService", () => {
     // Sensible defaults shared by most tests.
     tokenService.generateOpaqueToken.mockReturnValue("raw-opaque-token");
     maintenanceStateRepository.isMaintenanceMode.mockResolvedValue(false);
+    maintenanceStateRepository.isLoginBlocked.mockResolvedValue(false);
+    platformMaintenanceGateRepository.isEnabled.mockResolvedValue(false);
     tokenService.hashOpaqueToken.mockReturnValue("hashed-opaque-token");
     tokenService.signAccessToken.mockReturnValue({ token: "access-token", expiresIn: 900 });
     tokenService.signRefreshToken.mockReturnValue({
@@ -698,6 +712,70 @@ describe("AuthService", () => {
       );
 
       expect(maintenanceStateRepository.isMaintenanceMode).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("login — workspace suspended/archived (PRD-007 Volume-1 §4.1)", () => {
+    it("blocks a new login when the user's workspace has been suspended or archived", async () => {
+      userRepository.findByEmail.mockResolvedValue(fakeUser({ workspaceId: "workspace-1" }));
+      passwordService.compare.mockResolvedValue(true);
+      maintenanceStateRepository.isLoginBlocked.mockResolvedValue(true);
+
+      await expect(
+        service.login(
+          { email: "jane@example.com", password: "Passw0rd1" },
+          { userAgent: null, ipAddress: null },
+        ),
+      ).rejects.toThrow("suspended");
+      expect(loginHistoryRepository.record).toHaveBeenCalledWith(
+        expect.objectContaining({ success: false, reason: "WORKSPACE_SUSPENDED_OR_ARCHIVED" }),
+      );
+      expect(userRepository.recordSuccessfulLogin).not.toHaveBeenCalled();
+    });
+
+    it("does not check the login-blocked gate for a user with no workspace yet", async () => {
+      userRepository.findByEmail.mockResolvedValue(fakeUser({ workspaceId: null }));
+      passwordService.compare.mockResolvedValue(true);
+
+      await service.login(
+        { email: "jane@example.com", password: "Passw0rd1" },
+        { userAgent: null, ipAddress: null },
+      );
+
+      expect(maintenanceStateRepository.isLoginBlocked).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("login — platform-wide maintenance (PRD-007 Volume-1 §4.7)", () => {
+    it("blocks a new login for any workspace when platform-wide maintenance is enabled", async () => {
+      userRepository.findByEmail.mockResolvedValue(fakeUser({ workspaceId: "workspace-1" }));
+      passwordService.compare.mockResolvedValue(true);
+      platformMaintenanceGateRepository.isEnabled.mockResolvedValue(true);
+
+      await expect(
+        service.login(
+          { email: "jane@example.com", password: "Passw0rd1" },
+          { userAgent: null, ipAddress: null },
+        ),
+      ).rejects.toThrow("platform");
+      expect(loginHistoryRepository.record).toHaveBeenCalledWith(
+        expect.objectContaining({ success: false, reason: "PLATFORM_MAINTENANCE_MODE" }),
+      );
+      // The platform-wide gate short-circuits before any per-workspace check runs.
+      expect(maintenanceStateRepository.isLoginBlocked).not.toHaveBeenCalled();
+    });
+
+    it("checks the platform-wide gate even for a user with no workspace yet", async () => {
+      userRepository.findByEmail.mockResolvedValue(fakeUser({ workspaceId: null }));
+      passwordService.compare.mockResolvedValue(true);
+      platformMaintenanceGateRepository.isEnabled.mockResolvedValue(true);
+
+      await expect(
+        service.login(
+          { email: "jane@example.com", password: "Passw0rd1" },
+          { userAgent: null, ipAddress: null },
+        ),
+      ).rejects.toThrow("platform");
     });
   });
 });
