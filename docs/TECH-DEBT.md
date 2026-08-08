@@ -281,4 +281,19 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 
 **Closing this out looks like:** a dedicated MFA/Security initiative that adds, to Identity: TOTP-based Two-Factor Authentication (secret generation, QR enrollment, verification on login), single-use Recovery Codes, a Trusted Devices list (skip 2FA on remembered devices), WebAuthn/Passkey support, and Authenticator App enrollment — each surfaced through Settings the same way Password/Sessions/Login History are in this volume (thin orchestration, Identity remains sole owner, `docs/ADR-SET-004-identity-orchestration-strategy.md`'s pattern extends directly).
 
+---
+
+## TD-019 — OAuth Integration Initiative (Google, Microsoft, Slack, Zoom connections)
+
+**Raised:** 2026-08-08 (Phase-7 Part-3, Settings — Integrations & External Services; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** PRD-006 Volume-3 §4.5 (OAuth Connections) proposed workspace-level connections to Google, Microsoft, Slack, and Zoom — Settings storing connection metadata (provider/connected user/connected at/status), Identity owning the actual OAuth2 token exchange and refresh-token handling (the same ownership split §4.4 gives API Keys and this volume's own ADR-SET-005 confirms). None of it was built this volume: no OAuth login, connection flow, provider SDK, or token-exchange code exists anywhere in Identity.
+
+**Why accepted for now:** Resolved 2026-08-08, Architecture Review: Identity has zero existing OAuth infrastructure to extend (unlike API Keys, which could reuse `PasswordService`'s established bcrypt pattern, or WhatsApp lifecycle actions, which could reuse the already-working `MetaApiClient`). Four full OAuth2 client integrations, each with its own provider quirks (token refresh, scope negotiation, revocation), is realistically its own multi-week initiative — bundling it into a volume already covering WhatsApp lifecycle actions, Email config, Webhooks (config + delivery pipeline), API Keys, and Third-party App toggles would have meaningfully increased this volume's defect surface for a capability nothing else in Volume-3 depends on.
+
+**Closing this out looks like:** a dedicated OAuth Integrations initiative that adds, to Identity: OAuth2 client flows for Google/Microsoft/Slack/Zoom (authorization-code exchange, refresh-token storage via `TokenEncryptionService` — reversible, same reasoning as the WABA access token — never bcrypt), and to Settings: an `OAuthConnectionsController`/service exposing connect/status/disconnect, orchestrating Identity's token handling the same thin-proxy shape `WhatsAppIntegrationService`/`SecuritySettingsService` already establish. §9's `GET /settings/oauth`, `POST /settings/oauth/connect`, `DELETE /settings/oauth/:provider` endpoints were never implemented — they belong to this initiative, not retrofitted onto Volume-3's existing controllers.
+
+**Trigger to revisit:** OAuth Integrations initiative planning and approval — the natural moment a concrete need for one of these four providers (e.g. a specific customer requesting Slack notifications or Google Calendar sync) makes the build cost worth it.
+
 **Trigger to revisit:** MFA/Security initiative planning and approval — likely prioritized by a real customer security requirement (enterprise SSO/compliance ask) rather than a fixed date.
