@@ -2,10 +2,14 @@ import type { WorkspaceDocument } from "../../workspace/schemas/workspace.schema
 import type { UserDocument } from "../../identity/schemas/user.schema.js";
 import type { PlatformAnnouncementDocument } from "../schemas/platform-announcement.schema.js";
 import type { SupportTicketDocument } from "../schemas/support-ticket.schema.js";
+import type { SupportSessionDocument } from "../schemas/support-session.schema.js";
+import type { PlatformAuditEntryDocument } from "../schemas/platform-audit-entry.schema.js";
 import type {
   PlatformAnnouncementSummary,
+  PlatformAuditEntrySummary,
   PlatformSearchUserSummary,
   PlatformWorkspaceSummary,
+  SupportSessionSummary,
   SupportTicketSummary,
 } from "../platform.types.js";
 
@@ -61,5 +65,40 @@ export function toSupportTicketSummary(ticket: SupportTicketDocument): SupportTi
     createdBy: ticket.createdBy,
     createdAt: ticket.createdAt.toISOString(),
     updatedAt: ticket.updatedAt.toISOString(),
+  };
+}
+
+export function toSupportSessionSummary(session: SupportSessionDocument): SupportSessionSummary {
+  return {
+    id: session._id.toString(),
+    workspaceId: session.workspaceId,
+    requestedBy: session.requestedBy,
+    approvedBy: session.approvedBy,
+    reason: session.reason,
+    durationMinutes: session.durationMinutes,
+    status: session.status,
+    approvedAt: session.approvedAt ? session.approvedAt.toISOString() : null,
+    startedBy: session.startedBy,
+    startedAt: session.startedAt ? session.startedAt.toISOString() : null,
+    expiresAt: session.expiresAt ? session.expiresAt.toISOString() : null,
+    endedAt: session.endedAt ? session.endedAt.toISOString() : null,
+    terminationReason: session.terminationReason,
+    createdAt: session.createdAt.toISOString(),
+    updatedAt: session.updatedAt.toISOString(),
+  };
+}
+
+export function toPlatformAuditEntrySummary(
+  entry: PlatformAuditEntryDocument,
+): PlatformAuditEntrySummary {
+  return {
+    id: entry._id.toString(),
+    eventType: entry.eventType,
+    description: entry.description,
+    workspaceId: entry.workspaceId,
+    actorId: entry.actorId,
+    metadata: entry.metadata,
+    occurredAt: entry.occurredAt.toISOString(),
+    createdAt: entry.createdAt.toISOString(),
   };
 }

@@ -1,11 +1,13 @@
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { MongooseModule } from "@nestjs/mongoose";
+import { BullModule } from "@nestjs/bullmq";
 import { WorkspaceModule } from "../workspace/workspace.module.js";
 import { IdentityModule } from "../identity/identity.module.js";
 import { CrmModule } from "../crm/crm.module.js";
 import { CommunicationModule } from "../communication/communication.module.js";
 import { BillingModule } from "../billing/billing.module.js";
+import { SettingsModule } from "../settings/settings.module.js";
 import { HealthModule } from "../../health/health.module.js";
 import { PlatformUser, PlatformUserSchema } from "./schemas/platform-user.schema.js";
 import { PlatformSession, PlatformSessionSchema } from "./schemas/platform-session.schema.js";
@@ -22,12 +24,19 @@ import {
   PlatformMaintenanceStateSchema,
 } from "./schemas/platform-maintenance-state.schema.js";
 import { SupportTicket, SupportTicketSchema } from "./schemas/support-ticket.schema.js";
+import { SupportSession, SupportSessionSchema } from "./schemas/support-session.schema.js";
+import {
+  PlatformAuditEntry,
+  PlatformAuditEntrySchema,
+} from "./schemas/platform-audit-entry.schema.js";
 import { PlatformUserRepository } from "./repositories/platform-user.repository.js";
 import { PlatformSessionRepository } from "./repositories/platform-session.repository.js";
 import { PlatformAnnouncementRepository } from "./repositories/platform-announcement.repository.js";
 import { PlatformFeatureFlagOverrideRepository } from "./repositories/platform-feature-flag-override.repository.js";
 import { PlatformMaintenanceStateRepository } from "./repositories/platform-maintenance-state.repository.js";
 import { SupportTicketRepository } from "./repositories/support-ticket.repository.js";
+import { SupportSessionRepository } from "./repositories/support-session.repository.js";
+import { PlatformAuditRepository } from "./repositories/platform-audit.repository.js";
 import { PlatformPasswordService } from "./services/platform-password.service.js";
 import { PlatformTokenService } from "./services/platform-token.service.js";
 import { PlatformAuthService } from "./services/platform-auth.service.js";
@@ -43,8 +52,16 @@ import { PlatformInvoicesService } from "./services/platform-invoices.service.js
 import { PlatformPaymentsService } from "./services/platform-payments.service.js";
 import { PlatformBillingDashboardService } from "./services/platform-billing-dashboard.service.js";
 import { PlatformSupportTicketsService } from "./services/platform-support-tickets.service.js";
+import { PlatformSupportSessionsService } from "./services/platform-support-sessions.service.js";
+import { PlatformAuditService } from "./services/platform-audit.service.js";
+import { PlatformInvestigationService } from "./services/platform-investigation.service.js";
+import { PlatformSupportWorkspaceOverviewService } from "./services/platform-support-workspace-overview.service.js";
 import { PlatformAuthGuard } from "./guards/platform-auth.guard.js";
 import { PlatformPermissionsGuard } from "./guards/platform-permissions.guard.js";
+import { SupportSessionGuard } from "./guards/support-session.guard.js";
+import { PlatformAuditListener } from "./listeners/platform-audit.listener.js";
+import { SupportSessionLifecycleProcessor } from "./queue/support-session-lifecycle.processor.js";
+import { SUPPORT_SESSION_LIFECYCLE_QUEUE } from "./platform.constants.js";
 import { PlatformAuthController } from "./controllers/platform-auth.controller.js";
 import { PlatformUsersController } from "./controllers/platform-users.controller.js";
 import { PlatformWorkspacesController } from "./controllers/platform-workspaces.controller.js";
@@ -58,6 +75,11 @@ import { PlatformInvoicesController } from "./controllers/platform-invoices.cont
 import { PlatformPaymentsController } from "./controllers/platform-payments.controller.js";
 import { PlatformBillingDashboardController } from "./controllers/platform-billing-dashboard.controller.js";
 import { PlatformSupportTicketsController } from "./controllers/platform-support-tickets.controller.js";
+import { PlatformSupportAccessController } from "./controllers/platform-support-access.controller.js";
+import { PlatformSupportSessionsController } from "./controllers/platform-support-sessions.controller.js";
+import { PlatformAuditController } from "./controllers/platform-audit.controller.js";
+import { PlatformInvestigationController } from "./controllers/platform-investigation.controller.js";
+import { PlatformSupportWorkspaceController } from "./controllers/platform-support-workspace.controller.js";
 
 /**
  * Platform Administration & Tenant Management (PRD-007 Volume-1) — the
@@ -84,12 +106,16 @@ import { PlatformSupportTicketsController } from "./controllers/platform-support
       { name: PlatformFeatureFlagOverride.name, schema: PlatformFeatureFlagOverrideSchema },
       { name: PlatformMaintenanceState.name, schema: PlatformMaintenanceStateSchema },
       { name: SupportTicket.name, schema: SupportTicketSchema },
+      { name: SupportSession.name, schema: SupportSessionSchema },
+      { name: PlatformAuditEntry.name, schema: PlatformAuditEntrySchema },
     ]),
+    BullModule.registerQueue({ name: SUPPORT_SESSION_LIFECYCLE_QUEUE }),
     WorkspaceModule,
     IdentityModule,
     CrmModule,
     CommunicationModule,
     BillingModule,
+    SettingsModule,
     HealthModule,
   ],
   controllers: [
@@ -106,6 +132,11 @@ import { PlatformSupportTicketsController } from "./controllers/platform-support
     PlatformPaymentsController,
     PlatformBillingDashboardController,
     PlatformSupportTicketsController,
+    PlatformSupportAccessController,
+    PlatformSupportSessionsController,
+    PlatformAuditController,
+    PlatformInvestigationController,
+    PlatformSupportWorkspaceController,
   ],
   providers: [
     PlatformUserRepository,
@@ -114,6 +145,8 @@ import { PlatformSupportTicketsController } from "./controllers/platform-support
     PlatformFeatureFlagOverrideRepository,
     PlatformMaintenanceStateRepository,
     SupportTicketRepository,
+    SupportSessionRepository,
+    PlatformAuditRepository,
     PlatformPasswordService,
     PlatformTokenService,
     PlatformAuthService,
@@ -129,8 +162,15 @@ import { PlatformSupportTicketsController } from "./controllers/platform-support
     PlatformPaymentsService,
     PlatformBillingDashboardService,
     PlatformSupportTicketsService,
+    PlatformSupportSessionsService,
+    PlatformAuditService,
+    PlatformInvestigationService,
+    PlatformSupportWorkspaceOverviewService,
     PlatformAuthGuard,
     PlatformPermissionsGuard,
+    SupportSessionGuard,
+    PlatformAuditListener,
+    SupportSessionLifecycleProcessor,
   ],
 })
 export class PlatformModule {}

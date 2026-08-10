@@ -186,5 +186,12 @@ import { SystemAdminController } from "./controllers/system-admin.controller.js"
     ConfigHistoryListener,
     PlatformFeatureOverrideListener,
   ],
+  // SettingsService/AuditLogService exported for PRD-007 Volume-3 — Platform
+  // Support's Cross-Tenant Read Access (§4.7, branding/preferences overview
+  // only) and Investigation Timeline (§4.5, composing Settings' existing
+  // workspace-scoped Audit Logs) delegate through these rather than
+  // reaching into WorkspaceSettingsRepository/AuditLogRepository directly.
+  // See docs/ADR-PLAT-005-platform-support-break-glass-boundary.md.
+  exports: [SettingsService, AuditLogService],
 })
 export class SettingsModule {}

@@ -87,6 +87,38 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.FULL,
     [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.FULL,
   },
+  // PRD-007 Volume-3 (Platform Support, Break-Glass Access & Global Audit) —
+  // Architecture Review, 2026-08-10: §6 "Break-Glass is available only to
+  // PLATFORM_SUPER_ADMIN. Support roles may only request access." —
+  // APPROVE_SUPPORT_ACCESS/START_SUPPORT_SESSION (the actions that actually
+  // grant live cross-tenant access) are Super-Admin-only; REQUEST_SUPPORT_
+  // ACCESS and the two VIEW_* permissions follow the existing VIEW_*
+  // precedent (FULL for all three roles).
+  [PlatformPermission.REQUEST_SUPPORT_ACCESS]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.FULL,
+  },
+  [PlatformPermission.APPROVE_SUPPORT_ACCESS]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.NONE,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.NONE,
+  },
+  [PlatformPermission.START_SUPPORT_SESSION]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.NONE,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.NONE,
+  },
+  [PlatformPermission.VIEW_GLOBAL_AUDIT]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.FULL,
+  },
+  [PlatformPermission.VIEW_INVESTIGATION]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.FULL,
+  },
 };
 
 export function getPlatformPermissionLevel(

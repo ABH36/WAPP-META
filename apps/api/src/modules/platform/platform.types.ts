@@ -5,6 +5,10 @@ import type {
   SupportTicketPriority,
   SupportTicketStatus,
 } from "./schemas/support-ticket.schema.js";
+import type { SupportSessionStatus } from "./schemas/support-session.schema.js";
+import type { SubscriptionSummary, InvoiceSummary } from "../billing/billing.types.js";
+import type { SettingsOverview } from "../settings/settings.types.js";
+import type { MemberSummary } from "../workspace/workspace.types.js";
 
 /** PRD-007 Volume-1 — a distinct `type` discriminator from the tenant AccessTokenPayload's `"access"`, on top of the already-separate signing secret. */
 export interface PlatformAccessTokenPayload {
@@ -86,4 +90,54 @@ export interface SupportTicketSummary {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** PRD-007 Volume-3 §4.1/§4.2 — the request and the session it becomes are the same record. */
+export interface SupportSessionSummary {
+  id: string;
+  workspaceId: string;
+  requestedBy: string;
+  approvedBy: string | null;
+  reason: string;
+  durationMinutes: number;
+  status: SupportSessionStatus;
+  approvedAt: string | null;
+  startedBy: string | null;
+  startedAt: string | null;
+  expiresAt: string | null;
+  endedAt: string | null;
+  terminationReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** PRD-007 Volume-3 §4.4 — Global Audit Center. */
+export interface PlatformAuditEntrySummary {
+  id: string;
+  eventType: string;
+  description: string;
+  workspaceId: string | null;
+  actorId: string | null;
+  metadata: Record<string, unknown>;
+  occurredAt: string;
+  createdAt: string;
+}
+
+/** PRD-007 Volume-3 §4.5 — Investigation Timeline, a normalized read projection over 4 sources; it owns none of the underlying data. */
+export interface InvestigationTimelineEntry {
+  source: "PLATFORM_AUDIT" | "SETTINGS_AUDIT" | "BILLING_HISTORY" | "LOGIN_HISTORY";
+  id: string;
+  workspaceId: string;
+  eventType: string;
+  description: string;
+  occurredAt: string;
+}
+
+/** PRD-007 Volume-3 §4.7 — Cross-Tenant Read Access, gated by an active Support Session. Composed from Volume-1/2's already-cross-tenant-capable services + a new Settings branding/preferences read (resolved scope: branding/preferences overview only — Integrations/Webhooks/API Keys/Feature Flags/Audit Logs/Data Management stay out of reach). */
+export interface SupportWorkspaceOverview {
+  workspace: PlatformWorkspaceSummary;
+  users: MemberSummary[];
+  subscription: SubscriptionSummary;
+  invoices: InvoiceSummary[];
+  settingsOverview: SettingsOverview;
 }

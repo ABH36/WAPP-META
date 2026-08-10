@@ -248,6 +248,21 @@ export const DomainEvent = {
   INVOICE_VOIDED: "platform.invoice_voided",
   SUPPORT_TICKET_CREATED: "platform.support_ticket_created",
   SUPPORT_TICKET_RESOLVED: "platform.support_ticket_resolved",
+  // PRD-007 Volume-3 (Platform Support, Break-Glass Access & Global Audit,
+  // §8). Workspace-scoped — every Break-Glass/Support Session action is
+  // against one specific tenant. All 5 get a PlatformAuditListener handler
+  // (BR-002 — every Support Session generates immutable Audit entries).
+  // IMPERSONATION_STARTED/ENDED from §8's literal list are deliberately NOT
+  // added — Architecture Review, 2026-08-10: this volume ships read-only
+  // cross-tenant access only (no real tenant-identity impersonation, no
+  // delegated JWT), so there is no distinct "impersonation window" separate
+  // from the Support Session's own ACTIVE state to mark the start/end of —
+  // see docs/ADR-PLAT-005-platform-support-break-glass-boundary.md.
+  BREAK_GLASS_REQUESTED: "platform.break_glass_requested",
+  BREAK_GLASS_APPROVED: "platform.break_glass_approved",
+  SUPPORT_SESSION_STARTED: "platform.support_session_started",
+  SUPPORT_SESSION_TERMINATED: "platform.support_session_terminated",
+  SUPPORT_SESSION_EXPIRED: "platform.support_session_expired",
 } as const;
 
 interface BaseEventPayload {
@@ -801,5 +816,36 @@ export interface SupportTicketCreatedPayload extends BaseEventPayload {
 
 export interface SupportTicketResolvedPayload extends BaseEventPayload {
   ticketId: string;
+  actorId: string;
+}
+
+/** PRD-007 Volume-3 — every field below is workspace-scoped (extends BaseEventPayload). */
+export interface BreakGlassRequestedPayload extends BaseEventPayload {
+  sessionId: string;
+  reason: string;
+  durationMinutes: number;
+  actorId: string;
+}
+
+export interface BreakGlassApprovedPayload extends BaseEventPayload {
+  sessionId: string;
+  actorId: string;
+}
+
+export interface SupportSessionStartedPayload extends BaseEventPayload {
+  sessionId: string;
+  expiresAt: string;
+  actorId: string;
+}
+
+export interface SupportSessionTerminatedPayload extends BaseEventPayload {
+  sessionId: string;
+  reason: string;
+  actorId: string;
+}
+
+/** actorId is "system" — the lifecycle sweep, not a platform operator, ends this one. */
+export interface SupportSessionExpiredPayload extends BaseEventPayload {
+  sessionId: string;
   actorId: string;
 }
