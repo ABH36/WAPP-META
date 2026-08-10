@@ -4,9 +4,12 @@ import { DomainEvent } from "../../../common/events/domain-events.js";
 import type {
   BreakGlassApprovedPayload,
   BreakGlassRequestedPayload,
+  ComplianceReportExportedPayload,
   PlatformFeatureUpdatedPayload,
   PlatformMaintenanceDisabledPayload,
   PlatformMaintenanceEnabledPayload,
+  PlatformPolicyUpdatedPayload,
+  PlatformUserRoleChangedPayload,
   SupportSessionExpiredPayload,
   SupportSessionStartedPayload,
   SupportSessionTerminatedPayload,
@@ -94,6 +97,47 @@ export class PlatformAuditListener {
     await this.platformAuditService.record(
       DomainEvent.PLATFORM_MAINTENANCE_DISABLED,
       "Platform Maintenance Disabled",
+      null,
+      payload.actorId,
+      payload as unknown as Record<string, unknown>,
+      new Date(payload.occurredAt),
+    );
+  }
+
+  // PRD-007 Volume-4 (Platform Analytics, Governance & Compliance, §8) —
+  // also genuinely platform-wide, no workspaceId. BR-004 — "Every policy
+  // change generates Platform Audit"; Q4's approved role-change capability
+  // and the Compliance Export action are audited the same way.
+
+  @OnEvent(DomainEvent.PLATFORM_POLICY_UPDATED)
+  async onPlatformPolicyUpdated(payload: PlatformPolicyUpdatedPayload): Promise<void> {
+    await this.platformAuditService.record(
+      DomainEvent.PLATFORM_POLICY_UPDATED,
+      `Governance Policy "${payload.policyKey}" updated to version ${payload.version} (${payload.reason})`,
+      null,
+      payload.actorId,
+      payload as unknown as Record<string, unknown>,
+      new Date(payload.occurredAt),
+    );
+  }
+
+  @OnEvent(DomainEvent.PLATFORM_USER_ROLE_CHANGED)
+  async onPlatformUserRoleChanged(payload: PlatformUserRoleChangedPayload): Promise<void> {
+    await this.platformAuditService.record(
+      DomainEvent.PLATFORM_USER_ROLE_CHANGED,
+      `Platform User role changed from ${payload.previousRole} to ${payload.newRole}`,
+      null,
+      payload.actorId,
+      payload as unknown as Record<string, unknown>,
+      new Date(payload.occurredAt),
+    );
+  }
+
+  @OnEvent(DomainEvent.COMPLIANCE_REPORT_EXPORTED)
+  async onComplianceReportExported(payload: ComplianceReportExportedPayload): Promise<void> {
+    await this.platformAuditService.record(
+      DomainEvent.COMPLIANCE_REPORT_EXPORTED,
+      `Compliance Report exported (${payload.format})`,
       null,
       payload.actorId,
       payload as unknown as Record<string, unknown>,

@@ -72,4 +72,29 @@ export class SupportTicketRepository {
       .findOneAndUpdate({ _id: id }, { $set: input }, { new: true })
       .exec();
   }
+
+  /**
+   * PRD-007 Volume-4 §4.5 (Platform KPIs, "Support Resolution Time") —
+   * approximated as `updatedAt - createdAt` for RESOLVED/CLOSED tickets,
+   * since this schema (frozen, PRD-007 Volume-2) has no dedicated
+   * `resolvedAt` field. A ticket that bounced back through WAITING_CUSTOMER
+   * before resolving would slightly understate its true resolution time —
+   * an accepted approximation rather than a frozen-schema change for one
+   * KPI. See docs/ADR-PLAT-008-platform-analytics-strategy.md.
+   */
+  async getAverageResolutionHours(): Promise<number | null> {
+    const rows = await this.supportTicketModel
+      .aggregate<{ avgMs: number }>([
+        { $match: { status: { $in: [SupportTicketStatus.RESOLVED, SupportTicketStatus.CLOSED] } } },
+        {
+          $group: {
+            _id: null,
+            avgMs: { $avg: { $subtract: ["$updatedAt", "$createdAt"] } },
+          },
+        },
+      ])
+      .exec();
+    const row = rows[0];
+    return row ? row.avgMs / (1000 * 60 * 60) : null;
+  }
 }

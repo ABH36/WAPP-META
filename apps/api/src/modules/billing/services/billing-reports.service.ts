@@ -368,4 +368,9 @@ export class BillingReportsService {
   async getPlatformRevenueTotal(): Promise<number> {
     return this.billingReportsRepository.sumAllPaidPaymentsAcrossWorkspaces();
   }
+
+  /** PRD-007 Volume-4 §4.5 (Platform KPIs, "Revenue Growth") — cross-tenant, ranged. */
+  async getPlatformRevenueInRange(from: Date, to: Date): Promise<number> {
+    return this.billingReportsRepository.sumAllPaidPaymentsInRangeAcrossWorkspaces(from, to);
+  }
 }

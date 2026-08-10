@@ -192,6 +192,19 @@ import { SystemAdminController } from "./controllers/system-admin.controller.js"
   // workspace-scoped Audit Logs) delegate through these rather than
   // reaching into WorkspaceSettingsRepository/AuditLogRepository directly.
   // See docs/ADR-PLAT-005-platform-support-break-glass-boundary.md.
-  exports: [SettingsService, AuditLogService],
+  // ExportJobRepository/FeatureFlagRepository/RetentionPolicyRepository
+  // additionally exported for PRD-007 Volume-4 — the Compliance Dashboard's
+  // "Export Jobs"/"Data Retention Status" widgets and the Feature Adoption
+  // KPI each need one new cross-tenant aggregate read
+  // (countByStatusAcrossWorkspaces/findAll/countEnabledAcrossWorkspaces),
+  // the same additive-export-widening pattern Billing used in Volume-2. See
+  // docs/ADR-PLAT-008-platform-analytics-strategy.md.
+  exports: [
+    SettingsService,
+    AuditLogService,
+    ExportJobRepository,
+    FeatureFlagRepository,
+    RetentionPolicyRepository,
+  ],
 })
 export class SettingsModule {}

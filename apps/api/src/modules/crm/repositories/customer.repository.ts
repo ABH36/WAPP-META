@@ -67,6 +67,16 @@ export class CustomerRepository {
     @InjectModel(Customer.name) private readonly customerModel: Model<CustomerDocument>,
   ) {}
 
+  /** PRD-007 Volume-4 §4.1 (Platform Analytics Dashboard, "CRM Growth") — cross-tenant, deliberately no workspaceId filter, matching LeadRepository/DealRepository's Volume-1 countAll() precedent. */
+  async countAll(): Promise<number> {
+    return this.customerModel.countDocuments().exec();
+  }
+
+  /** PRD-007 Volume-4 §4.5 (Platform KPIs, "Customer Growth") — cross-tenant count of Customers created on/after `since`. */
+  async countCreatedSince(since: Date): Promise<number> {
+    return this.customerModel.countDocuments({ createdAt: { $gte: since } }).exec();
+  }
+
   /** `session` — passed by LeadConversionService when creating a Customer as part of its transaction (BR-008); omitted for the normal, non-transactional Part-1 create path. */
   async create(input: CreateCustomerInput, session?: ClientSession): Promise<CustomerDocument> {
     const [created] = await this.customerModel.create(

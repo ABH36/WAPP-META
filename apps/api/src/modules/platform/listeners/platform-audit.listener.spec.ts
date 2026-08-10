@@ -111,4 +111,58 @@ describe("PlatformAuditListener", () => {
       new Date(occurredAt),
     );
   });
+
+  it("records PLATFORM_POLICY_UPDATED with the key/version/reason in the description and a null workspaceId", async () => {
+    const occurredAt = new Date().toISOString();
+    await listener.onPlatformPolicyUpdated({
+      policyKey: "SESSION_TIMEOUT",
+      version: 2,
+      reason: "Tightening session duration per security review",
+      actorId: "super-1",
+      occurredAt,
+    });
+
+    expect(platformAuditService.record).toHaveBeenCalledWith(
+      DomainEvent.PLATFORM_POLICY_UPDATED,
+      expect.stringContaining("SESSION_TIMEOUT"),
+      null,
+      "super-1",
+      expect.anything(),
+      new Date(occurredAt),
+    );
+  });
+
+  it("records PLATFORM_USER_ROLE_CHANGED with a null workspaceId", async () => {
+    const occurredAt = new Date().toISOString();
+    await listener.onPlatformUserRoleChanged({
+      platformUserId: "platform-user-1",
+      previousRole: "PLATFORM_SUPPORT_EXECUTIVE",
+      newRole: "PLATFORM_SUPPORT_MANAGER",
+      actorId: "super-1",
+      occurredAt,
+    });
+
+    expect(platformAuditService.record).toHaveBeenCalledWith(
+      DomainEvent.PLATFORM_USER_ROLE_CHANGED,
+      expect.stringContaining("PLATFORM_SUPPORT_MANAGER"),
+      null,
+      "super-1",
+      expect.anything(),
+      new Date(occurredAt),
+    );
+  });
+
+  it("records COMPLIANCE_REPORT_EXPORTED with a null workspaceId", async () => {
+    const occurredAt = new Date().toISOString();
+    await listener.onComplianceReportExported({ format: "CSV", actorId: "super-1", occurredAt });
+
+    expect(platformAuditService.record).toHaveBeenCalledWith(
+      DomainEvent.COMPLIANCE_REPORT_EXPORTED,
+      expect.stringContaining("CSV"),
+      null,
+      "super-1",
+      expect.anything(),
+      new Date(occurredAt),
+    );
+  });
 });

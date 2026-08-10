@@ -101,6 +101,17 @@ export class BillingReportsRepository {
     return rows[0]?.total ?? 0;
   }
 
+  /** PRD-007 Volume-4 §4.5 (Platform KPIs, "Revenue Growth") — same cross-tenant exception as sumAllPaidPaymentsAcrossWorkspaces, ranged. */
+  async sumAllPaidPaymentsInRangeAcrossWorkspaces(from: Date, to: Date): Promise<number> {
+    const rows = await this.paymentModel
+      .aggregate<{ total: number }>([
+        { $match: { status: PaymentStatus.PAID, paidAt: { $gte: from, $lte: to } } },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ])
+      .exec();
+    return rows[0]?.total ?? 0;
+  }
+
   /** Standard calendar-month grouping (resolved the same way CRM Reports' groupForecastByPeriod already does). */
   async monthlyRevenueBreakdown(workspaceId: string, from: Date): Promise<MonthlyRevenueEntry[]> {
     const rows = await this.paymentModel

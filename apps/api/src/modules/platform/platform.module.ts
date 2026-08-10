@@ -29,6 +29,11 @@ import {
   PlatformAuditEntry,
   PlatformAuditEntrySchema,
 } from "./schemas/platform-audit-entry.schema.js";
+import { GovernancePolicy, GovernancePolicySchema } from "./schemas/governance-policy.schema.js";
+import {
+  PlatformLoginHistoryEntry,
+  PlatformLoginHistoryEntrySchema,
+} from "./schemas/platform-login-history-entry.schema.js";
 import { PlatformUserRepository } from "./repositories/platform-user.repository.js";
 import { PlatformSessionRepository } from "./repositories/platform-session.repository.js";
 import { PlatformAnnouncementRepository } from "./repositories/platform-announcement.repository.js";
@@ -37,6 +42,8 @@ import { PlatformMaintenanceStateRepository } from "./repositories/platform-main
 import { SupportTicketRepository } from "./repositories/support-ticket.repository.js";
 import { SupportSessionRepository } from "./repositories/support-session.repository.js";
 import { PlatformAuditRepository } from "./repositories/platform-audit.repository.js";
+import { GovernancePolicyRepository } from "./repositories/governance-policy.repository.js";
+import { PlatformLoginHistoryRepository } from "./repositories/platform-login-history.repository.js";
 import { PlatformPasswordService } from "./services/platform-password.service.js";
 import { PlatformTokenService } from "./services/platform-token.service.js";
 import { PlatformAuthService } from "./services/platform-auth.service.js";
@@ -56,6 +63,11 @@ import { PlatformSupportSessionsService } from "./services/platform-support-sess
 import { PlatformAuditService } from "./services/platform-audit.service.js";
 import { PlatformInvestigationService } from "./services/platform-investigation.service.js";
 import { PlatformSupportWorkspaceOverviewService } from "./services/platform-support-workspace-overview.service.js";
+import { PlatformGovernancePolicyService } from "./services/platform-governance-policy.service.js";
+import { PlatformAnalyticsService } from "./services/platform-analytics.service.js";
+import { PlatformComplianceService } from "./services/platform-compliance.service.js";
+import { PlatformKpisService } from "./services/platform-kpis.service.js";
+import { PlatformReportsService } from "./services/platform-reports.service.js";
 import { PlatformAuthGuard } from "./guards/platform-auth.guard.js";
 import { PlatformPermissionsGuard } from "./guards/platform-permissions.guard.js";
 import { SupportSessionGuard } from "./guards/support-session.guard.js";
@@ -80,6 +92,11 @@ import { PlatformSupportSessionsController } from "./controllers/platform-suppor
 import { PlatformAuditController } from "./controllers/platform-audit.controller.js";
 import { PlatformInvestigationController } from "./controllers/platform-investigation.controller.js";
 import { PlatformSupportWorkspaceController } from "./controllers/platform-support-workspace.controller.js";
+import { PlatformPoliciesController } from "./controllers/platform-policies.controller.js";
+import { PlatformAnalyticsController } from "./controllers/platform-analytics.controller.js";
+import { PlatformComplianceController } from "./controllers/platform-compliance.controller.js";
+import { PlatformKpisController } from "./controllers/platform-kpis.controller.js";
+import { PlatformReportsController } from "./controllers/platform-reports.controller.js";
 
 /**
  * Platform Administration & Tenant Management (PRD-007 Volume-1) — the
@@ -108,6 +125,8 @@ import { PlatformSupportWorkspaceController } from "./controllers/platform-suppo
       { name: SupportTicket.name, schema: SupportTicketSchema },
       { name: SupportSession.name, schema: SupportSessionSchema },
       { name: PlatformAuditEntry.name, schema: PlatformAuditEntrySchema },
+      { name: GovernancePolicy.name, schema: GovernancePolicySchema },
+      { name: PlatformLoginHistoryEntry.name, schema: PlatformLoginHistoryEntrySchema },
     ]),
     BullModule.registerQueue({ name: SUPPORT_SESSION_LIFECYCLE_QUEUE }),
     WorkspaceModule,
@@ -137,6 +156,11 @@ import { PlatformSupportWorkspaceController } from "./controllers/platform-suppo
     PlatformAuditController,
     PlatformInvestigationController,
     PlatformSupportWorkspaceController,
+    PlatformPoliciesController,
+    PlatformAnalyticsController,
+    PlatformComplianceController,
+    PlatformKpisController,
+    PlatformReportsController,
   ],
   providers: [
     PlatformUserRepository,
@@ -147,6 +171,8 @@ import { PlatformSupportWorkspaceController } from "./controllers/platform-suppo
     SupportTicketRepository,
     SupportSessionRepository,
     PlatformAuditRepository,
+    GovernancePolicyRepository,
+    PlatformLoginHistoryRepository,
     PlatformPasswordService,
     PlatformTokenService,
     PlatformAuthService,
@@ -166,6 +192,11 @@ import { PlatformSupportWorkspaceController } from "./controllers/platform-suppo
     PlatformAuditService,
     PlatformInvestigationService,
     PlatformSupportWorkspaceOverviewService,
+    PlatformGovernancePolicyService,
+    PlatformAnalyticsService,
+    PlatformComplianceService,
+    PlatformKpisService,
+    PlatformReportsService,
     PlatformAuthGuard,
     PlatformPermissionsGuard,
     SupportSessionGuard,

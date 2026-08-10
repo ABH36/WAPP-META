@@ -4,10 +4,12 @@ import { Public } from "../../../common/decorators/public.decorator.js";
 import { PlatformAuthGuard } from "../guards/platform-auth.guard.js";
 import { PlatformPermissionsGuard } from "../guards/platform-permissions.guard.js";
 import { RequirePlatformPermission } from "../decorators/require-platform-permission.decorator.js";
+import { CurrentPlatformUser } from "../decorators/current-platform-user.decorator.js";
 import { PlatformUsersService } from "../services/platform-users.service.js";
 import { CreatePlatformUserDto } from "../dto/create-platform-user.dto.js";
 import { SetPlatformUserActiveDto } from "../dto/set-platform-user-active.dto.js";
-import type { PlatformUserProfile } from "../platform.types.js";
+import { UpdatePlatformUserRoleDto } from "../dto/update-platform-user-role.dto.js";
+import type { AuthenticatedPlatformUser, PlatformUserProfile } from "../platform.types.js";
 
 /** §4.3 — provisioning/listing/enable-disable of Platform Users, gated to PLATFORM_SUPER_ADMIN via MANAGE_PLATFORM_USERS. */
 @Public()
@@ -35,5 +37,16 @@ export class PlatformUsersController {
     @Body() dto: SetPlatformUserActiveDto,
   ): Promise<PlatformUserProfile> {
     return this.platformUsersService.setActive(id, dto.isActive);
+  }
+
+  /** PRD-007 Volume-4 §4.4 — Architecture Review, 2026-08-10: minimal role-change capability, gated the same as every other Platform User mutation. */
+  @RequirePlatformPermission(PlatformPermission.MANAGE_PLATFORM_USERS)
+  @Patch(":id/role")
+  async updateRole(
+    @Param("id") id: string,
+    @Body() dto: UpdatePlatformUserRoleDto,
+    @CurrentPlatformUser() user: AuthenticatedPlatformUser,
+  ): Promise<PlatformUserProfile> {
+    return this.platformUsersService.updateRole(id, dto.role, user.platformUserId);
   }
 }

@@ -57,4 +57,20 @@ export class ExportJobRepository {
       .updateOne({ _id: id }, { $set: { status: ExportJobStatus.FAILED, error } })
       .exec();
   }
+
+  /** PRD-007 Volume-4 §4.4 (Compliance Dashboard, "Export Jobs") — cross-tenant, the one deliberate exception to this repository's otherwise workspace-scoped methods. */
+  async countByStatusAcrossWorkspaces(): Promise<Record<ExportJobStatus, number>> {
+    const rows = await this.exportJobModel
+      .aggregate<{ _id: ExportJobStatus; count: number }>([
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ])
+      .exec();
+    const byStatus = Object.fromEntries(
+      Object.values(ExportJobStatus).map((status) => [status, 0]),
+    ) as Record<ExportJobStatus, number>;
+    for (const row of rows) {
+      byStatus[row._id] = row.count;
+    }
+    return byStatus;
+  }
 }

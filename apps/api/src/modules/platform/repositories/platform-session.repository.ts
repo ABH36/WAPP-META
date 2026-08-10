@@ -38,4 +38,11 @@ export class PlatformSessionRepository {
       .updateMany({ platformUserId, revokedAt: null }, { $set: { revokedAt: new Date() } })
       .exec();
   }
+
+  /** PRD-007 Volume-4 §4.1 (Platform Analytics Dashboard, "Active Platform Sessions"). */
+  async countActive(): Promise<number> {
+    return this.sessionModel
+      .countDocuments({ revokedAt: null, expiresAt: { $gt: new Date() } })
+      .exec();
+  }
 }

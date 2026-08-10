@@ -25,4 +25,12 @@ export enum PlatformPermission {
   START_SUPPORT_SESSION = "START_SUPPORT_SESSION",
   VIEW_GLOBAL_AUDIT = "VIEW_GLOBAL_AUDIT",
   VIEW_INVESTIGATION = "VIEW_INVESTIGATION",
+  // PRD-007 Volume-4 (Platform Analytics, Governance & Compliance). Global
+  // Configuration's MANAGE_GLOBAL_CONFIGURATION was merged into
+  // MANAGE_PLATFORM_POLICIES (Architecture Review, 2026-08-10 — Governance
+  // Policies and Global Configuration are one subsystem, not two).
+  VIEW_PLATFORM_ANALYTICS = "VIEW_PLATFORM_ANALYTICS",
+  VIEW_COMPLIANCE = "VIEW_COMPLIANCE",
+  MANAGE_PLATFORM_POLICIES = "MANAGE_PLATFORM_POLICIES",
+  EXPORT_PLATFORM_REPORTS = "EXPORT_PLATFORM_REPORTS",
 }

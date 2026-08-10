@@ -6,6 +6,7 @@ import type {
   SupportTicketStatus,
 } from "./schemas/support-ticket.schema.js";
 import type { SupportSessionStatus } from "./schemas/support-session.schema.js";
+import type { GovernancePolicyKey } from "./schemas/governance-policy.schema.js";
 import type { SubscriptionSummary, InvoiceSummary } from "../billing/billing.types.js";
 import type { SettingsOverview } from "../settings/settings.types.js";
 import type { MemberSummary } from "../workspace/workspace.types.js";
@@ -140,4 +141,64 @@ export interface SupportWorkspaceOverview {
   subscription: SubscriptionSummary;
   invoices: InvoiceSummary[];
   settingsOverview: SettingsOverview;
+}
+
+/** PRD-007 Volume-4 §4.3/§4.6 — Governance Policy subsystem (merged, Architecture Review 2026-08-10). */
+export interface GovernancePolicyHistoryEntrySummary {
+  value: Record<string, unknown>;
+  version: number;
+  reason: string;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+export interface GovernancePolicySummary {
+  key: GovernancePolicyKey;
+  value: Record<string, unknown>;
+  version: number;
+  reason: string;
+  updatedBy: string;
+  history: GovernancePolicyHistoryEntrySummary[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** PRD-007 Volume-4 §4.1 — Platform Analytics Dashboard. Storage Usage/API Usage deliberately excluded (TD-013's existing commercial deferral). */
+export interface PlatformAnalyticsSnapshot {
+  totalWorkspaces: number;
+  activeWorkspaces: number;
+  archivedWorkspaces: number;
+  platformUsers: number;
+  activePlatformSessions: number;
+  messagesProcessed: number;
+  crmGrowth: { totalLeads: number; totalDeals: number; totalCustomers: number };
+  revenueSummary: { totalRevenue: number };
+}
+
+/**
+ * PRD-007 Volume-4 §4.4 — Compliance Dashboard, read-only composition, no
+ * new persistence beyond what Volume-3/4 already own. `auditCoverage` is
+ * the total count of durable `PlatformAuditEntry` records (a volume
+ * indicator that the audit trail is populated), not a percentage — see
+ * docs/ADR-PLAT-008-platform-analytics-strategy.md for why a precise
+ * "% of events covered" formula was rejected as ill-defined.
+ */
+export interface PlatformComplianceSnapshot {
+  breakGlassSessions: { total: number; active: number };
+  platformLogins: { total: number; successful: number };
+  failedLoginAttempts: number;
+  permissionChanges: number;
+  auditCoverage: number;
+  dataRetentionStatus: { workspacesWithPolicy: number; totalWorkspaces: number };
+  exportJobs: Record<string, number>;
+}
+
+/** PRD-007 Volume-4 §4.5 — Platform KPIs, calculated live, never persisted (BR-006). */
+export interface PlatformKpiSnapshot {
+  workspaceGrowth: { newThisMonth: number; totalWorkspaces: number };
+  revenueGrowth: { currentMonth: number; previousMonth: number };
+  customerGrowth: { newThisMonth: number; totalCustomers: number };
+  supportResolutionTimeHours: number | null;
+  platformAvailability: { percentageUptime: number; note: string };
+  featureAdoption: Array<{ flagKey: string; adoptionPercentage: number }>;
 }

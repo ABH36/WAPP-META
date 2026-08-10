@@ -1,9 +1,11 @@
 import { Test } from "@nestjs/testing";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { PlatformRole } from "@wapp/shared-types";
 import { PlatformUsersService } from "./platform-users.service.js";
 import { PlatformUserRepository } from "../repositories/platform-user.repository.js";
 import { PlatformPasswordService } from "./platform-password.service.js";
+import { DomainEvent } from "../../../common/events/domain-events.js";
 import type { PlatformUserDocument } from "../schemas/platform-user.schema.js";
 
 function fakePlatformUser(overrides: Partial<Record<string, unknown>> = {}): PlatformUserDocument {
@@ -24,6 +26,7 @@ describe("PlatformUsersService", () => {
   let service: PlatformUsersService;
   let platformUserRepository: jest.Mocked<PlatformUserRepository>;
   let passwordService: jest.Mocked<PlatformPasswordService>;
+  let eventEmitter: jest.Mocked<EventEmitter2>;
 
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -33,18 +36,22 @@ describe("PlatformUsersService", () => {
           provide: PlatformUserRepository,
           useValue: {
             findByEmail: jest.fn(),
+            findById: jest.fn(),
             create: jest.fn(),
             findAll: jest.fn(),
             setActive: jest.fn(),
+            updateRole: jest.fn(),
           },
         },
         { provide: PlatformPasswordService, useValue: { hash: jest.fn() } },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
     service = moduleRef.get(PlatformUsersService);
     platformUserRepository = moduleRef.get(PlatformUserRepository);
     passwordService = moduleRef.get(PlatformPasswordService);
+    eventEmitter = moduleRef.get(EventEmitter2);
   });
 
   describe("create", () => {
@@ -107,6 +114,48 @@ describe("PlatformUsersService", () => {
       platformUserRepository.setActive.mockResolvedValue(null);
 
       await expect(service.setActive("missing", false)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe("updateRole", () => {
+    it("updates the role and emits PLATFORM_USER_ROLE_CHANGED with the previous and new role", async () => {
+      platformUserRepository.findById.mockResolvedValue(
+        fakePlatformUser({ role: PlatformRole.PLATFORM_SUPPORT_EXECUTIVE }),
+      );
+      platformUserRepository.updateRole.mockResolvedValue(
+        fakePlatformUser({ role: PlatformRole.PLATFORM_SUPPORT_MANAGER }),
+      );
+
+      const result = await service.updateRole(
+        "platform-user-1",
+        PlatformRole.PLATFORM_SUPPORT_MANAGER,
+        "super-1",
+      );
+
+      expect(platformUserRepository.updateRole).toHaveBeenCalledWith(
+        "platform-user-1",
+        PlatformRole.PLATFORM_SUPPORT_MANAGER,
+      );
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        DomainEvent.PLATFORM_USER_ROLE_CHANGED,
+        expect.objectContaining({
+          platformUserId: "platform-user-1",
+          previousRole: PlatformRole.PLATFORM_SUPPORT_EXECUTIVE,
+          newRole: PlatformRole.PLATFORM_SUPPORT_MANAGER,
+          actorId: "super-1",
+        }),
+      );
+      expect(result.role).toBe(PlatformRole.PLATFORM_SUPPORT_MANAGER);
+    });
+
+    it("throws NotFoundException when the platform user doesn't exist", async () => {
+      platformUserRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.updateRole("missing", PlatformRole.PLATFORM_SUPPORT_MANAGER, "super-1"),
+      ).rejects.toThrow(NotFoundException);
+      expect(platformUserRepository.updateRole).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
   });
 });

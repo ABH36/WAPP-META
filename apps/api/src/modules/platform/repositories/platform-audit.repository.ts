@@ -71,4 +71,12 @@ export class PlatformAuditRepository {
       .limit(limit)
       .exec();
   }
+
+  /** PRD-007 Volume-4 §4.5 (Platform KPIs, "Platform Availability") — chronological, so the caller can walk maintenance ENABLED/DISABLED pairs in order. */
+  async findByEventTypesAscending(eventTypes: string[]): Promise<PlatformAuditEntryDocument[]> {
+    return this.platformAuditEntryModel
+      .find({ eventType: { $in: eventTypes } })
+      .sort({ occurredAt: 1 })
+      .exec();
+  }
 }

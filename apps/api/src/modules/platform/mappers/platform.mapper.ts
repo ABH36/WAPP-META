@@ -4,7 +4,9 @@ import type { PlatformAnnouncementDocument } from "../schemas/platform-announcem
 import type { SupportTicketDocument } from "../schemas/support-ticket.schema.js";
 import type { SupportSessionDocument } from "../schemas/support-session.schema.js";
 import type { PlatformAuditEntryDocument } from "../schemas/platform-audit-entry.schema.js";
+import type { GovernancePolicyDocument } from "../schemas/governance-policy.schema.js";
 import type {
+  GovernancePolicySummary,
   PlatformAnnouncementSummary,
   PlatformAuditEntrySummary,
   PlatformSearchUserSummary,
@@ -100,5 +102,26 @@ export function toPlatformAuditEntrySummary(
     metadata: entry.metadata,
     occurredAt: entry.occurredAt.toISOString(),
     createdAt: entry.createdAt.toISOString(),
+  };
+}
+
+export function toGovernancePolicySummary(
+  policy: GovernancePolicyDocument,
+): GovernancePolicySummary {
+  return {
+    key: policy.key,
+    value: policy.value,
+    version: policy.version,
+    reason: policy.reason,
+    updatedBy: policy.updatedBy,
+    history: policy.history.map((entry) => ({
+      value: entry.value,
+      version: entry.version,
+      reason: entry.reason,
+      updatedBy: entry.updatedBy,
+      updatedAt: entry.updatedAt.toISOString(),
+    })),
+    createdAt: policy.createdAt.toISOString(),
+    updatedAt: policy.updatedAt.toISOString(),
   };
 }

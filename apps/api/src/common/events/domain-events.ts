@@ -263,6 +263,21 @@ export const DomainEvent = {
   SUPPORT_SESSION_STARTED: "platform.support_session_started",
   SUPPORT_SESSION_TERMINATED: "platform.support_session_terminated",
   SUPPORT_SESSION_EXPIRED: "platform.support_session_expired",
+  // PRD-007 Volume-4 (Platform Analytics, Governance & Compliance, §8).
+  // Genuinely platform-scoped (no single workspaceId) — do not extend
+  // BaseEventPayload, mirroring Volume-1's platform-wide events. Both get a
+  // PlatformAuditListener handler (BR-004 — every policy change generates
+  // Platform Audit; Q4's approved role-change capability is audited the
+  // same way). GLOBAL_CONFIGURATION_UPDATED and PLATFORM_ANALYTICS_EXPORTED
+  // from the source document's §8 list are deliberately NOT added —
+  // Architecture Review, 2026-08-10: Global Configuration was merged into
+  // Governance Policies (no separate event needed, PLATFORM_POLICY_UPDATED
+  // covers it), and Analytics Dashboard has no export route in §9 to fire
+  // an "exported" event from (same reasoning Volume-3 used to omit
+  // IMPERSONATION_STARTED/ENDED) — see docs/ADR-PLAT-008-platform-analytics-strategy.md.
+  PLATFORM_POLICY_UPDATED: "platform.policy_updated",
+  PLATFORM_USER_ROLE_CHANGED: "platform.user_role_changed",
+  COMPLIANCE_REPORT_EXPORTED: "platform.compliance_report_exported",
 } as const;
 
 interface BaseEventPayload {
@@ -847,5 +862,25 @@ export interface SupportSessionTerminatedPayload extends BaseEventPayload {
 /** actorId is "system" — the lifecycle sweep, not a platform operator, ends this one. */
 export interface SupportSessionExpiredPayload extends BaseEventPayload {
   sessionId: string;
+  actorId: string;
+}
+
+/** PRD-007 Volume-4 — platform-scoped, no single workspaceId (see BasePlatformEventPayload above). */
+export interface PlatformPolicyUpdatedPayload extends BasePlatformEventPayload {
+  policyKey: string;
+  version: number;
+  reason: string;
+  actorId: string;
+}
+
+export interface PlatformUserRoleChangedPayload extends BasePlatformEventPayload {
+  platformUserId: string;
+  previousRole: string;
+  newRole: string;
+  actorId: string;
+}
+
+export interface ComplianceReportExportedPayload extends BasePlatformEventPayload {
+  format: string;
   actorId: string;
 }

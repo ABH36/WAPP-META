@@ -4,6 +4,7 @@ import { PlatformRole } from "@wapp/shared-types";
 import { PlatformAuthService } from "./platform-auth.service.js";
 import { PlatformUserRepository } from "../repositories/platform-user.repository.js";
 import { PlatformSessionRepository } from "../repositories/platform-session.repository.js";
+import { PlatformLoginHistoryRepository } from "../repositories/platform-login-history.repository.js";
 import { PlatformPasswordService } from "./platform-password.service.js";
 import { PlatformTokenService } from "./platform-token.service.js";
 import type { PlatformUserDocument } from "../schemas/platform-user.schema.js";
@@ -45,6 +46,7 @@ describe("PlatformAuthService", () => {
   let service: PlatformAuthService;
   let platformUserRepository: jest.Mocked<PlatformUserRepository>;
   let sessionRepository: jest.Mocked<PlatformSessionRepository>;
+  let loginHistoryRepository: jest.Mocked<PlatformLoginHistoryRepository>;
   let passwordService: jest.Mocked<PlatformPasswordService>;
   let tokenService: jest.Mocked<PlatformTokenService>;
 
@@ -69,6 +71,7 @@ describe("PlatformAuthService", () => {
             revokeAllForUser: jest.fn(),
           },
         },
+        { provide: PlatformLoginHistoryRepository, useValue: { record: jest.fn() } },
         { provide: PlatformPasswordService, useValue: { hash: jest.fn(), compare: jest.fn() } },
         {
           provide: PlatformTokenService,
@@ -85,6 +88,7 @@ describe("PlatformAuthService", () => {
     service = moduleRef.get(PlatformAuthService);
     platformUserRepository = moduleRef.get(PlatformUserRepository);
     sessionRepository = moduleRef.get(PlatformSessionRepository);
+    loginHistoryRepository = moduleRef.get(PlatformLoginHistoryRepository);
     passwordService = moduleRef.get(PlatformPasswordService);
     tokenService = moduleRef.get(PlatformTokenService);
 
@@ -111,6 +115,9 @@ describe("PlatformAuthService", () => {
       expect(result.tokens.accessToken).toBe("access-token");
       expect(result.user.email).toBe("priya@wapp.internal");
       expect(platformUserRepository.recordSuccessfulLogin).toHaveBeenCalledWith("platform-user-1");
+      expect(loginHistoryRepository.record).toHaveBeenCalledWith(
+        expect.objectContaining({ platformUserId: "platform-user-1", success: true, reason: null }),
+      );
     });
 
     it("rejects an unknown email without revealing that it doesn't exist", async () => {
@@ -122,6 +129,14 @@ describe("PlatformAuthService", () => {
       ).rejects.toThrow(UnauthorizedException);
       // Timing-attack mitigation — still runs a bcrypt compare against the dummy hash.
       expect(passwordService.compare).toHaveBeenCalled();
+      expect(loginHistoryRepository.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platformUserId: null,
+          email: "nobody@wapp.internal",
+          success: false,
+          reason: "INVALID_CREDENTIALS",
+        }),
+      );
     });
 
     it("rejects a wrong password", async () => {
@@ -131,6 +146,13 @@ describe("PlatformAuthService", () => {
       await expect(
         service.login("priya@wapp.internal", "wrong", { userAgent: null, ipAddress: null }),
       ).rejects.toThrow(UnauthorizedException);
+      expect(loginHistoryRepository.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platformUserId: "platform-user-1",
+          success: false,
+          reason: "INVALID_CREDENTIALS",
+        }),
+      );
     });
 
     it("rejects a disabled platform account", async () => {
@@ -141,6 +163,13 @@ describe("PlatformAuthService", () => {
         service.login("priya@wapp.internal", "Passw0rd1", { userAgent: null, ipAddress: null }),
       ).rejects.toThrow(ForbiddenException);
       expect(platformUserRepository.recordSuccessfulLogin).not.toHaveBeenCalled();
+      expect(loginHistoryRepository.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platformUserId: "platform-user-1",
+          success: false,
+          reason: "ACCOUNT_INACTIVE",
+        }),
+      );
     });
   });
 

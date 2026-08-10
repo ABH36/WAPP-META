@@ -51,4 +51,15 @@ export class PlatformUserRepository {
       .findOneAndUpdate({ _id: id }, { $set: { isActive } }, { new: true })
       .exec();
   }
+
+  async countAll(): Promise<number> {
+    return this.platformUserModel.countDocuments().exec();
+  }
+
+  /** PRD-007 Volume-4 §4.4 ("Platform Permission Changes") — Architecture Review, 2026-08-10: role-change capability, previously absent entirely. */
+  async updateRole(id: string, role: PlatformRole): Promise<PlatformUserDocument | null> {
+    return this.platformUserModel
+      .findOneAndUpdate({ _id: id }, { $set: { role } }, { new: true })
+      .exec();
+  }
 }

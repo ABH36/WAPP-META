@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { PlatformUserRepository } from "../repositories/platform-user.repository.js";
 import { PlatformSessionRepository } from "../repositories/platform-session.repository.js";
+import { PlatformLoginHistoryRepository } from "../repositories/platform-login-history.repository.js";
 import { PlatformPasswordService } from "./platform-password.service.js";
 import { PlatformTokenService } from "./platform-token.service.js";
 import type { PlatformUserDocument } from "../schemas/platform-user.schema.js";
@@ -41,6 +42,7 @@ export class PlatformAuthService {
   constructor(
     private readonly platformUserRepository: PlatformUserRepository,
     private readonly sessionRepository: PlatformSessionRepository,
+    private readonly loginHistoryRepository: PlatformLoginHistoryRepository,
     private readonly passwordService: PlatformPasswordService,
     private readonly tokenService: PlatformTokenService,
   ) {}
@@ -53,21 +55,43 @@ export class PlatformAuthService {
     const user = await this.platformUserRepository.findByEmail(email, { withPassword: true });
     if (!user) {
       await this.passwordService.compare(password, DUMMY_PASSWORD_HASH);
+      await this.recordLoginAttempt(null, email, false, "INVALID_CREDENTIALS", meta);
       throw new UnauthorizedException("Invalid email or password");
     }
 
     const passwordMatches = await this.passwordService.compare(password, user.passwordHash);
     if (!passwordMatches) {
+      await this.recordLoginAttempt(user._id.toString(), email, false, "INVALID_CREDENTIALS", meta);
       throw new UnauthorizedException("Invalid email or password");
     }
 
     if (!user.isActive) {
+      await this.recordLoginAttempt(user._id.toString(), email, false, "ACCOUNT_INACTIVE", meta);
       throw new ForbiddenException("This platform account has been disabled.");
     }
 
     await this.platformUserRepository.recordSuccessfulLogin(user._id.toString());
+    await this.recordLoginAttempt(user._id.toString(), email, true, null, meta);
     const tokens = await this.issueTokenPair(user, meta);
     return { tokens, user: toPlatformUserProfile(user) };
+  }
+
+  /** §4.4 (Compliance Dashboard, "Failed Login Attempts"/"Platform Logins") — insert-only, mirrors tenant AuthService's own `recordLoginAttempt` exactly (same signature shape, same call sites). */
+  private async recordLoginAttempt(
+    platformUserId: string | null,
+    email: string,
+    success: boolean,
+    reason: string | null,
+    meta: PlatformRequestMeta,
+  ): Promise<void> {
+    await this.loginHistoryRepository.record({
+      platformUserId,
+      email,
+      success,
+      reason,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
   }
 
   async refresh(

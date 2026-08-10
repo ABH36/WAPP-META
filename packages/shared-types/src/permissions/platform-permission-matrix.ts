@@ -119,6 +119,37 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.FULL,
     [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.FULL,
   },
+  // PRD-007 Volume-4 (Platform Analytics, Governance & Compliance) —
+  // Architecture Review, 2026-08-10: "VIEW_COMPLIANCE remains
+  // PLATFORM_SUPER_ADMIN only. VIEW_PLATFORM_ANALYTICS and
+  // EXPORT_PLATFORM_REPORTS may be granted to support roles.
+  // MANAGE_PLATFORM_POLICIES remains PLATFORM_SUPER_ADMIN only." Compliance
+  // data (Failed Login Attempts, Break-Glass Sessions) is materially more
+  // sensitive than aggregate KPI counts, so it stays behind the same
+  // Super-Admin-only bar as every other high-blast-radius permission —
+  // MANAGE_PLATFORM_POLICIES additionally gates GET /platform/policies
+  // (read), not just PATCH, since these are the platform's own security
+  // configuration values.
+  [PlatformPermission.VIEW_PLATFORM_ANALYTICS]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.FULL,
+  },
+  [PlatformPermission.VIEW_COMPLIANCE]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.NONE,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.NONE,
+  },
+  [PlatformPermission.MANAGE_PLATFORM_POLICIES]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.NONE,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.NONE,
+  },
+  [PlatformPermission.EXPORT_PLATFORM_REPORTS]: {
+    [PlatformRole.PLATFORM_SUPER_ADMIN]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_MANAGER]: PermissionLevel.FULL,
+    [PlatformRole.PLATFORM_SUPPORT_EXECUTIVE]: PermissionLevel.FULL,
+  },
 };
 
 export function getPlatformPermissionLevel(

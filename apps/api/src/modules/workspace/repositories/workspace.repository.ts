@@ -133,6 +133,13 @@ export class WorkspaceRepository {
     return this.workspaceModel.countDocuments({ isDeleted: false, status }).exec();
   }
 
+  /** PRD-007 Volume-4 §4.5 (Platform KPIs, "Workspace Growth"). */
+  async countCreatedSince(since: Date): Promise<number> {
+    return this.workspaceModel
+      .countDocuments({ isDeleted: false, createdAt: { $gte: since } })
+      .exec();
+  }
+
   /** PRD-007 Volume-1 §4.1/§10 — Suspend/Reactivate/Archive, always attributed to the acting PlatformUser (reason required for Suspend/Archive, null for Reactivate). */
   async updateStatusWithReason(
     id: string,
