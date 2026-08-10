@@ -3,11 +3,11 @@ import { deleteCookie, getCookie, setCookie } from "@wapp/ui";
 import type { ApiErrorResponse, ApiSuccessResponse } from "@wapp/shared-types";
 import { env } from "./env";
 import { REFRESH_TOKEN_COOKIE } from "./auth-cookie";
+import { refreshTokenCookieMaxAge } from "./remember-me";
 import { useAuthStore } from "../stores/auth-store";
 import type { IssuedTokenPair } from "../types/auth";
 
 export { REFRESH_TOKEN_COOKIE };
-const REFRESH_TOKEN_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // matches the backend's default 30d refresh TTL
 
 /** FRD-001 Volume-1 §13 — normalized client-side error, replacing axios's raw AxiosError at every call site. Never a raw stack trace/backend internal message (TAD-001 ERR-002, same rule the backend's own HttpExceptionFilter already enforces). */
 export class ApiError extends Error {
@@ -57,7 +57,7 @@ async function refreshAccessToken(): Promise<string> {
   });
   const tokens = response.data.data;
   useAuthStore.getState().setAccessToken(tokens.accessToken);
-  setCookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, REFRESH_TOKEN_MAX_AGE_SECONDS);
+  setCookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, refreshTokenCookieMaxAge());
   return tokens.accessToken;
 }
 

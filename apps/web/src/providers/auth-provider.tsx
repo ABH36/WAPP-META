@@ -6,10 +6,9 @@ import { getCookie, setCookie } from "@wapp/ui";
 import type { ApiSuccessResponse } from "@wapp/shared-types";
 import { env } from "../lib/env";
 import { REFRESH_TOKEN_COOKIE, apiGet } from "../lib/api";
+import { refreshTokenCookieMaxAge } from "../lib/remember-me";
 import { useAuthStore } from "../stores/auth-store";
 import type { IssuedTokenPair, UserProfile } from "../types/auth";
-
-const REFRESH_TOKEN_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
 /**
  * FRD-001 Volume-1 §9 — "Session Expiry"/"Role Detection." The access token
@@ -45,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
           { refreshToken },
         );
         const tokens = refreshRes.data.data;
-        setCookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, REFRESH_TOKEN_MAX_AGE_SECONDS);
+        setCookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, refreshTokenCookieMaxAge());
         useAuthStore.getState().setAccessToken(tokens.accessToken);
 
         const user = await apiGet<UserProfile>("/auth/me");

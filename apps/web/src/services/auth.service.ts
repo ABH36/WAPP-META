@@ -1,5 +1,5 @@
-import { apiGet, apiPost } from "../lib/api";
-import type { IssuedTokenPair, UserProfile } from "../types/auth";
+import { apiDelete, apiGet, apiPost } from "../lib/api";
+import type { IssuedTokenPair, SessionSummary, UserProfile } from "../types/auth";
 
 /** FRD-001 Volume-1 §9 — thin, typed wrappers over `apps/api`'s `/auth/*` (mirrors `AuthController` exactly, apps/api/src/modules/identity/controllers/auth.controller.ts). No business logic here — a request/response shape mapping only. */
 export const authService = {
@@ -38,5 +38,18 @@ export const authService = {
 
   me(): Promise<UserProfile> {
     return apiGet("/auth/me");
+  },
+
+  logoutAll(): Promise<{ message: string }> {
+    return apiPost("/auth/logout-all");
+  },
+
+  /** FRD-001 Volume-2 §4.5. No `isCurrent` field on any returned session — see types/auth.ts. */
+  sessions(): Promise<SessionSummary[]> {
+    return apiGet("/auth/sessions");
+  },
+
+  revokeSession(id: string): Promise<{ message: string }> {
+    return apiDelete(`/auth/sessions/${id}`);
   },
 };

@@ -26,3 +26,23 @@ export interface IssuedTokenPair {
   refreshToken: string;
   expiresIn: number;
 }
+
+/** FRD-001 Volume-2 §4.5 — mirrors `SessionSummary` exactly (`identity.types.ts`). No `isCurrent` field — confirmed absent backend-side, Architecture Review 2026-08-10. */
+export interface SessionSummary {
+  id: string;
+  userAgent: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+  expiresAt: string;
+}
+
+/** FRD-001 Volume-2 §4.6 — mirrors `LoginHistorySummary` exactly. `reason` is one of the backend's own internal strings (`INVALID_CREDENTIALS`, `PLATFORM_MAINTENANCE_MODE`, etc.) — never displayed verbatim, see `lib/login-reason.ts`. */
+export interface LoginHistorySummary {
+  id: string;
+  userId: string;
+  success: boolean;
+  reason: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}

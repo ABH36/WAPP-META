@@ -10,11 +10,19 @@
  * (Protected/Guest Routes) has something to inspect server-side, at the edge,
  * before a page renders.
  */
-export function setCookie(name: string, value: string, maxAgeSeconds: number): void {
+/**
+ * FRD-001 Volume-2 §4.1 — `maxAgeSeconds` is optional: omitting it sets a
+ * session cookie (no `Max-Age`), cleared when the browser closes — the
+ * mechanism "Remember Me" is built on (there is no backend-side hook for
+ * it at all, confirmed by Architecture Review, 2026-08-10 — it's purely
+ * this storage-persistence choice).
+ */
+export function setCookie(name: string, value: string, maxAgeSeconds?: number): void {
   if (typeof document === "undefined") return;
   const secure =
     typeof location !== "undefined" && location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${secure}`;
+  const maxAge = maxAgeSeconds !== undefined ? `; Max-Age=${maxAgeSeconds}` : "";
+  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/${maxAge}; SameSite=Lax${secure}`;
 }
 
 export function getCookie(name: string): string | null {

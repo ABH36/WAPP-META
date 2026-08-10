@@ -18,6 +18,8 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 1. Adopt `nestjs-zod` (or a similar Zod-to-class-validator bridge) so `apps/api` DTOs are generated directly from the `shared-validation` Zod schemas, removing the second copy entirely.
 2. Or, if NestJS's own validation ecosystem is preferred long-term, move the canonical rules into `class-validator`-based DTOs in a shared package instead, and have `shared-validation` re-export/wrap them for the frontend.
 
+**Partially addressed (2026-08-10, FRD-001 Volume-2, Authentication & Identity UI):** `passwordSchema` gained `.max(128)` to match the backend's own bound, and a new `PASSWORD_POLICY_RULES` export now drives `PasswordStrengthIndicator`'s live checklist on every password-entry form (`apps/web`'s Reset Password and Change Password). This is the frontend finally consuming the single source of truth `shared-validation` was always meant to be — the schema existed before this volume, just unused by any form. Backend runtime validation remains completely unchanged: `apps/api`'s Identity DTOs still hand-replicate the same rules as `class-validator` decorators, so the actual duplication this entry describes is untouched. No additional Technical Debt is introduced by this volume. See `docs/ADR-FE-003-authentication-ui-strategy.md`, "Shared password validation closes part of TD-001, deliberately not all of it."
+
 **Trigger to revisit:** the next module whose DTOs would duplicate `shared-validation` rules a third time (Workspace's business profile fields, GSTIN validation, etc.) — three independent copies of the same rule is the point this stops being "acceptable duplication" and becomes real drift risk.
 
 ---

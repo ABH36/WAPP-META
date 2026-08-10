@@ -3,11 +3,11 @@ import { deleteCookie, getCookie, setCookie } from "@wapp/ui";
 import type { ApiErrorResponse, ApiSuccessResponse } from "@wapp/shared-types";
 import { env } from "./env";
 import { REFRESH_TOKEN_COOKIE } from "./auth-cookie";
+import { refreshTokenCookieMaxAge } from "./remember-me";
 import { useAuthStore } from "../stores/auth-store";
 import type { IssuedPlatformTokenPair } from "../types/auth";
 
 export { REFRESH_TOKEN_COOKIE };
-const REFRESH_TOKEN_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // matches the backend's default Platform refresh TTL
 
 export class ApiError extends Error {
   readonly statusCode: number | null;
@@ -51,7 +51,7 @@ async function refreshAccessToken(): Promise<string> {
   );
   const tokens = response.data.data;
   useAuthStore.getState().setAccessToken(tokens.accessToken);
-  setCookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, REFRESH_TOKEN_MAX_AGE_SECONDS);
+  setCookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, refreshTokenCookieMaxAge());
   return tokens.accessToken;
 }
 

@@ -1,14 +1,14 @@
 import { Suspense } from "react";
-import { LoginForm } from "../../../features/auth/login-form";
+import { ResetPasswordForm } from "../../../features/auth/reset-password-form";
 
-export default function PlatformLoginPage(): React.JSX.Element {
+export default function ResetPasswordPage(): React.JSX.Element {
   return (
     <div>
       <h1 className="text-h2 mb-6 text-center text-neutral-900 dark:text-neutral-50">
-        Platform Login
+        Reset password
       </h1>
       <Suspense fallback={null}>
-        <LoginForm />
+        <ResetPasswordForm />
       </Suspense>
     </div>
   );

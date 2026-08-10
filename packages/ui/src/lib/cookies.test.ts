@@ -29,4 +29,9 @@ describe("cookies", () => {
     setCookie("special", "a;b=c d", 60);
     expect(getCookie("special")).toBe("a;b=c d");
   });
+
+  it("FRD-001 Volume-2 — sets a session cookie (still readable) when maxAgeSeconds is omitted", () => {
+    setCookie("session_only", "value");
+    expect(getCookie("session_only")).toBe("value");
+  });
 });
