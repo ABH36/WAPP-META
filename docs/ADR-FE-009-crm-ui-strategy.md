@@ -1,0 +1,26 @@
+# CRM UI Strategy
+
+**Status:** Accepted
+**Date:** 2026-08-11
+**Scope:** FRD-001 Volume-5 — CRM UI. How `apps/web` implements the CRM Dashboard, Leads, Customers, Deals, and Activities on top of the frozen CRM backend (PRD-004 Volume-5, PRD-004 Volume-6), without re-owning lead qualification, customer lifecycle, deal-stage enforcement, or activity/task business logic.
+**Implemented in:** `apps/web/src/{features/crm,services,types,lib}`, `apps/web/src/app/(workspace)/crm`, `packages/ui/src/components/{lead-card,customer-card,deal-card,deal-tile,pipeline-column,activity-card,timeline,stage-badge,probability-badge,revenue-chart}.tsx`
+
+## Dashboard composition: strictly `dashboardSummary()` plus a separate Activities query, never derived
+
+`dashboard-view.tsx` calls exactly two endpoints — `crmService.dashboardSummary()` for the Summary Card grid and a separate `activityService.list({sortBy: "createdAt", sortOrder: "desc", limit: 10})` for "Recent Activity" — per the Architect's explicit instruction that Recent Activity "shall be composed using a separate Activities query," not synthesized from the summary's own counters. No report-distribution charts live on the Dashboard; those belong to the Reports screen only, keeping the Dashboard a navigation-and-glance surface consistent with `SummaryCard`'s own "no duplicated dashboard logic" doc comment (established FRD-001 Volume-3 §4.8).
+
+## Lead lifecycle presentation: transition-table-driven Select, and a hard-locked state once converted
+
+`lead-detail.tsx`'s status picker only ever offers the real next states from `getValidLeadTransitions` (`lib/crm-transitions.ts`, mirroring the backend's own `LEAD_STATUS_TRANSITIONS` exactly) — the backend remains the sole enforcer (BR-007); this is UX convenience, not validation duplication. Once a Lead's `convertedAt` is set, every control on the page (edit form, status Select, assign Select, Archive) is disabled and replaced with a `Link` to the resulting Customer — Lead Conversion (`POST /crm/leads/:id/convert`) is an atomic, one-way backend transaction (Customer + Deal created together), so the frontend never presents a converted Lead as though it were still editable.
+
+## Customer presentation: no owner field, and Related Deals sourced from the ordinary Deal list
+
+`CustomerSummary` has no `assignedUserId`/owner field on the backend at all (confirmed directly against `crm.types.ts` and `customer.controller.ts`, not assumed) — `customer-detail.tsx` never renders an "Owner" or "Assigned to" field, unlike Lead and Deal. "Related Deals" is not a dedicated endpoint; it's the ordinary `dealService.list({customerId})` call, since Deal already supports filtering by its `customerId` foreign key. Block/Activate/Archive are each a distinct action route (matching `ADR-CRM-004`'s "Archive is Customer's real, terminal soft-delete" — no generic status PATCH exists), so the detail page's action buttons are status-dependent rather than one generic dropdown.
+
+## Activities architecture: one flat resource for seven types, AND-composed per-instance permission, no standalone detail route
+
+Tasks, Follow-ups, Notes, Reminders, Calls, Meetings, and Emails are not separate resources — they are one `ActivityType`-discriminated collection (`ActivitySummary`, `activity.service.ts`), confirmed by the absence of any per-type controller or schema split. `ActivityController` carries zero `@RequirePermission` decorators (ADR-CRM-016/017); access is derived entirely from whichever `customerId`/`dealId` a specific Activity references, via `useActivityViewPermission`/`useActivityEditPermission` (`lib/permissions.ts`) — **both** underlying permissions are required (AND, never OR) when an Activity references both a Customer and a Deal. Because access is per-instance rather than per-screen, there is deliberately no standalone `/crm/activities/[id]` detail route (unlike Leads/Customers/Deals) — every Activity is reached either through the Customer/Deal profile's `ActivityFeed`, or, for the standalone list (`activity-list.tsx`), each row self-gates independently and links through to its related Customer/Deal rather than to a detail page that doesn't exist. Completion differs by subtype and has no generic action: Task uses `updateTaskStatus`, Follow-up uses `completeFollowUp` — both surfaced inline in the standalone list, since there's no detail page to host them on instead.
+
+## Deal ownership: `assignedTo`, never created directly, reopened only through a dedicated route
+
+Deal's owner field is `assignedTo` (not `assignedUserId`, unlike Lead and Activity — confirmed against the real schema, not assumed consistent by naming convention). No `POST /crm/deals` route exists anywhere (ADR-CRM-010) — a Deal is created exclusively as an atomic side effect of Lead Conversion, so `deal.service.ts` has no `create()` method and `deal-list.tsx` links to Leads instead of opening a create form. Deal also has no `delete()` — it's permanent once created. `LOST → OPEN` exists only via the dedicated `POST /crm/deals/:id/reopen` route, never through the ordinary stage-transition table (`getValidDealTransitions(DealStage.LOST)` correctly returns `[]`) — `deal-detail.tsx`'s Reopen button is a distinct action, not a stage-picker option.

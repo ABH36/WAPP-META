@@ -80,3 +80,29 @@ export * from "./components/contact-card";
 // Settings form (Card + Switch + Textarea, all pre-existing), not a list of
 // cards, since the backend exposes one Settings object, not named rules
 // (ADR-FE-008).
+
+export * from "./components/revenue-chart";
+export * from "./components/stage-badge";
+export * from "./components/probability-badge";
+export * from "./components/lead-card";
+export * from "./components/customer-card";
+export * from "./components/deal-card";
+export * from "./components/deal-tile";
+export * from "./components/pipeline-column";
+export * from "./components/activity-card";
+export * from "./components/timeline";
+
+// FRD-001 Volume-5 — the 9 above are CRM UI's presentational primitives
+// (§7: LeadCard, CustomerCard, DealCard, DealTile, PipelineColumn,
+// ActivityCard, Timeline, StageBadge, ProbabilityBadge — every §7 name is
+// built). RevenueChart is the first consumer of Recharts (DS-001 §10's
+// pre-approved chart library, installed this volume) — one flexible
+// bar/line/pie primitive covers all 5 chart types §10 names, rather than
+// 5 bespoke components. ReportCard/ForecastCard (also named in §7) are
+// deliberately NOT built — the existing Volume-3 `SummaryCard` already
+// covers "label + value + description," so building near-duplicates would
+// have violated the "don't add abstractions beyond what's needed"
+// principle; Reports/Forecast screens reuse SummaryCard directly. Forms
+// (Lead/Customer/Deal edit forms, Activity/Note composer) stay
+// app-specific in apps/web/src/features/crm/, same reasoning as every
+// prior volume's forms — see docs/ADR-FE-009-crm-ui-strategy.md.

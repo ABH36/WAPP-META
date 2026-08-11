@@ -5,11 +5,19 @@ import { Permission } from "@wapp/shared-types";
 import {
   Bot,
   Building2,
+  CalendarDays,
+  Columns3,
+  FileText,
+  HandCoins,
   LayoutDashboard,
+  LineChart,
+  ListChecks,
   MessageSquare,
   Radio,
   Send,
-  FileText,
+  TrendingUp,
+  UserPlus,
+  Users,
 } from "lucide-react";
 import { Sidebar, SidebarGroup, SidebarItem } from "@wapp/ui";
 import { useUiStore } from "../../stores/ui-store";
@@ -49,8 +57,21 @@ const COMMUNICATION_TABS = [
   },
 ] as const;
 
+const CRM_TABS = [
+  { href: "/crm", label: "Dashboard", icon: LayoutDashboard, requires: Permission.VIEW_REPORTS },
+  { href: "/crm/leads", label: "Leads", icon: UserPlus, requires: Permission.VIEW_LEADS },
+  { href: "/crm/customers", label: "Customers", icon: Users, requires: Permission.VIEW_CUSTOMERS },
+  { href: "/crm/deals", label: "Deals", icon: HandCoins, requires: Permission.VIEW_DEALS },
+  { href: "/crm/pipeline", label: "Pipeline", icon: Columns3, requires: Permission.VIEW_DEALS },
+  { href: "/crm/activities", label: "Activities", icon: ListChecks, requires: null },
+  { href: "/crm/calendar", label: "Calendar", icon: CalendarDays, requires: null },
+  { href: "/crm/reports", label: "Reports", icon: LineChart, requires: Permission.VIEW_REPORTS },
+  { href: "/crm/forecast", label: "Forecast", icon: TrendingUp, requires: Permission.VIEW_REPORTS },
+] as const;
+
 /**
- * FRD-001 Volume-1 §19 / FRD-001 Volume-3 §6 / FRD-001 Volume-4 §6 —
+ * FRD-001 Volume-1 §19 / FRD-001 Volume-3 §6 / FRD-001 Volume-4 §6 /
+ * FRD-001 Volume-5 §6 —
  * remaining module nav items (CRM, Billing, Settings, Team) are added one
  * per module's own frontend implementation step, mirroring `packages/ui`'s
  * own incremental-component-addition convention (`index.ts`'s comment).
@@ -68,12 +89,18 @@ const COMMUNICATION_TABS = [
  * `SALES_EXECUTIVE`/`SUPPORT_MANAGER`/`SUPPORT_EXECUTIVE` — same "hide
  * entirely" pattern as Volume-3's Branding/Preferences tabs, since the
  * underlying `GET` routes themselves are permission-gated, not just their
- * writes.
+ * writes. "CRM" expands into 9 sub-items, matching §6 exactly — Deals and
+ * Pipeline are hidden for `MARKETING_EXECUTIVE` (`VIEW_DEALS` is `NONE`
+ * for that role, the only CRM read permission that's ever `NONE`).
+ * Activities and Calendar have no nav-level gate — Activities has no
+ * permission of its own at all (per-instance only, ADR-CRM-016), and
+ * Calendar is just a presentation over Activities.
  */
 export function WorkspaceSidebar(): React.JSX.Element {
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const pathname = usePathname();
   const inCommunication = pathname.startsWith("/communication");
+  const inCrm = pathname.startsWith("/crm");
 
   // Each permission this sidebar might need to check is called unconditionally
   // (never inside the .map() below) — React's rules of hooks require a fixed
@@ -82,6 +109,10 @@ export function WorkspaceSidebar(): React.JSX.Element {
   const canViewBroadcasts = useHasPermission(Permission.VIEW_BROADCASTS);
   const canViewTemplates = useHasPermission(Permission.VIEW_TEMPLATES);
   const canViewWorkspace = useHasPermission(Permission.VIEW_WORKSPACE);
+  const canViewReports = useHasPermission(Permission.VIEW_REPORTS);
+  const canViewLeads = useHasPermission(Permission.VIEW_LEADS);
+  const canViewCustomers = useHasPermission(Permission.VIEW_CUSTOMERS);
+  const canViewDeals = useHasPermission(Permission.VIEW_DEALS);
 
   const grantedPermissions = new Set<Permission>(
     [
@@ -89,9 +120,16 @@ export function WorkspaceSidebar(): React.JSX.Element {
       canViewBroadcasts && Permission.VIEW_BROADCASTS,
       canViewTemplates && Permission.VIEW_TEMPLATES,
       canViewWorkspace && Permission.VIEW_WORKSPACE,
+      canViewReports && Permission.VIEW_REPORTS,
+      canViewLeads && Permission.VIEW_LEADS,
+      canViewCustomers && Permission.VIEW_CUSTOMERS,
+      canViewDeals && Permission.VIEW_DEALS,
     ].filter((p): p is Permission => !!p),
   );
   const visibleCommunicationTabs = COMMUNICATION_TABS.filter(
+    (tab) => !tab.requires || grantedPermissions.has(tab.requires),
+  );
+  const visibleCrmTabs = CRM_TABS.filter(
     (tab) => !tab.requires || grantedPermissions.has(tab.requires),
   );
 
@@ -123,6 +161,23 @@ export function WorkspaceSidebar(): React.JSX.Element {
         defaultOpen={inCommunication}
       >
         {visibleCommunicationTabs.map((tab) => (
+          <SidebarItem
+            key={tab.href}
+            href={tab.href}
+            icon={<tab.icon className="h-4 w-4" aria-hidden />}
+            active={pathname === tab.href}
+          >
+            {tab.label}
+          </SidebarItem>
+        ))}
+      </SidebarGroup>
+      <SidebarGroup
+        label="CRM"
+        icon={<Users className="h-4 w-4" aria-hidden />}
+        collapsed={collapsed}
+        defaultOpen={inCrm}
+      >
+        {visibleCrmTabs.map((tab) => (
           <SidebarItem
             key={tab.href}
             href={tab.href}

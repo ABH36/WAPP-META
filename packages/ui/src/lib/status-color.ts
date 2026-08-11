@@ -25,6 +25,12 @@ export type StatusColorToken = "success" | "warning" | "danger" | "info" | "neut
  * drifted package, and `packages/ui` can't import those app-local types
  * (wrong dependency direction), so the real values are added here as
  * plain strings, relying on this function's existing `| string` fallback.
+ *
+ * FRD-001 Volume-5 — CRM's `LeadStatus`/`DealStage` WON/LOST/UNQUALIFIED
+ * already had entries from earlier volumes; `CustomerStatus.ARCHIVED`
+ * ("ARCHIVED") already matches via `ConversationStatus.ARCHIVED`'s
+ * existing entry (same string, no new line needed). Only
+ * `CustomerStatus.BLOCKED` is genuinely new here.
  */
 export function getStatusColor(
   status: WorkspaceStatus | LeadStatus | DealStage | ConversationStatus | PaymentStatus | string,
@@ -46,6 +52,7 @@ export function getStatusColor(
     "RUNNING", // Broadcast
     "SCHEDULED", // Broadcast
     "PAUSED", // Broadcast / Template
+    "BLOCKED", // Customer
   ];
   const negative: string[] = [
     WorkspaceStatus.SUSPENDED,

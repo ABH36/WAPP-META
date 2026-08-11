@@ -1,9 +1,4 @@
-import {
-  PermissionLevel,
-  getPermissionLevel,
-  hasAnyAccess,
-  type Permission,
-} from "@wapp/shared-types";
+import { Permission, PermissionLevel, getPermissionLevel, hasAnyAccess } from "@wapp/shared-types";
 import { useAuthStore } from "../stores/auth-store";
 
 /**
@@ -48,4 +43,37 @@ export function useHasPermission(permission: Permission): boolean {
  */
 export function useHasFullPermission(permission: Permission): boolean {
   return usePermissionLevel(permission) === PermissionLevel.FULL;
+}
+
+/**
+ * FRD-001 Volume-5 §4.6/§4.7/§4.8 — Activities have no permission of
+ * their own (`ActivityController` has zero `@RequirePermission`
+ * decorators, ADR-CRM-016/017). Access is derived from whichever
+ * `customerId`/`dealId` a specific Activity references — if both are
+ * set, the backend requires **both** underlying permissions (AND, not
+ * OR), never just one. These hooks mirror that exact rule so the
+ * frontend never shows a control the backend would reject.
+ */
+export function useActivityViewPermission(
+  customerId: string | null,
+  dealId: string | null,
+): boolean {
+  const canViewCustomers = useHasPermission(Permission.VIEW_CUSTOMERS);
+  const canViewDeals = useHasPermission(Permission.VIEW_DEALS);
+  if (customerId && dealId) return canViewCustomers && canViewDeals;
+  if (customerId) return canViewCustomers;
+  if (dealId) return canViewDeals;
+  return false;
+}
+
+export function useActivityEditPermission(
+  customerId: string | null,
+  dealId: string | null,
+): boolean {
+  const canEditCustomers = useHasFullPermission(Permission.EDIT_CUSTOMER);
+  const canCreateDeals = useHasFullPermission(Permission.CREATE_DEALS);
+  if (customerId && dealId) return canEditCustomers && canCreateDeals;
+  if (customerId) return canEditCustomers;
+  if (dealId) return canCreateDeals;
+  return false;
 }

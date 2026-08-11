@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { WorkspaceStatus, LeadStatus, DealStage, PaymentStatus } from "@wapp/shared-types";
+import {
+  WorkspaceStatus,
+  LeadStatus,
+  DealStage,
+  PaymentStatus,
+  CustomerStatus,
+} from "@wapp/shared-types";
 import { getStatusColor } from "./status-color";
 
 describe("getStatusColor", () => {
@@ -57,5 +63,16 @@ describe("getStatusColor", () => {
     expect(getStatusColor("PAUSED")).toBe("warning");
     expect(getStatusColor("DISABLED")).toBe("neutral");
     expect(getStatusColor("DRAFT")).toBe("info");
+  });
+
+  it("maps CRM's real Lead/Deal/Customer status values (FRD-001 Volume-5)", () => {
+    expect(getStatusColor(LeadStatus.UNQUALIFIED)).toBe("neutral");
+    expect(getStatusColor(DealStage.OPEN)).toBe("info");
+    expect(getStatusColor(DealStage.QUALIFICATION)).toBe("info");
+    expect(getStatusColor(CustomerStatus.BLOCKED)).toBe("warning");
+    // ARCHIVED is shared with ConversationStatus.ARCHIVED (already "neutral").
+    expect(getStatusColor(CustomerStatus.ARCHIVED)).toBe("neutral");
+    // ACTIVE is shared with WorkspaceStatus.ACTIVE (already "success").
+    expect(getStatusColor(CustomerStatus.ACTIVE)).toBe("success");
   });
 });

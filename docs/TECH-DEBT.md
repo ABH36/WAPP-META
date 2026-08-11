@@ -479,3 +479,93 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** exposing `lastCustomerMessageAt` (or a computed `withinCustomerServiceWindow: boolean` / `customerServiceWindowExpiresAt: string | null`, arguably a cleaner contract than a raw timestamp for the frontend to reason about) on `ConversationSummary`. Once available, the Composer can proactively disable the free-text mode and default to the Template tab before the agent even starts typing, rather than after a failed send — a small change since the reactive UX plumbing already exists.
 
 **Trigger to revisit:** the next real Composer complaint about the reactive flow being confusing (typing a message, then discovering it can't be sent), or when `docs/COMM-COMPLIANCE-ENGINE.md`'s own named "Proactive UX" follow-up gets picked up.
+
+---
+
+## TD-032 — No Customer Report endpoint
+
+**Raised:** 2026-08-11 (FRD-001 Volume-5, CRM UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-5's Reports screen (§4.10) named a "Customer Report" alongside Lead/Deal/Activity Report, but `apps/api`'s CRM Reports controller exposes only `GET /crm/reports/{dashboard,leads,deals,activities,forecast}` — confirmed by reading `reports.controller.ts` directly during Architecture Review, not just the ADR summaries. No customer-segmentation, lifecycle, or acquisition-source aggregate route exists anywhere in the module.
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review, matching the explicit instruction that Reports is scoped to Lead/Deal/Activity only this volume. `reports-view.tsx` renders exactly three report sections; no client-side aggregation over `customerService.list()` was attempted as a substitute — that would mean paginating the entire Customer collection into memory to compute figures a real backend aggregate should own, and would silently imply a "Customer Report" the backend was never asked to produce.
+
+**Closing this out looks like:** a `GET /crm/reports/customers` route (matching the existing `leads`/`deals`/`activities` convention) returning workspace-scoped aggregates — candidates: status distribution (Active/Blocked/Archived), source distribution, average customer age, customers-with-no-open-deal count. Exact field list needs its own scoped design pass.
+
+**Trigger to revisit:** a future CRM Reports expansion volume, or a real request for customer-segmentation insight that the current three reports can't answer.
+
+---
+
+## TD-033 — No Sales Report endpoint
+
+**Raised:** 2026-08-11 (FRD-001 Volume-5, CRM UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-5's Reports screen (§4.10) also named a "Sales Report," distinct from the Deal Report already exposed — presumably a rep/team-level sales-performance rollup rather than deal-stage aggregates. No such route exists; the closest backend capability is `GET /crm/reports/team-performance` (`TeamPerformanceReport`, mirrored in `types/crm.ts` but never surfaced by any screen this volume, per its own doc comment: "not one of the FRD's named report screens, but exposed by the backend").
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review, matching the same "Lead/Deal/Activity Report only" scope decision as TD-032. `TeamPerformanceReport` was deliberately left unused rather than repurposed as a stand-in "Sales Report" — its shape (per-user deals won/leads qualified/tasks completed) doesn't match what a "Sales Report" would typically mean (revenue trends, quota attainment, win-rate over time), and guessing at that mapping risked shipping a mislabeled screen.
+
+**Closing this out looks like:** either a dedicated `GET /crm/reports/sales` endpoint once the exact intended shape is specified, or — if `TeamPerformanceReport` turns out to be what "Sales Report" meant all along — a scoped follow-up to build a screen against the endpoint that already exists, confirmed against the Architect's original intent rather than assumed.
+
+**Trigger to revisit:** the next CRM Reports expansion volume, when the Architect can clarify whether "Sales Report" and the existing `team-performance` endpoint are the same thing.
+
+---
+
+## TD-034 — No Calendar support for Meetings
+
+**Raised:** 2026-08-11 (FRD-001 Volume-5, CRM UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-5's Calendar (§4.9) is scoped to Tasks and Follow-ups only (Architecture Review approval), but `ActivityType.MEETING` is a real, full activity type with its own timeline presence (`ActivityCard`'s `TYPE_ICON` already renders it) — it simply never appears on `calendar-view.tsx`'s grid, which only queries `ActivityType.TASK`/`ActivityType.FOLLOW_UP`.
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review, matching the explicit instruction that Calendar covers Tasks and Follow-ups only this volume. Meetings have no dedicated date-range-filterable field exposed by `activityService.list()` beyond the generic `dueFrom`/`dueTo` (which only ever filters Task's `dueDate` server-side, per `activity.service.ts`'s own doc comment) — a Meeting's relevant date isn't currently modeled distinctly enough from a generic Activity's `createdAt` to place it reliably on a calendar grid without guessing.
+
+**Closing this out looks like:** either a dedicated `meetingDate`-equivalent field on Meeting-type Activities plus server-side range filtering for it (mirroring how Task's `dueDate` and Follow-up's `followUpDate` already work), or an explicit product decision that Meetings belong on the Calendar via a different field entirely. Once resolved, `calendar-view.tsx`'s `CalendarChip`/`itemsForDay` composition already generalizes to a third activity type with minimal change.
+
+**Trigger to revisit:** a real scheduling need for Meetings specifically (as opposed to Tasks/Follow-ups), or a future Calendar-expansion volume.
+
+---
+
+## TD-035 — No Calendar support for Calls
+
+**Raised:** 2026-08-11 (FRD-001 Volume-5, CRM UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** Same gap as TD-034, for `ActivityType.CALL`. Calls have no calendar-relevant date field distinct from `createdAt`, and were excluded from Calendar's scope by the same Architecture Review decision.
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review — Calendar is Tasks and Follow-ups only this volume; Calls remain visible in the standalone Activities list (`activity-list.tsx`) and each Customer/Deal's `ActivityFeed`, just not on the Calendar grid.
+
+**Closing this out looks like:** the same shape of fix as TD-034 — a scheduled-call-date field with server-side range filtering, once product defines whether Calls need to be calendar-schedulable (as opposed to logged after the fact, which is how the current data model reads).
+
+**Trigger to revisit:** a real need to schedule (not just log) Calls, or a future Calendar-expansion volume — likely bundled with TD-034 and TD-036 as one combined Calendar-scope-expansion initiative given the identical shape of the gap.
+
+---
+
+## TD-036 — No Calendar support for Emails
+
+**Raised:** 2026-08-11 (FRD-001 Volume-5, CRM UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** Same gap as TD-034/TD-035, for `ActivityType.EMAIL`. No calendar-relevant date field, excluded from Calendar's scope by the same Architecture Review decision.
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review — Calendar is Tasks and Follow-ups only this volume; Emails remain visible in the standalone Activities list and `ActivityFeed`, just not on the Calendar grid.
+
+**Closing this out looks like:** the same shape of fix as TD-034/TD-035 — a scheduled-send-date field with server-side range filtering, if Email activities are ever meant to represent a scheduled send rather than a logged record of one already sent.
+
+**Trigger to revisit:** the same combined Calendar-scope-expansion initiative named in TD-034/TD-035.
+
+---
+
+## TD-037 — No Customer → Lead reverse lookup
+
+**Raised:** 2026-08-11 (FRD-001 Volume-5, CRM UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** A Customer is created exclusively as a side effect of `POST /crm/leads/:id/convert` (ADR-CRM-010), and `LeadSummary.customerId` records the forward link once conversion happens — but there is no reverse route or field (`GET /crm/customers/:id/lead` or a `sourceLeadId` on `CustomerSummary`) letting a viewer navigate from a Customer back to the Lead it originated from. Confirmed against `crm.types.ts` and `customer.controller.ts` directly: `CustomerSummary` has no lead-reference field at all.
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review — named as an accepted gap rather than something to route around. `customer-detail.tsx` has no "View originating Lead" link; the only cross-reference this volume ships is the forward direction, `lead-detail.tsx`'s "View Customer" link once a Lead is converted (`convertedAt` set). Adding a client-side search (scanning Leads for `customerId === this customer's id`) was rejected as a substitute — Leads have no `customerId`-filter query parameter either (`lead.service.ts`'s `list()` params confirmed), so it would require fetching the entire Lead collection to find one record.
+
+**Closing this out looks like:** exposing the reverse link somewhere — either a `sourceLeadId` field added to `CustomerSummary` (cheapest, since the relationship already exists in the data the convert transaction wrote), or a dedicated `customerId` filter on `GET /crm/leads`. Either unblocks a simple "View originating Lead" link on `customer-detail.tsx`.
+
+**Trigger to revisit:** a real support/sales workflow need to trace a Customer back to its originating Lead (common in attribution/source-effectiveness analysis), or a future CRM cross-linking initiative.
