@@ -372,3 +372,18 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** per config family, its own scoped extension: (1) Identity's `TokenService`/`PlatformTokenService` sign-time logic reads `SESSION_TIMEOUT` from `GovernancePolicyRepository` (falling back to the existing env var if unset), most likely requiring the token TTL to become a per-sign-call parameter rather than a `JwtModule.register()`-time constant; (2) Settings' `RetentionPolicyRepository.getOrCreate()` seeds new workspaces' defaults from `DEFAULT_RETENTION` instead of the schema's own hardcoded default; (3) `PlatformMaintenanceService.setEnabled()` falls back to `PLATFORM_MAINTENANCE_DEFAULTS`' reason text when none is supplied in the request. Each of these touches a frozen module and needs its own sign-off under the frozen-module-governance checklist — not a single combined change.
 
 **Trigger to revisit:** a real operator need for one of these values to actually change platform behavior at runtime (e.g., an incident requiring an immediate, code-deploy-free session-timeout tightening) — surfaced and explicitly approved per config family, since each requires touching a different frozen module.
+
+---
+
+## TD-025 — No Communication dashboard/summary endpoint
+
+**Raised:** 2026-08-11 (FRD-001 Volume-3, Workspace UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-3's Workspace Dashboard Summary Cards (§4.8) need a Communication Overview alongside Subscription/Billing/CRM, but no such endpoint exists anywhere in the Communication module. Confirmed by grepping the entire module during Architecture Review: every route is per-entity (`GET /communication/broadcasts/:id/stats`, `GET /communication/campaigns/:id/stats`, `GET /communication/whatsapp/connection`, `GET /communication/whatsapp/phone-numbers`, conversation/message lists) — nothing analogous to `crm/reports/dashboard` or `billing/reports/dashboard` that returns a workspace-wide summary in one call.
+
+**Why accepted for now:** Resolved 2026-08-10, Architecture Review, matching the explicit instruction: "Communication Overview is intentionally omitted from this volume because no backend dashboard endpoint currently exists. A Technical Debt entry may document this future enhancement." Building a client-side aggregation from existing per-broadcast/per-campaign/connection endpoints was explicitly rejected as an alternative (likely slow — N+1-shaped fan-out across every broadcast/campaign the workspace has ever run — and architecturally messy for what should be a single dashboard card), and adding a new backend route wasn't authorized as part of this frontend volume ("No backend changes are authorized as part of this volume" — Architecture Review approval).
+
+**Closing this out looks like:** a `GET /communication/reports/dashboard`-shaped endpoint (matching the existing `billing/reports/dashboard`/`crm/reports/dashboard` convention), returning workspace-scoped aggregate figures a Summary Card can actually use — candidates: active conversations count, messages sent this period, broadcast/campaign completion rate, WhatsApp connection health. Exact field list needs its own scoped design pass (which counters matter for a glanceable card vs. which belong on a future dedicated Communication dashboard/reports screen) rather than being guessed here.
+
+**Trigger to revisit:** either a dedicated Communication Reports/Analytics initiative (comparable to how CRM and Billing each got their own `reports` submodule), or a future Workspace/Platform Dashboard volume that specifically wants to complete the Summary Cards row.
