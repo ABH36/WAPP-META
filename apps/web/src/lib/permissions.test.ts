@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { Permission, PermissionLevel, TenantRole } from "@wapp/shared-types";
-import { useHasPermission, usePermissionLevel } from "./permissions";
+import { useHasFullPermission, useHasPermission, usePermissionLevel } from "./permissions";
 import { useAuthStore } from "../stores/auth-store";
 
 function setRole(role: TenantRole | null): void {
@@ -48,6 +48,20 @@ describe("permissions", () => {
   it("useHasPermission is true for every role on VIEW_WORKSPACE", () => {
     setRole(TenantRole.SUPPORT_EXECUTIVE);
     const { result } = renderHook(() => useHasPermission(Permission.VIEW_WORKSPACE));
+    expect(result.current).toBe(true);
+  });
+
+  it("useHasFullPermission is false for a VIEW_ONLY role (Sales Manager on Templates), even though useHasPermission is true", () => {
+    setRole(TenantRole.SALES_MANAGER);
+    const { result: full } = renderHook(() => useHasFullPermission(Permission.VIEW_TEMPLATES));
+    const { result: any } = renderHook(() => useHasPermission(Permission.VIEW_TEMPLATES));
+    expect(full.current).toBe(false);
+    expect(any.current).toBe(true);
+  });
+
+  it("useHasFullPermission is true for a FULL role (Owner on Templates)", () => {
+    setRole(TenantRole.OWNER);
+    const { result } = renderHook(() => useHasFullPermission(Permission.VIEW_TEMPLATES));
     expect(result.current).toBe(true);
   });
 });

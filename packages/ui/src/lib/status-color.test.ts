@@ -29,4 +29,33 @@ describe("getStatusColor", () => {
   it("defaults unmapped values to info", () => {
     expect(getStatusColor("SOME_UNMAPPED_STATUS")).toBe("info");
   });
+
+  it("maps Communication's real Conversation status values (FRD-001 Volume-4)", () => {
+    expect(getStatusColor("RESOLVED")).toBe("success");
+    expect(getStatusColor("PENDING")).toBe("warning");
+    expect(getStatusColor("SPAM")).toBe("danger");
+    expect(getStatusColor("CLOSED")).toBe("neutral");
+    expect(getStatusColor("NEW")).toBe("info");
+    expect(getStatusColor("OPEN")).toBe("info");
+  });
+
+  it("maps Communication's real Broadcast/Campaign status values", () => {
+    expect(getStatusColor("COMPLETED")).toBe("success");
+    expect(getStatusColor("RUNNING")).toBe("warning");
+    expect(getStatusColor("SCHEDULED")).toBe("warning");
+    expect(getStatusColor("FAILED")).toBe("danger");
+    expect(getStatusColor("CANCELLED")).toBe("neutral");
+    // "ACTIVE" is shared with WorkspaceStatus.ACTIVE (already "success") —
+    // Campaign's ACTIVE reuses that bucket rather than special-casing a
+    // cross-domain string collision.
+    expect(getStatusColor("ACTIVE")).toBe("success");
+  });
+
+  it("maps Communication's real Template status values", () => {
+    expect(getStatusColor("APPROVED")).toBe("success");
+    expect(getStatusColor("REJECTED")).toBe("danger");
+    expect(getStatusColor("PAUSED")).toBe("warning");
+    expect(getStatusColor("DISABLED")).toBe("neutral");
+    expect(getStatusColor("DRAFT")).toBe("info");
+  });
 });

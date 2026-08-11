@@ -387,3 +387,95 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** a `GET /communication/reports/dashboard`-shaped endpoint (matching the existing `billing/reports/dashboard`/`crm/reports/dashboard` convention), returning workspace-scoped aggregate figures a Summary Card can actually use — candidates: active conversations count, messages sent this period, broadcast/campaign completion rate, WhatsApp connection health. Exact field list needs its own scoped design pass (which counters matter for a glanceable card vs. which belong on a future dedicated Communication dashboard/reports screen) rather than being guessed here.
 
 **Trigger to revisit:** either a dedicated Communication Reports/Analytics initiative (comparable to how CRM and Billing each got their own `reports` submodule), or a future Workspace/Platform Dashboard volume that specifically wants to complete the Summary Cards row.
+
+**Still open (2026-08-11, FRD-001 Volume-4, Communication UI):** confirmed still relevant — the Communication Dashboard built in this volume (§4.1) also has no aggregation endpoint to call, and composes its own counts from four separate `status`-filtered `?limit=1` calls instead (see `docs/ADR-FE-007-communication-ui-strategy.md`, "Dashboard composition"). No new entry filed; this is the same gap, now confirmed from two independent volumes.
+
+---
+
+## TD-026 — No Communication real-time infrastructure (WebSocket/SSE)
+
+**Raised:** 2026-08-11 (FRD-001 Volume-4, Communication UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-4's Inbox and Conversation View need "live" updates for new messages, message status changes, conversation updates, and assignment changes, but no push mechanism exists anywhere in the backend. Confirmed by a repo-wide search during Architecture Review: zero matches for `WebSocketGateway`, `@nestjs/websockets`, `socket.io`, or `EventSource` anywhere in `apps/api`. Every relevant domain event (`CONVERSATION_ASSIGNED`, `MESSAGE_SENT`, `CONVERSATION_STATUS_CHANGED`, etc.) is emitted via NestJS's in-process `EventEmitter2` and consumed only by a logging listener — nothing is pushed to any client, and per `docs/ADR-COMM-003`, these events "have no persisted, queryable record — they exist only as ephemeral domain events."
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review, matching the explicit instruction: "Real-time behaviour is approved as polling only. TanStack Query polling replaces live push for this volume. No WebSocket, SSE or custom client-side realtime implementation shall be introduced." Building a client-side real-time simulation (long-polling tricks, a fake WebSocket shim) was explicitly rejected — it would mean inventing backend behavior that doesn't exist, contrary to `ADR-FE-001`'s "no unsupported backend behaviour is simulated in the frontend" principle, and would need to be torn out the moment a real backend mechanism ships.
+
+**Closing this out looks like:** a NestJS `@WebSocketGateway` (or SSE endpoint) emitting the same domain events already fired via `EventEmitter2` — `CONVERSATION_ASSIGNED`, `MESSAGE_SENT` (or a `MESSAGE_STATUS_CHANGED` equivalent), `CONVERSATION_STATUS_CHANGED` — scoped per-workspace (and likely per-conversation-subscription for the Conversation View specifically), with a documented connection/auth handshake. The frontend swap is comparatively small once that exists: `inbox-list.tsx`/`conversation-view.tsx`'s `refetchInterval`-based queries become event-triggered `queryClient.invalidateQueries` calls instead.
+
+**Trigger to revisit:** a real operator/customer complaint about staleness (agents missing new messages until the next 15-second poll), or a dedicated Communication real-time infrastructure initiative — whichever comes first.
+
+---
+
+## TD-027 — No Communication attachment/media support (send or inbound-display)
+
+**Raised:** 2026-08-11 (FRD-001 Volume-4, Communication UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-4's Conversation View, Message Composer, and Templates sections all named Attachments (§4.3/§4.4/§4.10) as in-scope, but no media pipeline exists anywhere in Communication — not for sending, not for inbound display. Confirmed during Architecture Review: `SendMessageDto`/`SendTemplateMessageDto`/`ReplyConversationDto` have no media field at all; `Message.schema.ts`'s own doc comment states inbound non-text messages are "recorded with their Meta `type` and the full original payload in `rawPayload`, so no data is lost even though this slice doesn't process media — closing that gap (download/store to Cloudinary, captions, etc.) is later scope"; and `StorageService` (the existing Cloudinary signed-upload pattern, used today only by Workspace Branding) has zero usages anywhere in the Communication module.
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review, matching the explicit instruction: "Attachments and Labels are excluded from this volume because no backend capability exists." Neither send-side media (composing and attaching a file to an outbound message) nor inbound-display media (rendering an image/document a customer sent) has anything to be built against — building either would mean a frontend feature with no functioning backend counterpart.
+
+**Closing this out looks like:** two related but separable pieces of backend work — (1) outbound: a media field on `SendMessageDto`/message-sending flow, most likely reusing the existing `StorageService.generateUploadSignature()` Cloudinary pattern (get-signature → direct upload → confirm, same three-step flow Workspace Branding already established); (2) inbound: a webhook-time media-download pipeline that fetches the Meta media URL (which expires quickly) and persists it to durable storage, plus exposing a `mediaUrl` field on `MessageSummary` for the frontend to render. These don't have to ship together — inbound-display alone would already close much of the FRD's Conversation View gap even before outbound sending exists.
+
+**Trigger to revisit:** a real customer-support need for image/document exchange (a very common WhatsApp Business use case — this is likely to be requested soon after this volume ships), or a dedicated Communication Attachments initiative.
+
+---
+
+## TD-028 — No Communication/Contact labels (zero backend support anywhere)
+
+**Raised:** 2026-08-11 (FRD-001 Volume-4, Communication UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-4 named a full Labels section (§4.8: list/create/edit/delete, color, usage count) plus label references on Conversation View and Contacts, but Labels don't exist as a backend resource anywhere in the repository — not in Communication, not in CRM. Confirmed during Architecture Review: no `LabelSchema`, no `labels.controller.ts`, no CRM tagging model, and no `LABEL`/`TAG` entry in `PERMISSION_MATRIX` anywhere in `apps/api` or `packages/shared-types`.
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review, matching the explicit instruction: "Attachments and Labels are excluded from this volume because no backend capability exists." This is a hard gap, not a naming mismatch — there is no underlying entity to build CRUD UI against, and no "usage count" to compute since nothing produces the underlying data.
+
+**Closing this out looks like:** a genuinely new backend slice — a `Label` schema (name, color, workspace-scoped), CRUD routes, a many-to-many association with Conversation and/or Contact, and a `PERMISSION_MATRIX` row for who can manage labels vs. just apply them. Worth designing once, shared between Communication and CRM if both need tagging, rather than building two independent label systems later.
+
+**Trigger to revisit:** a real, specific request to categorize/filter conversations or contacts beyond what `status`/`assignedToUserId` already provide — surfaced as its own scoped backend initiative, not bundled into an unrelated volume.
+
+---
+
+## TD-029 — No Contacts list/search endpoint
+
+**Raised:** 2026-08-11 (FRD-001 Volume-4, Communication UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** No `GET /contacts`, `GET /contacts/:id`, `PATCH /contacts/:id`, or contact search route exists anywhere in the backend — `ContactRepository` exposes only internal lookup methods (`findOrCreate`, `findByIdForWorkspace`, `findByIdsForWorkspace`), never through a controller. This has two concrete consequences in FRD-001 Volume-4: (1) Contacts could not be built as a standalone module (§4.5) — resolved by presenting contact info as a read-only panel embedded in Conversation View, using only the fields `ConversationSummary` already carries (`ADR-FE-007`, "Contacts is not a standalone module"); (2) Broadcast/Campaign creation's `targetContactIds` picker (`use-known-contacts.ts`) has no real audience source to draw from, so it's limited to the distinct contacts appearing in the 100 most recently active conversations — not a full, searchable contact base.
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review — no backend changes were authorized as part of this frontend volume, and both consequences were explicitly reviewed and accepted as the correct scope for what's actually buildable today rather than left implicit.
+
+**Closing this out looks like:** a real `GET /contacts` (list, with search/filter by name or phone) and `GET /contacts/:id` route, likely alongside a proper Contacts module boundary decision (does Contact stay Communication-owned, per `ADR-COMM-002`, or does it need CRM-style enrichment — custom fields, ownership, lifecycle — at which point it starts to resemble CRM's `Customer` entity and that overlap needs its own resolution). Once it exists, `use-known-contacts.ts` becomes a real searchable picker instead of a recent-conversations approximation, and a genuine Contacts List/Profile screen becomes buildable.
+
+**Trigger to revisit:** a real operator complaint that Broadcast/Campaign audiences can't reach contacts who haven't messaged recently, or a CRM-Communication contact-model unification initiative.
+
+---
+
+## TD-030 — `@wapp/shared-types` Communication enums have drifted from the real backend
+
+**Raised:** 2026-08-11 (FRD-001 Volume-4, Communication UI; discovered during implementation, not part of the original Architecture Review checklist)
+**Status:** Open
+
+**What:** `@wapp/shared-types`'s `ConversationStatus` and `TemplateStatus` enums don't match what `apps/api`'s Communication module actually returns — `ConversationStatus.PENDING_CUSTOMER` vs. the real schema's `PENDING`; `TemplateStatus.SUBMITTED` vs. the real schema's `PAUSED`. `CampaignStatus`, `MessageStatus`, `MessageDirection`, and `AssignmentStrategy` have no `@wapp/shared-types` equivalent at all. The Communication module defines all of these locally in its own schema files rather than importing the shared package — despite `ConversationStatus`'s own doc comment in `@wapp/shared-types` tracing to "PRD-003 Part 2 §G," the same section the Communication module's real implementation covers, suggesting the shared package was scaffolded ahead of the real implementation and never reconciled once it shipped.
+
+**Why accepted for now:** Discovered mid-implementation, 2026-08-11 — not one of the four gaps the Architecture Review approval named, so it's filed separately rather than folded into an existing entry. `apps/web`'s own Communication types (`types/conversation.ts`, `types/template.ts`, etc.) were written to mirror the real, running backend instead of the drifted shared package, and `packages/ui/src/lib/status-color.ts`'s `getStatusColor` was extended with the real string-literal values directly rather than importing the incorrect enum — both documented inline. Fixing `@wapp/shared-types` itself was judged out of this frontend volume's authority: it's a shared package other code may already reference, and changing an enum's members needs its own review, not a silent fix bundled into an unrelated UI volume.
+
+**Closing this out looks like:** correcting `ConversationStatus.PENDING_CUSTOMER` → `PENDING` and `TemplateStatus.SUBMITTED` → `PAUSED` in `@wapp/shared-types`, adding `CampaignStatus`/`MessageStatus`/`MessageDirection`/`AssignmentStrategy`, and then migrating `apps/api`'s Communication module to import from the shared package instead of maintaining local duplicates — plus updating `apps/web`'s types and `packages/ui`'s `getStatusColor` to consume the corrected shared enums instead of local mirrors/raw strings. A search across the codebase for any other consumer of the current (wrong) `ConversationStatus`/`TemplateStatus` values should happen before the enum members are renamed, in case something already depends on the incorrect names.
+
+**Trigger to revisit:** the next module that needs a canonical, shared Communication status type (a future Platform-level Communication view, or a reporting module cutting across Communication data) — that's the point duplicating a third local copy stops being tenable.
+
+---
+
+## TD-031 — `lastCustomerMessageAt` not exposed on `ConversationSummary` (blocks proactive compliance-window UX)
+
+**Raised:** 2026-08-11 (FRD-001 Volume-4, Communication UI; discovered during implementation, not part of the original Architecture Review checklist)
+**Status:** Open
+
+**What:** The Meta 24-hour customer-service window (free-text replies blocked outside it, template messages exempt) is enforced server-side via `Conversation.lastCustomerMessageAt` — a field that exists on the Mongoose schema but is never serialized into `ConversationSummary` (confirmed against both `communication.mapper.ts` and `communication.types.ts`). The backend's own compliance documentation (`docs/COMM-COMPLIANCE-ENGINE.md`) explicitly names proactively warning an agent before they attempt an out-of-window free-text send as "a frontend concern once a frontend exists" — but building that proactive check requires exactly the field that isn't exposed.
+
+**Why accepted for now:** Discovered mid-implementation, 2026-08-11 — not one of the four gaps the Architecture Review approval named. `message-composer.tsx` handles the window reactively instead: a failed free-text send that returns a 403 surfaces a warning with a one-click switch to the Template picker, matching the backend's documented _intent_ for the outcome, just triggered after the attempt rather than before it (see `docs/ADR-FE-008-communication-inbox-strategy.md`, "Message Composer: the 24-hour compliance window is handled reactively"). No client-side approximation of `lastCustomerMessageAt` (e.g., guessing from `lastMessageAt` plus message direction) was attempted — `lastMessageAt` includes outbound messages too, so it can't substitute for the real field without risking a wrong answer in either direction.
+
+**Closing this out looks like:** exposing `lastCustomerMessageAt` (or a computed `withinCustomerServiceWindow: boolean` / `customerServiceWindowExpiresAt: string | null`, arguably a cleaner contract than a raw timestamp for the frontend to reason about) on `ConversationSummary`. Once available, the Composer can proactively disable the free-text mode and default to the Template tab before the agent even starts typing, rather than after a failed send — a small change since the reactive UX plumbing already exists.
+
+**Trigger to revisit:** the next real Composer complaint about the reactive flow being confusing (typing a message, then discovering it can't be sent), or when `docs/COMM-COMPLIANCE-ENGINE.md`'s own named "Proactive UX" follow-up gets picked up.

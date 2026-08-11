@@ -34,3 +34,18 @@ export function useHasPermission(permission: Permission): boolean {
   }
   return hasAnyAccess(role, permission);
 }
+
+/**
+ * FRD-001 Volume-4 — write actions (create/edit/send) must check for
+ * `FULL` specifically, not just "not NONE." The backend's permission
+ * guard (`permissions.guard.ts`) only checks `level !== NONE`, so a
+ * `VIEW_ONLY` role (e.g. `SALES_MANAGER` on Templates/Broadcasts/
+ * Campaigns) isn't actually blocked server-side from calling a write
+ * route directly — only the frontend prevents it (Architecture Review,
+ * 2026-08-11: "View-only users shall never receive create, edit or send
+ * actions"). `useHasPermission` alone is still correct for gating
+ * read/view access.
+ */
+export function useHasFullPermission(permission: Permission): boolean {
+  return usePermissionLevel(permission) === PermissionLevel.FULL;
+}

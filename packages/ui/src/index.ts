@@ -53,3 +53,30 @@ export * from "./components/workspace-status-badge";
 // (title+description+action) — rather than inventing an unapproved shared
 // name, that composition lives locally inside each Workspace page too; see
 // docs/ADR-FE-005-workspace-ui-strategy.md.
+
+export * from "./components/sidebar-group";
+export * from "./components/conversation-card";
+export * from "./components/chat-bubble";
+export * from "./components/template-card";
+export * from "./components/broadcast-card";
+export * from "./components/campaign-card";
+export * from "./components/contact-card";
+
+// FRD-001 Volume-4 — SidebarGroup (an extension of Volume-1's Sidebar
+// system, §6's "Communication expands into...") plus the 6 below are
+// Communication UI's presentational
+// primitives (§7: ConversationCard, ChatBubble, TemplateCard, ContactCard;
+// CampaignCard as named, plus BroadcastCard added because the Architecture
+// Review, 2026-08-11, required Broadcasts and Campaigns to be exposed as
+// the two distinct backend resources they actually are — the FRD's
+// original §7 list only anticipated one). "MessageComposer", "ConversationList"
+// (DS-001 §7's other two names) are deliberately NOT shared components —
+// same reasoning as every prior volume's forms — they bind to app-specific
+// service calls, polling, and the 24-hour compliance-window handling, built
+// inside apps/web/src/features/communication/ instead. "LabelBadge" and
+// "AttachmentViewer" (also named in §7) are not built at all this volume —
+// Labels and Attachments have zero backend support (see docs/TECH-DEBT.md).
+// "AutomationCard" isn't built either — Automation is presented as a single
+// Settings form (Card + Switch + Textarea, all pre-existing), not a list of
+// cards, since the backend exposes one Settings object, not named rules
+// (ADR-FE-008).
