@@ -1,4 +1,11 @@
-import { AnalyticsView } from "../../../features/platform/analytics-view";
+import dynamic from "next/dynamic";
+import { SkeletonCard } from "@wapp/ui";
+
+// FRD-001 Volume-9 §4.1 — code-split; this view pulls in `recharts`.
+const AnalyticsView = dynamic(
+  () => import("../../../features/platform/analytics-view").then((m) => m.AnalyticsView),
+  { loading: () => <SkeletonCard /> },
+);
 
 export default function AnalyticsPage(): React.JSX.Element {
   return (

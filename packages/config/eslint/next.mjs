@@ -1,9 +1,15 @@
 // @wapp/config — Next.js 15 App Router ESLint extension
+import jsxA11y from "eslint-plugin-jsx-a11y";
 import { baseConfig } from "./base.mjs";
 
 /** @type {import("eslint").Linter.Config[]} */
 export const nextConfig = [
   ...baseConfig,
+  // FRD-001 Volume-9 §4.2/ADR-FE-017 — eslint-plugin-jsx-a11y's own flat
+  // "recommended" preset. Previously listed as a devDependency but never
+  // actually spread into this config — every jsx-a11y rule was dormant
+  // across every app/package until this volume wired it in for real.
+  jsxA11y.flatConfigs.recommended,
   {
     rules: {
       // DS-001 / TAD-001: Pages Router is prohibited — App Router only.

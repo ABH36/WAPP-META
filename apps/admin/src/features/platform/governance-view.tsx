@@ -35,6 +35,10 @@ export function GovernanceView(): React.JSX.Element {
     queryKey: ["platform", "policies"],
     queryFn: () => governanceService.listPolicies(),
     enabled: canView,
+    // FRD-001 Volume-9 §4.1/§8 — Super-Admin-only, rarely-changed security
+    // config; writes still invalidate this key immediately (see
+    // handleSave), so a longer window never shows stale post-write data.
+    staleTime: 2 * 60_000,
   });
 
   const complianceQuery = useQuery({

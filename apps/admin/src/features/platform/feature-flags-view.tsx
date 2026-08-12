@@ -28,6 +28,11 @@ export function FeatureFlagsView(): React.JSX.Element {
     queryKey: ["platform", "feature-flags"],
     queryFn: () => featureFlagsService.list(),
     enabled: canView,
+    // FRD-001 Volume-9 §4.1/§8 — Super-Admin-only, rarely-toggled config;
+    // the global 30s default is unnecessarily short for this data. Writes
+    // still invalidate this key immediately (see handleSetEnabled), so a
+    // longer window never shows stale data after this admin's own action.
+    staleTime: 2 * 60_000,
   });
 
   const handleSetEnabled = async (flagKey: FeatureFlagKey, enabled: boolean) => {

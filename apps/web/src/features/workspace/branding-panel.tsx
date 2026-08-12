@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Permission } from "@wapp/shared-types";
 import { Building2, Trash2, Upload } from "lucide-react";
@@ -85,9 +86,15 @@ export function BrandingPanel(): React.JSX.Element {
       {error ? <Alert variant="danger">{error}</Alert> : null}
 
       <div className="flex items-center gap-4">
-        <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
           {logoUrl ? (
-            <img src={logoUrl} alt="Workspace logo" className="h-full w-full object-contain" />
+            <Image
+              src={logoUrl}
+              alt="Workspace logo"
+              fill
+              sizes="80px"
+              className="object-contain"
+            />
           ) : (
             <Building2 className="h-8 w-8 text-neutral-400" aria-hidden />
           )}

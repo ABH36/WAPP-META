@@ -34,6 +34,12 @@ export function DashboardView(): React.JSX.Element {
     queryKey: ["platform", "dashboard"],
     queryFn: () => dashboardService.snapshot(),
     enabled: canView,
+    // FRD-001 Volume-9 §4.1/§8 — includes live systemHealth; the global
+    // 30s staleTime is too coarse for infra status an operator relies on
+    // for incident response. Same 15s-polling precedent Communication's
+    // Inbox established in Volume-4 (no WebSocket/SSE exists anywhere).
+    staleTime: 15_000,
+    refetchInterval: 15_000,
   });
   const billingSnapshotQuery = useQuery({
     queryKey: ["platform", "billing", "dashboard"],

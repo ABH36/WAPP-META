@@ -8,6 +8,9 @@ describe("PlatformUserCard", () => {
       <PlatformUserCard
         fullName="Jane Admin"
         email="jane@wapp.internal"
+        // PlatformUserCard's own `role` prop is a business PlatformRole
+        // value, unrelated to the ARIA `role` attribute.
+        // eslint-disable-next-line jsx-a11y/aria-role
         role="PLATFORM_SUPER_ADMIN"
         isActive
         lastLoginAt="2026-08-01T00:00:00.000Z"
@@ -23,6 +26,7 @@ describe("PlatformUserCard", () => {
       <PlatformUserCard
         fullName="Jane"
         email="jane@wapp.internal"
+        // eslint-disable-next-line jsx-a11y/aria-role -- see note above
         role="PLATFORM_SUPPORT_EXECUTIVE"
         isActive={false}
         lastLoginAt={null}

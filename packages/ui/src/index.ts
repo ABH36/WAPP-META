@@ -127,6 +127,20 @@ export * from "./components/announcement-card";
 export * from "./components/feature-flag-card";
 export * from "./components/maintenance-banner";
 
+export * from "./components/dialog";
+export * from "./components/skip-link";
+export * from "./components/route-error";
+
+// FRD-001 Volume-9 — Performance, Accessibility & PWA. `Dialog` (+
+// `DialogHeader`/`DialogTitle`/`DialogDescription`/`DialogFooter`) is
+// DS-001 §4's "Modal" primitive, deferred since Volume-1 until a real
+// accessible-dialog requirement existed (first named as missing by
+// Volume-5's Lead Detail Convert flow). Built on the native `<dialog>`
+// element for free focus-trapping/Escape-to-close/focus-return rather
+// than a hand-rolled implementation. `SkipLink` is new — no screen before
+// this volume needed one since none had complex enough layouts to make
+// keyboard-only navigation past the sidebar/header meaningfully slow.
+
 // FRD-001 Volume-8 — Platform Administration UI's presentational primitives.
 // §7 also names PlatformStatCard, WorkspaceRegistryTable, BillingOperationCard,
 // and AuditTimeline/AnalyticsChart, none of which were built as separate

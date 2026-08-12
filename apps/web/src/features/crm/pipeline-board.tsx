@@ -118,6 +118,18 @@ export function PipelineBoard(): React.JSX.Element {
 
   const deals = dealsQuery.data?.items ?? [];
 
+  // FRD-001 Volume-9 §4.1/§10 — `onDragOver` fires continuously while
+  // dragging (setDragOverColumn on every event), re-rendering this
+  // component many times per second during a single drag gesture; without
+  // memoization this re-filters up to 200 deals into 6 columns on every one
+  // of those renders. Recomputed only when `deals` itself changes.
+  const dealsByStage = React.useMemo(() => {
+    const map = new Map<DealStage, DealSummary[]>();
+    for (const stage of COLUMNS) map.set(stage, []);
+    for (const deal of deals) map.get(deal.stage)?.push(deal);
+    return map;
+  }, [deals]);
+
   return (
     <div className="flex flex-col gap-4">
       {error ? <Alert variant="danger">{error}</Alert> : null}
@@ -155,7 +167,7 @@ export function PipelineBoard(): React.JSX.Element {
 
       <div className="flex flex-col gap-4 md:flex-row md:overflow-x-auto md:pb-2">
         {COLUMNS.map((stage) => {
-          const columnDeals = deals.filter((d) => d.stage === stage);
+          const columnDeals = dealsByStage.get(stage) ?? [];
           const totalValue = columnDeals.reduce((sum, d) => sum + d.value, 0);
           return (
             <PipelineColumn

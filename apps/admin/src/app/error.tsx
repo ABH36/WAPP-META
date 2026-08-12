@@ -1,9 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle } from "lucide-react";
-import { Button, EmptyState } from "@wapp/ui";
+import { RouteError } from "@wapp/ui";
 
+/**
+ * Root Error Boundary. FRD-001 Volume-9 extracted the actual
+ * presentational body into `@wapp/ui`'s `RouteError`, reused by every
+ * nested route's own `error.tsx` too — this file stays the one place
+ * `console.error` reporting happens for errors that escape all the way
+ * to the root. Unlike every nested `error.tsx` (already inside a parent
+ * layout's own `<main>`), this one renders with no enclosing landmark at
+ * all — wrapped here, not inside `RouteError` itself, to avoid a
+ * duplicate nested `<main>` in the common case.
+ */
 export default function RootError({
   error,
   reset,
@@ -16,21 +25,8 @@ export default function RootError({
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <EmptyState
-        icon={<AlertTriangle className="h-10 w-10" aria-hidden />}
-        title="Something went wrong"
-        description={
-          error.digest
-            ? `An unexpected error occurred. Reference: ${error.digest}`
-            : "An unexpected error occurred. Please try again."
-        }
-        action={
-          <Button variant="primary" onClick={reset}>
-            Try again
-          </Button>
-        }
-      />
-    </div>
+    <main>
+      <RouteError error={error} reset={reset} />
+    </main>
   );
 }

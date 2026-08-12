@@ -5,7 +5,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LeadStatus, Permission } from "@wapp/shared-types";
-import { Alert, Badge, Button, Card, Input, Select, SkeletonText, Textarea } from "@wapp/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Dialog,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Select,
+  SkeletonText,
+  Textarea,
+} from "@wapp/ui";
 import { leadService, type UpdateLeadPayload } from "../../services/lead.service";
 import { teamService } from "../../services/team.service";
 import { useHasFullPermission, useHasPermission } from "../../lib/permissions";
@@ -20,12 +34,10 @@ interface LeadDetailProps {
  * FRD-001 Volume-5 §4.2 — a converted Lead (`convertedAt` set) is
  * permanently read-only: edit/assign/status/archive all reject once
  * converted (Architecture Review, 2026-08-11) — the detail view disables
- * every control rather than letting the user hit a 400. Convert itself
- * has no confirmation dialog primitive available (Modal is still
- * deferred per DS-001's incremental-addition convention), so it's gated
- * behind a plain "Convert to Customer" button with an inline warning
- * instead — irreversible, but not hidden behind extra UI machinery this
- * volume doesn't have.
+ * every control rather than letting the user hit a 400. Convert is
+ * irreversible, so it's gated behind a real confirmation `Dialog`
+ * (FRD-001 Volume-9 — DS-001's Modal primitive, unavailable until now)
+ * rather than the plain unconfirmed button this volume shipped with.
  */
 export function LeadDetail({ leadId }: LeadDetailProps): React.JSX.Element {
   const router = useRouter();
@@ -36,6 +48,7 @@ export function LeadDetail({ leadId }: LeadDetailProps): React.JSX.Element {
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [acting, setActing] = React.useState(false);
   const [form, setForm] = React.useState<UpdateLeadPayload | null>(null);
+  const [confirmingConvert, setConfirmingConvert] = React.useState(false);
 
   const leadQuery = useQuery({
     queryKey: ["crm", "lead", leadId],
@@ -124,9 +137,11 @@ export function LeadDetail({ leadId }: LeadDetailProps): React.JSX.Element {
     try {
       const result = await leadService.convert(leadId);
       await invalidate();
+      setConfirmingConvert(false);
       router.push(`/crm/customers/${result.customerId}`);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Failed to convert lead.");
+      setConfirmingConvert(false);
     } finally {
       setActing(false);
     }
@@ -292,8 +307,7 @@ export function LeadDetail({ leadId }: LeadDetailProps): React.JSX.Element {
                 type="button"
                 variant="primary"
                 size="sm"
-                loading={acting}
-                onClick={() => void handleConvert()}
+                onClick={() => setConfirmingConvert(true)}
               >
                 Convert to Customer
               </Button>
@@ -301,6 +315,40 @@ export function LeadDetail({ leadId }: LeadDetailProps): React.JSX.Element {
           </div>
         </Card>
       ) : null}
+
+      <Dialog
+        open={confirmingConvert}
+        onOpenChange={setConfirmingConvert}
+        labelledBy="convert-lead-title"
+      >
+        <DialogHeader>
+          <DialogTitle id="convert-lead-title">Convert this lead to a Customer?</DialogTitle>
+          <DialogDescription>
+            This is permanent. The lead becomes read-only and a new Customer record is created — it
+            cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={acting}
+            onClick={() => setConfirmingConvert(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            loading={acting}
+            onClick={() => void handleConvert()}
+          >
+            Convert
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

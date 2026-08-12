@@ -26,6 +26,10 @@ export function MaintenanceView(): React.JSX.Element {
     queryKey: ["platform", "maintenance"],
     queryFn: () => maintenanceService.getStatus(),
     enabled: canView,
+    // FRD-001 Volume-9 §4.1/§8 — this gate blocks tenant login platform-wide;
+    // a stale "operating normally" read has amplified consequences here.
+    staleTime: 15_000,
+    refetchInterval: 15_000,
   });
 
   const handleToggle = async (enabled: boolean) => {

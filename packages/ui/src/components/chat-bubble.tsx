@@ -32,7 +32,7 @@ export const ChatBubble = React.forwardRef<HTMLDivElement, ChatBubbleProps>(
           className={cn(
             "text-body-sm max-w-[75%] rounded-lg px-3 py-2",
             outbound
-              ? "bg-brand-500 text-white"
+              ? "bg-brand-600 text-white"
               : "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-50",
           )}
         >

@@ -38,6 +38,9 @@ export const CardTitle = React.forwardRef<
   HTMLHeadingElement,
   React.HTMLAttributes<HTMLHeadingElement>
 >(({ className, ...props }, ref) => (
+  // Content comes from the spread `props.children`, which the rule can't
+  // see statically; every real usage across the app passes real text content.
+  // eslint-disable-next-line jsx-a11y/heading-has-content
   <h3
     ref={ref}
     className={cn("text-h3 text-neutral-900 dark:text-neutral-50", className)}

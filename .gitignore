@@ -9,6 +9,11 @@ build/
 out/
 *.tsbuildinfo
 
+# FRD-001 Volume-9 — Serwist-generated service worker (apps/web only),
+# rebuilt from apps/web/src/app/sw.ts on every `next build`.
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+
 # Environment — never commit secrets (TAD-001 SEC-007 / DEP-005)
 .env
 .env.local
@@ -21,6 +26,12 @@ out/
 # Testing
 coverage/
 .nyc_output/
+
+# FRD-001 Volume-9 — Playwright artifacts
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
 
 # Logs
 *.log

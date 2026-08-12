@@ -30,6 +30,6 @@ describe("Button", () => {
 
   it("applies the destructive variant class", () => {
     render(<Button variant="destructive">Delete</Button>);
-    expect(screen.getByRole("button").className).toContain("bg-danger-500");
+    expect(screen.getByRole("button").className).toContain("bg-danger-700");
   });
 });

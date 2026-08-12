@@ -47,6 +47,11 @@ export function BreakGlassView(): React.JSX.Element {
     queryKey: ["platform", "support", "sessions", status],
     queryFn: () => breakGlassService.listSessions({ status: status || undefined, limit: 50 }),
     enabled: canView,
+    // FRD-001 Volume-9 §4.1/§8 — Break-Glass approvals are a multi-operator
+    // coordination surface (one admin requests, another approves); the
+    // global 30s staleTime is too coarse for that handoff.
+    staleTime: 10_000,
+    refetchInterval: 10_000,
   });
 
   const overviewQuery = useQuery({

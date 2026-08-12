@@ -19,7 +19,15 @@ const GUEST_ONLY_PATHS = [
   "/forgot-password",
   "/reset-password",
 ];
-const PUBLIC_PATHS = ["/"];
+const PUBLIC_PATHS = [
+  "/",
+  // FRD-001 Volume-9 §4.3/§4.4 — the service worker's offline navigation
+  // fallback (sw.ts's `fallbacks.entries`) precaches this page's real
+  // content the first time a signed-in-or-not browser visits while online;
+  // if this were gated like every other route, an unauthenticated device
+  // would precache the /login redirect instead of the actual offline page.
+  "/offline",
+];
 
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
@@ -48,5 +56,13 @@ export function middleware(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)"],
+  // FRD-001 Volume-9 — robots.txt/sitemap.xml/manifest.webmanifest/sw.js
+  // added to the exclusion list alongside favicon.ico: none of these are
+  // "pages," they're crawler/PWA infrastructure files that must never be
+  // auth-gated. Caught by Lighthouse's `robots-txt` audit — an
+  // unauthenticated crawler request for /robots.txt was being redirected
+  // to /login (a real bug, not a Lighthouse false positive).
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)",
+  ],
 };

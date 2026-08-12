@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Permission } from "@wapp/shared-types";
@@ -93,11 +94,15 @@ export function SettingsHome(): React.JSX.Element {
                 label="Branding"
                 value={
                   settingsQuery.data.branding.logoUrl ? (
-                    <img
-                      src={settingsQuery.data.branding.logoUrl}
-                      alt="Workspace logo"
-                      className="h-8 w-auto object-contain"
-                    />
+                    <div className="relative h-8 w-24">
+                      <Image
+                        src={settingsQuery.data.branding.logoUrl}
+                        alt="Workspace logo"
+                        fill
+                        sizes="96px"
+                        className="object-contain object-left"
+                      />
+                    </div>
                   ) : (
                     "No logo set"
                   )

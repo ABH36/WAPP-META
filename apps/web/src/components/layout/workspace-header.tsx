@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Menu, Moon, Sun } from "lucide-react";
+import { Menu, Moon, Sun, WifiOff } from "lucide-react";
 import { Theme } from "@wapp/shared-types";
-import { Header } from "@wapp/ui";
+import { Badge, Header } from "@wapp/ui";
 import { useAuthStore } from "../../stores/auth-store";
 import { useUiStore } from "../../stores/ui-store";
 import { useThemeStore } from "../../stores/theme-store";
 import { syncSidebar, syncTheme } from "../../lib/preference-sync";
+import { useOnlineStatus } from "../../lib/use-online-status";
 
 /**
  * FRD-001 Volume-1 §5/§7 — DS-001 §5's "topbar (workspace switcher — future
@@ -25,6 +26,7 @@ export function WorkspaceHeader(): React.JSX.Element {
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
   const user = useAuthStore((s) => s.user);
+  const isOnline = useOnlineStatus();
 
   const handleToggleSidebar = (): void => {
     const next = !sidebarCollapsed;
@@ -52,6 +54,12 @@ export function WorkspaceHeader(): React.JSX.Element {
       }
       right={
         <>
+          {!isOnline ? (
+            <Badge variant="warning">
+              <WifiOff className="h-3 w-3" aria-hidden />
+              Offline
+            </Badge>
+          ) : null}
           <button
             type="button"
             onClick={handleToggleTheme}

@@ -1,6 +1,24 @@
 packages:
   - "apps/*"
   - "packages/*"
+packageExtensions:
+  # FRD-001 Volume-9 — @hookform/resolvers/zod imports zod but never
+  # declares it as a real dependency, so it fell through to pnpm's shared
+  # virtual-store fallback slot for undeclared/phantom imports — which
+  # started resolving to zod@4 (a genuinely new, correctly private/isolated
+  # dependency of @serwist/build/next/webpack-plugin) once this volume
+  # installed serwist, causing a real ZodType shape mismatch at every
+  # zodResolver() call site (the app's schemas are all zod v3). A global
+  # `overrides: {zod: ...}` was tried first and rejected — it force-
+  # downgrades @serwist/build's own explicit "zod": "4.4.3" pin too,
+  # breaking it at runtime ("schema.implementAsync is not a function").
+  # This instead patches @hookform/resolvers's own manifest to declare the
+  # dependency it always actually needed, giving it a private, correctly
+  # isolated zod v3 instance — zero effect on any other package's own
+  # resolution, including @serwist/build's v4.
+  "@hookform/resolvers":
+    dependencies:
+      zod: ^3.23.8
 allowBuilds:
   "@nestjs/core": true
   bcrypt: true

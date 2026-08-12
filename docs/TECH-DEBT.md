@@ -764,3 +764,63 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** backend work to add a per-workspace override layer (e.g. a `workspaceId`-scoped feature-flag collection consulted before falling back to the platform-wide value), followed by a per-workspace override UI — likely surfaced from the Workspace Registry's workspace-detail view rather than this screen.
 
 **Trigger to revisit:** a real need to enable/disable a feature for a single tenant (e.g. a beta customer) without affecting the rest of the platform.
+
+---
+
+## TD-051 — Dark-mode Badge contrast falls narrowly short of WCAG AA for `danger`/`info` variants
+
+**Raised:** 2026-08-12 (FRD-001 Volume-9, Performance/Accessibility/PWA)
+**Status:** Open
+
+**What:** A computed WCAG relative-luminance audit of every design-token pairing found `Badge`'s dark-mode `danger`/`info` variants (`text-danger-500`/`text-info-500` on a `bg-danger-500/10`/`bg-info-500/10` tint over a typical `neutral-900` background) measure 4.31:1 and 4.35:1 respectively — just under the 4.5:1 AA threshold for this 12px caption-sized text. The `success`/`warning` variants pass comfortably (6.73:1/7.10:1); only these two fall short, and only in dark mode.
+
+**Why accepted for now:** Resolved 2026-08-12, Architecture Review: "Accessibility score remains an engineering target rather than a hard release gate. Remaining exceptions, if any, shall be documented as Technical Debt." The gap is narrow (3–4% short), confined to a 12px caption element that never conveys status by color alone (every Badge usage pairs the color with a real text label — "FAILED"/"ERROR"/etc.), and closing it properly requires either inventing a new intermediate color stop (the `danger`/`info` scales only define 50/500/700, unlike `neutral`/`brand`'s full 50–900 range) or shifting dark-mode badge text to a different, less semantically "danger-red"/"info-blue" shade — both real design decisions, not a one-line fix, and disproportionate to the size of the gap.
+
+**Closing this out looks like:** either add `danger-400`/`info-400` stops to `tailwind.preset.ts` (computed to land ≥4.5:1 against `neutral-900` at the same 10% tint) and use them for dark-mode `Badge` text specifically, or bump the dark-mode tint's opacity in the _opposite_ direction confirmed during this volume's audit (lower opacity keeps the background closer to `neutral-900`'s very low luminance, preserving contrast against the lighter text — raising it, counter-intuitively, reduces contrast since it pulls the background luminance toward the text's own hue).
+
+**Trigger to revisit:** a broader dark-mode design-token pass, or a real accessibility complaint/audit finding tied to this specific pairing.
+
+---
+
+## TD-052 — Public Website has no real SEO content (infrastructure only)
+
+**Raised:** 2026-08-12 (FRD-001 Volume-9, Performance/Accessibility/PWA)
+**Status:** Open
+
+**What:** `apps/web`'s `(public)/page.tsx` is still the exact FRD-001 Volume-1 placeholder ("Marketing content ships with the Public Website module... built when the Public Website module begins, per the approved Module Development Order," PRD-008 Vol 2 §4) — no real marketing page, blog, pricing page, or any other public-facing content exists yet. This volume built the SEO _mechanism_ only: a `generateMetadata`/static-`metadata` convention (demonstrated on the root layout's Open Graph/Twitter defaults, deliberately not forced onto the placeholder page itself — see below), `robots.ts` (disallows every authenticated route, allows `/`), and `sitemap.ts` (lists exactly the one real public URL that exists today).
+
+**Why accepted for now:** Resolved 2026-08-12, Architecture Review: "SEO scope is infrastructure only. Per-page marketing SEO remains deferred until the Public Website module exists." Fabricating per-page marketing copy/metadata for the placeholder page was explicitly rejected during this volume's own implementation — it would need to be entirely redone once real content ships, and risks misrepresenting a Phase-1 scaffolding page as real marketing content in search results.
+
+**Closing this out looks like:** when the Public Website module (PRD-008 Vol 2) ships real pages, each one adds its own `generateMetadata`/`metadata` export following the convention `app/layout.tsx` already establishes (title/description/OG/Twitter), and `sitemap.ts` grows one entry per real page.
+
+**Trigger to revisit:** the Public Website module beginning implementation, per SDP-001's Module Development Order.
+
+---
+
+## TD-053 — CRM Pipeline Kanban board has an unbounded, unvirtualized 200-deal client-side fetch
+
+**Raised:** 2026-08-12 (FRD-001 Volume-9, Performance/Accessibility/PWA — originally built FRD-001 Volume-5)
+**Status:** Open
+
+**What:** `pipeline-board.tsx` fetches `dealService.list({page: 1, limit: 200})` and groups the full result client-side into 6 Kanban columns — no server-side pagination per column, no client-side virtualization. A workspace with more than 200 open deals silently truncates the board (deals beyond the 200th in list order never appear), and every one of the 200 deals is held in memory and re-grouped (now memoized as of this volume — see `docs/ADR-FE-017-production-frontend-strategy.md`) regardless of how many are actually visible in the viewport at once.
+
+**Why accepted for now:** Resolved 2026-08-12, Architecture Review: "Existing scalability observations remain documented... remain Technical Debt rather than architectural changes." This is a pre-existing condition from Volume-5, not introduced by this volume — this volume's own contribution was fixing the _re-render_ cost (memoizing the grouping) without addressing the underlying _fetch-size_ ceiling, which is a genuine architectural change (server-side per-column pagination, or a "load more" pattern per column) out of scope for a hardening-only volume.
+
+**Closing this out looks like:** either a dedicated pipeline endpoint that paginates per-stage server-side, or client-side virtualization (e.g. `@tanstack/react-virtual`, not currently installed anywhere in this repo) if the 200-item fetch itself is kept but rendering needs to scale further.
+
+**Trigger to revisit:** a real customer workspace approaching or exceeding 200 concurrently-open deals, or a support report of deals "missing" from the Pipeline view.
+
+---
+
+## TD-054 — PWA scope is `apps/web`-only; deeper PWA capabilities are unbuilt
+
+**Raised:** 2026-08-12 (FRD-001 Volume-9, Performance/Accessibility/PWA)
+**Status:** Open
+
+**What:** Per the Architecture Review's explicit scope decision, `apps/admin` has no manifest, service worker, or install experience — it remains a standard authenticated console. Within `apps/web`'s own PWA implementation, several capabilities named in FRD-001 Volume-9's planning document are explicitly out of scope for this volume (§14 "Out of Scope") or simply not built: Push Notifications, Background Sync/Periodic Background Sync (no offline mutation queueing of any kind — BR-005 forbids offline mutations entirely, so this may never be needed), and any richer install-prompt UX beyond the current single dismissible toast (e.g. an in-app "Install" menu item independent of the browser's `beforeinstallprompt` timing).
+
+**Why accepted for now:** Resolved 2026-08-12, Architecture Review — apps/admin's exclusion is a direct, explicit scope decision (it "remains a standard authenticated administration console"), and Push Notifications/Background Sync were named Out of Scope in the FRD's own §14 from the start, not discovered gaps.
+
+**Closing this out looks like:** a dedicated future FRD volume (or extension of this one) if a real product need for cross-tenant push notifications, background sync, or an `apps/admin` install experience emerges — none is anticipated given `apps/admin`'s internal-only, always-online operator-console nature.
+
+**Trigger to revisit:** a real product requirement for any of the above — none currently exists.

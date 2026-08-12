@@ -1,10 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle } from "lucide-react";
-import { Button, EmptyState } from "@wapp/ui";
+import { RouteError } from "@wapp/ui";
 
-/** FRD-001 Volume-1 §13/§14 — root Error Boundary. Never renders the raw error message (TAD-001 ERR-002 — same rule the backend's HttpExceptionFilter already enforces); `error.digest` (Next.js's server-side correlation id) is the only thing surfaced, for support correlation. */
+/**
+ * FRD-001 Volume-1 §13/§14 — root Error Boundary. FRD-001 Volume-9
+ * extracted the actual presentational body into `@wapp/ui`'s
+ * `RouteError`, reused by every nested route's own `error.tsx` too — this
+ * file stays the one place `console.error` reporting happens for errors
+ * that escape all the way to the root. Unlike every nested `error.tsx`
+ * (already inside a parent layout's own `<main>`), this one renders with
+ * no enclosing landmark at all — wrapped here, not inside `RouteError`
+ * itself, to avoid a duplicate nested `<main>` in the common case.
+ */
 export default function RootError({
   error,
   reset,
@@ -13,26 +21,13 @@ export default function RootError({
   reset: () => void;
 }): React.JSX.Element {
   React.useEffect(() => {
-    // Volume-1 has no error-reporting service wired up yet; this is the interim visibility mechanism.
+    // No error-reporting service wired up yet; this is the interim visibility mechanism.
     console.error("Unhandled route error", error);
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <EmptyState
-        icon={<AlertTriangle className="h-10 w-10" aria-hidden />}
-        title="Something went wrong"
-        description={
-          error.digest
-            ? `An unexpected error occurred. Reference: ${error.digest}`
-            : "An unexpected error occurred. Please try again."
-        }
-        action={
-          <Button variant="primary" onClick={reset}>
-            Try again
-          </Button>
-        }
-      />
-    </div>
+    <main>
+      <RouteError error={error} reset={reset} />
+    </main>
   );
 }

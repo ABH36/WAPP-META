@@ -1,4 +1,11 @@
-import { ReportsView } from "../../../../features/billing/reports-view";
+import dynamic from "next/dynamic";
+import { SkeletonCard } from "@wapp/ui";
+
+// FRD-001 Volume-9 §4.1 — code-split; this view pulls in `recharts`.
+const ReportsView = dynamic(
+  () => import("../../../../features/billing/reports-view").then((m) => m.ReportsView),
+  { loading: () => <SkeletonCard /> },
+);
 
 export default function BillingReportsPage(): React.JSX.Element {
   return (

@@ -3,13 +3,17 @@
  * sidebar/nav chrome — minimizes distraction on the highest-drop-off screens").
  * Screens (Register, Login, Verify Email, Forgot Password, ...) are built with
  * the Identity module (SDP-001 §6, Module Development Order step 1).
+ *
+ * `<main>` wrapper added FRD-001 Volume-9 (Lighthouse's `landmark-one-main`
+ * audit caught its absence — no sidebar means no other layout here ever
+ * added one, unlike the (workspace)/(platform) shells).
  */
 export default function AuthLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>): React.JSX.Element {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
+    <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
       <div className="w-full max-w-[420px]">{children}</div>
-    </div>
+    </main>
   );
 }
