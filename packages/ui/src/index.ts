@@ -119,6 +119,28 @@ export * from "./components/api-key-card";
 export * from "./components/webhook-card";
 export * from "./components/export-job-card";
 export * from "./components/health-status-card";
+export * from "./components/platform-user-card";
+export * from "./components/support-ticket-card";
+export * from "./components/break-glass-card";
+export * from "./components/governance-card";
+export * from "./components/announcement-card";
+export * from "./components/feature-flag-card";
+export * from "./components/maintenance-banner";
+
+// FRD-001 Volume-8 — Platform Administration UI's presentational primitives.
+// §7 also names PlatformStatCard, WorkspaceRegistryTable, BillingOperationCard,
+// and AuditTimeline/AnalyticsChart, none of which were built as separate
+// components: PlatformStatCard is exactly SummaryCard's "label + value +
+// description" shape, reused directly (same ReportCard/ForecastCard
+// precedent as every prior volume); WorkspaceRegistryTable composes the
+// existing generic Table/TableHeader/TableRow/TableCell primitives
+// (Volume-2) directly in the feature file rather than a bespoke wrapper;
+// BillingOperationCard is covered by the existing InvoiceCard/PaymentCard
+// (Volume-6) for those two sub-resources, with Subscription rows composed
+// directly from Card/Badge/StageBadge (no dedicated SubscriptionCard
+// exists in Billing's own tenant-facing volume either); AuditTimeline
+// reuses Timeline/TimelineItem (Volume-5); AnalyticsChart reuses
+// RevenueChart (Volume-5/6). See docs/ADR-FE-015-platform-administration-ui-strategy.md.
 
 // FRD-001 Volume-7 — Settings UI's presentational primitives. §7 also names
 // BrandingCard, SessionCard, and LoginHistoryTable, but none of the three

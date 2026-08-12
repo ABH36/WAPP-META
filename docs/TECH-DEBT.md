@@ -689,3 +689,78 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** a dedicated frontend effort scoped around the Meta Embedded Signup flow specifically — obtaining and configuring a Meta App ID, loading the Facebook JS SDK, implementing the popup + `postMessage` listener, and wiring the resulting `code`/`wabaId`/`phoneNumberId` into the existing (and already-working) `POST communication/whatsapp/connect` route. The backend side of this needs no further work — it's purely a frontend integration effort once Meta app credentials are provisioned.
 
 **Trigger to revisit:** a real customer onboarding need (a new workspace with no WhatsApp connection yet has no self-service path to connect one today), or a dedicated WhatsApp Onboarding initiative.
+
+---
+
+## TD-046 — Global Announcements have no lifecycle (status/scheduling/publish/archive)
+
+**Raised:** 2026-08-12 (FRD-001 Volume-8, Platform Administration UI)
+**Status:** Open
+
+**What:** `PlatformAnnouncementController` exposes only `POST /platform/announcements` and `GET /platform/announcements` — no status field (Active/Scheduled/Expired), no scheduled-publish date, and no Archive route exist anywhere on `PlatformAnnouncementSummary` or its service. The domain event an announcement create fires also has zero consumers today — nothing is ever actually delivered to or surfaced for a tenant.
+
+**Why accepted for now:** Resolved 2026-08-12, Architecture Review: "minimal Create + List only, no fabricated Active/Scheduled/Expired states." `announcements-view.tsx` and the new `AnnouncementCard` primitive expose Create and List exclusively; no status badge or scheduling UI was built, since inventing client-side lifecycle state with no backend counterpart would misrepresent what the feature actually does.
+
+**Closing this out looks like:** backend work first — a status field and state machine on `PlatformAnnouncementSummary`, a scheduled-publish mechanism, an Archive route, and a real consumer for the announcement-created domain event (e.g. a tenant-facing banner or notification) — followed by the corresponding frontend lifecycle UI.
+
+**Trigger to revisit:** a real product need for scheduled or time-limited platform-wide messaging, or a tenant-facing consumer being built for the existing (currently unconsumed) domain event.
+
+---
+
+## TD-047 — Platform Analytics has no User Growth, Subscription Trends, or Activity Trends
+
+**Raised:** 2026-08-12 (FRD-001 Volume-8, Platform Administration UI)
+**Status:** Open
+
+**What:** FRD-001 Volume-8's planning document named 6 Analytics categories; `GET /platform/analytics` and `GET /platform/kpis` together only cover Platform KPIs, Revenue, and Workspace Growth. "User Growth," "Subscription Trends," and "Activity Trends" have no backend endpoint, service method, or DTO anywhere in `apps/api`'s platform module — confirmed by a direct read of every platform analytics service file.
+
+**Why accepted for now:** Resolved 2026-08-12, Architecture Review: represent only the 3 real categories, no fabricated data. `analytics-view.tsx` renders Platform KPIs/Revenue/Workspace Growth via `SummaryCard` tiles and `RevenueChart` categorical comparisons only; the other 3 named categories are simply absent from the screen rather than shown empty or mocked.
+
+**Closing this out looks like:** backend work to add the missing aggregation queries (user signup/growth over time, subscription tier transition trends, platform/tenant activity trends) and expose them via new or extended `GET /platform/analytics`-family routes, followed by extending `analytics-view.tsx` with the corresponding chart sections.
+
+**Trigger to revisit:** a Product/Architect decision that these 3 categories are needed for platform operations reporting, prioritized against other backend work.
+
+---
+
+## TD-048 — Break-Glass has no Reject route for a `REQUESTED` session
+
+**Raised:** 2026-08-12 (FRD-001 Volume-8, Platform Administration UI)
+**Status:** Open
+
+**What:** `break-glass.service.ts`'s available routes are `requestAccess`/`approveAccess`/`startSession`/`endSession`/`listSessions`/`getWorkspaceOverview` — there is no `PATCH .../reject` or equivalent on `PlatformBreakGlassController`. A `REQUESTED` session can only ever transition to `APPROVED`; there is no way for a Super-Admin to formally deny a request (it can only be left pending indefinitely or expire).
+
+**Why accepted for now:** Resolved 2026-08-12, Architecture Review: "Break-Glass Approve-only action per the approved resolution" — no Reject UI was built since no backend route exists to call. `break-glass-view.tsx` offers Approve on `REQUESTED` sessions and nothing else.
+
+**Closing this out looks like:** a `PATCH /platform/support/access/:id/reject` (or similar) route and a `REJECTED` (or reuse of an existing terminal) `SupportSessionStatus` value on the backend, followed by adding a Reject action alongside Approve in `break-glass-view.tsx`.
+
+**Trigger to revisit:** an operational need to explicitly deny and record a rejected Break-Glass request, rather than leaving it to expire silently.
+
+---
+
+## TD-049 — No Reset Password route for Platform Users
+
+**Raised:** 2026-08-12 (FRD-001 Volume-8, Platform Administration UI)
+**Status:** Open
+
+**What:** `platform-users.service.ts`'s available routes are `list`/`create`/`setActive`/`updateRole` — there is no reset-password route on `PlatformUsersController`. A Super-Admin has no self-service way to reset another Platform User's password from the console; the only account-recovery path today is whatever the Platform User's own forgot-password flow (if any) provides.
+
+**Why accepted for now:** No Reset Password UI was built anywhere in `platform-users-view.tsx` since no backend route exists to call — building a form against a nonexistent endpoint was ruled out during implementation.
+
+**Closing this out looks like:** a `POST /platform/users/:id/reset-password` (or equivalent, e.g. issuing a reset token/temporary password) route on the backend, followed by adding the corresponding action to `platform-users-view.tsx`, gated the same as every other write action (`useHasFullPlatformPermission(MANAGE_PLATFORM_USERS)`).
+
+**Trigger to revisit:** an operational need — a locked-out Platform User with no working self-service recovery path.
+
+---
+
+## TD-050 — Feature Flags have no per-workspace override
+
+**Raised:** 2026-08-12 (FRD-001 Volume-8, Platform Administration UI)
+**Status:** Open
+
+**What:** `PlatformFeatureFlagsService` supports exactly one global override tier per `FeatureFlagKey` (`enabled: boolean | null`, where `null` means "inherit the workspace-level default"). There is no per-workspace override mechanism anywhere on the backend — a Super-Admin can only flip a flag platform-wide, never for a single tenant.
+
+**Why accepted for now:** Resolved 2026-08-12, Architecture Review: "single global override per flag, not per-workspace — Workspace Overrides has no backend support anywhere." `feature-flags-view.tsx` and the new `FeatureFlagCard` primitive expose only the single global Enable/Disable action per flag; no per-workspace UI was built.
+
+**Closing this out looks like:** backend work to add a per-workspace override layer (e.g. a `workspaceId`-scoped feature-flag collection consulted before falling back to the platform-wide value), followed by a per-workspace override UI — likely surfaced from the Workspace Registry's workspace-detail view rather than this screen.
+
+**Trigger to revisit:** a real need to enable/disable a feature for a single tenant (e.g. a beta customer) without affecting the rest of the platform.
