@@ -569,3 +569,65 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** exposing the reverse link somewhere — either a `sourceLeadId` field added to `CustomerSummary` (cheapest, since the relationship already exists in the data the convert transaction wrote), or a dedicated `customerId` filter on `GET /crm/leads`. Either unblocks a simple "View originating Lead" link on `customer-detail.tsx`.
 
 **Trigger to revisit:** a real support/sales workflow need to trace a Customer back to its originating Lead (common in attribution/source-effectiveness analysis), or a future CRM cross-linking initiative.
+
+---
+
+## TD-038 — No Invoice PDF/download endpoint
+
+**Raised:** 2026-08-11 (FRD-001 Volume-6, Billing UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-6's Invoices screen (§4.4) named "View, Download" as the supported actions, but no PDF or binary download route exists anywhere in the backend — confirmed by grepping the entire `billing` and `platform` modules for `pdf`/`download` during Architecture Review. `InvoiceController` (`billing/invoices`) has exactly two routes, `GET` (list) and `GET :id` (detail), both read-only JSON — no third route of any kind.
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review, matching the explicit instruction that Invoice Download is excluded from this volume because no backend endpoint exists. `invoice-detail.tsx` renders the same fields the `GET :id` response already provides (no separate document to fetch); no attempt was made to repurpose `GET /billing/reports/export` (CSV/Excel, shaped for multi-row report data across many Invoices) into a single-invoice PDF substitute — the two are architecturally unrelated: one produces a tabular report, the other would need to render one formatted document.
+
+**Closing this out looks like:** a `GET /billing/invoices/:id/pdf` (or `/download`) route generating and streaming a formatted PDF for one Invoice — most likely reusing whatever templating/PDF-generation library the eventual choice settles on (none exists in the backend today; `exceljs`, used for Excel report exports, doesn't produce PDFs). Once it exists, `invoice-detail.tsx` gains a "Download" button following the same authenticated-blob pattern `crmService.exportReport()`/`billingService.exportReport()` already established.
+
+**Trigger to revisit:** a real customer/accounting need for a shareable, printable Invoice document (a very common expectation for any paid SaaS product), or a dedicated Billing Documents initiative.
+
+---
+
+## TD-039 — No tenant-scoped Billing History endpoint
+
+**Raised:** 2026-08-11 (FRD-001 Volume-6, Billing UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-6's Billing History Timeline (§4.6) wants a read-only feed of subscription/plan/trial/invoice/payment events, and the data genuinely exists — `BillingHistoryListener` writes 17 distinct event types into a durable `billing_history_entries` Mongo collection via `BillingHistoryRepository`, unlike Communication/CRM's purely ephemeral `EventEmitter2`-only domain events. But the only route exposing it, `GET /platform/billing/history?workspaceId=&limit=`, is Platform-operator-scoped (`PlatformPermission.VIEW_PLATFORM_BILLING`, a separate `PlatformAuthGuard`/`PlatformPermissionsGuard` system, built for Customer Support tooling per PRD-007 Volume-2 §4.5) — structurally unreachable from a tenant/Workspace session. No tenant-facing controller ever injects `BillingHistoryService`.
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review, matching the explicit instruction that Billing History Timeline is excluded from this volume: "The write-side exists, but no tenant-scoped read endpoint currently exists. No client-side approximation shall be introduced." Composing a partial timeline from the Subscription/Invoice/Payment list endpoints was explicitly rejected — it would misrepresent event coverage (missing trial-started, grace-period-entered, and other events with no corresponding list-endpoint row) and would mean simulating a "history" feature the backend doesn't actually provide in that shape, contrary to `ADR-FE-001`'s "no unsupported backend behaviour is simulated in the frontend" principle.
+
+**Closing this out looks like:** a small, workspace-scoped tenant-facing route — e.g. `GET /billing/history` on the existing `BillingReportsController` or a new dedicated controller, gated by the ordinary `BILLING_ACCESS` permission (not the Platform system) — reading from the same `BillingHistoryRepository.findByWorkspace()` the Platform route already uses. This should be cheap: the write side, the repository, and the exact response shape (`BillingHistoryEntrySummary`) all already exist; only a new controller route and permission check are needed.
+
+**Trigger to revisit:** a real tenant Owner/Administrator request for billing-event history visibility, or the next Billing volume that wants to complete §4.6.
+
+---
+
+## TD-040 — Billing Forecast has no multi-period or trial-conversion projection
+
+**Raised:** 2026-08-11 (FRD-001 Volume-6, Billing UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-6's Forecast screen (§4.8) named three distinct capabilities — Revenue Forecast, Renewal Forecast, Trial Conversion — but `apps/api`'s only forecast-shaped data is `RevenueReport.forecast: {nextRenewalDate, expectedAmount}`, a single next-renewal figure folded into the Revenue Report (`ADR-BILL-010`; confirmed zero matches for "forecast" anywhere else in the `billing` module). There is nothing resembling CRM's `ForecastReport` (`monthlyForecast`/`quarterlyForecast`/`yearlyForecast` buckets, FRD-001 Volume-5) — no multi-period revenue projection, no renewal-likelihood modeling across multiple future renewals, and no trial-conversion-probability field anywhere in `billing.types.ts`.
+
+**Why accepted for now:** Resolved 2026-08-11, Architecture Review, matching the explicit instruction: "Forecast is intentionally minimal... Renewal Forecast and Trial Conversion Forecast are excluded because no backend support exists." `forecast-view.tsx` renders only the two fields the backend actually returns (`nextRenewalDate`, `expectedAmount`, the latter null until GTM pricing is approved — TD-009) — no client-side extrapolation (e.g., projecting `expectedAmount` forward across future renewal cycles, or estimating trial-conversion likelihood from `SubscriptionStatus` history) was attempted, since either would mean inventing a commercial/statistical model the backend never specified.
+
+**Closing this out looks like:** dedicated backend work to define and compute the two missing forecast types — a periodized revenue-forecast endpoint (mirroring CRM's bucket-based `ForecastReport` shape) and a trial-conversion-probability computation (likely requiring historical trial-outcome data this Phase doesn't yet track in an aggregatable way). Both are commercial/data-modeling decisions, not something to guess at in a frontend volume.
+
+**Trigger to revisit:** a real business need for forward-looking revenue planning (once GTM pricing is approved and Plan prices are non-null, this becomes far more useful), or a dedicated Billing Analytics/Forecasting initiative.
+
+---
+
+## TD-041 — Administrator's `VIEW_ONLY` Billing permission not enforced server-side for Subscription mutations
+
+**Raised:** 2026-08-11 (FRD-001 Volume-6, Billing UI; discovered during implementation, not part of the original Architecture Review checklist)
+**Status:** Open
+
+**What:** `PermissionsGuard.canActivate` (`permissions.guard.ts`) only checks `level !== NONE` — it does not distinguish `VIEW_ONLY` from `FULL` at the framework level. `Administrator` holds `BILLING_ACCESS` at `VIEW_ONLY` per `permission-matrix.ts`, but because the guard's check is binary, `Administrator` is not actually blocked server-side today from calling `POST /billing/subscription/{upgrade,downgrade,cancel}` — only `PaymentController`'s separate, explicit `ensureOwner()` check narrows Payment/Refund recording specifically; no equivalent check exists for Subscription mutations.
+
+**Why accepted for now:** Discovered mid-implementation, 2026-08-11 — not one of the gaps the Architecture Review's own approval named going in, but flagged proactively and folded into the Architect's final Tech Debt list. `apps/web`'s `subscription-view.tsx` already gates Upgrade/Downgrade/Cancel on `useHasFullPermission(BILLING_ACCESS)` (`=== FULL`), which correctly evaluates `false` for Administrator — so no frontend change was needed to stay correct, and no UI exposes these actions to a VIEW_ONLY-level user. But this is convenience rendering only (`ADR-FE-001`, BR-004) — the backend's own `@RequirePermission` guard is supposed to be the authoritative enforcement layer, and today it isn't, for this specific case.
+
+**Closing this out looks like:** either extending `PermissionsGuard` to support a `@RequireFullPermission` variant (checking `=== FULL`, distinct from the existing `!== NONE` check) for routes that need it, or adding an explicit in-controller check to `SubscriptionController` mirroring `PaymentController`'s `ensureOwner()` pattern (though Subscription mutations are intended for `FULL`-level users generally, not Owner-only specifically, so the two controllers' fixes likely shouldn't be identical). A repo-wide audit for other routes with the same VIEW_ONLY-vs-FULL gap would be worth doing at the same time, since this pattern could recur anywhere a permission has more than two levels.
+
+**Trigger to revisit:** a security review or penetration test that would otherwise catch this, or the next volume that introduces another multi-level (`VIEW_ONLY`/`FULL`) permission with write routes, making a systemic fix worth doing once rather than per-controller.
+
+**Trigger to revisit:** a real support/sales workflow need to trace a Customer back to its originating Lead (common in attribution/source-effectiveness analysis), or a future CRM cross-linking initiative.

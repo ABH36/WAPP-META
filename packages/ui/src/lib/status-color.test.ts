@@ -5,6 +5,8 @@ import {
   DealStage,
   PaymentStatus,
   CustomerStatus,
+  SubscriptionStatus,
+  InvoiceStatus,
 } from "@wapp/shared-types";
 import { getStatusColor } from "./status-color";
 
@@ -74,5 +76,24 @@ describe("getStatusColor", () => {
     expect(getStatusColor(CustomerStatus.ARCHIVED)).toBe("neutral");
     // ACTIVE is shared with WorkspaceStatus.ACTIVE (already "success").
     expect(getStatusColor(CustomerStatus.ACTIVE)).toBe("success");
+  });
+
+  it("maps Billing's real Subscription/Invoice/Payment status values (FRD-001 Volume-6)", () => {
+    // ACTIVE/TRIAL/SUSPENDED/CANCELLED are shared with WorkspaceStatus's existing buckets.
+    expect(getStatusColor(SubscriptionStatus.ACTIVE)).toBe("success");
+    expect(getStatusColor(SubscriptionStatus.TRIAL)).toBe("warning");
+    expect(getStatusColor(SubscriptionStatus.SUSPENDED)).toBe("danger");
+    expect(getStatusColor(SubscriptionStatus.CANCELLED)).toBe("neutral");
+    expect(getStatusColor(SubscriptionStatus.GRACE_PERIOD)).toBe("warning");
+    // PAID is shared with PaymentStatus.PAID's existing "success" bucket.
+    expect(getStatusColor(InvoiceStatus.PAID)).toBe("success");
+    expect(getStatusColor(InvoiceStatus.ISSUED)).toBe("warning");
+    expect(getStatusColor(InvoiceStatus.VOID)).toBe("neutral");
+    expect(getStatusColor(InvoiceStatus.REFUNDED)).toBe("neutral");
+    // DRAFT is never produced by any real code path — deliberately left unmapped, falls to "info".
+    expect(getStatusColor(InvoiceStatus.DRAFT)).toBe("info");
+    expect(getStatusColor(PaymentStatus.REFUNDED)).toBe("neutral");
+    expect(getStatusColor(PaymentStatus.PARTIALLY_REFUNDED)).toBe("warning");
+    expect(getStatusColor(PaymentStatus.CHARGEBACK)).toBe("danger");
   });
 });

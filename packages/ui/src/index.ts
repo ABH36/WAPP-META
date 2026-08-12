@@ -106,3 +106,24 @@ export * from "./components/timeline";
 // (Lead/Customer/Deal edit forms, Activity/Note composer) stay
 // app-specific in apps/web/src/features/crm/, same reasoning as every
 // prior volume's forms — see docs/ADR-FE-009-crm-ui-strategy.md.
+
+export * from "./components/usage-progress";
+export * from "./components/feature-limit-card";
+export * from "./components/plan-card";
+export * from "./components/invoice-card";
+export * from "./components/payment-card";
+
+// FRD-001 Volume-6 — Billing UI's presentational primitives. §7 names
+// "UsageCard" and "FeatureLimitCard" as separate components describing the
+// same shape (one feature/counter's usage at a glance) — only
+// FeatureLimitCard was built, matching the ReportCard/ForecastCard
+// precedent above. "RevenueCard"/"ForecastCard" (also named in §7) are
+// likewise not built — both are exactly SummaryCard's "label + value +
+// description" shape, reused directly on the Reports/Forecast screens.
+// "SubscriptionBadge" isn't built either — `StageBadge` (Volume-5) is
+// already a generic "any status string via getStatusColor" wrapper, reused
+// as-is for SubscriptionStatus/InvoiceStatus/PaymentStatus.
+// "BillingHistoryTimeline" is not built at all — the Billing History
+// Timeline screen was dropped this volume (no tenant-facing endpoint
+// exists, see docs/TECH-DEBT.md). See
+// docs/ADR-FE-011-billing-ui-strategy.md.

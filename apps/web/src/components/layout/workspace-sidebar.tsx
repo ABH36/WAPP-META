@@ -7,7 +7,9 @@ import {
   Building2,
   CalendarDays,
   Columns3,
+  CreditCard,
   FileText,
+  Gauge,
   HandCoins,
   LayoutDashboard,
   LineChart,
@@ -18,6 +20,7 @@ import {
   TrendingUp,
   UserPlus,
   Users,
+  Wallet,
 } from "lucide-react";
 import { Sidebar, SidebarGroup, SidebarItem } from "@wapp/ui";
 import { useUiStore } from "../../stores/ui-store";
@@ -69,6 +72,51 @@ const CRM_TABS = [
   { href: "/crm/forecast", label: "Forecast", icon: TrendingUp, requires: Permission.VIEW_REPORTS },
 ] as const;
 
+const BILLING_TABS = [
+  {
+    href: "/billing",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    requires: Permission.BILLING_ACCESS,
+  },
+  {
+    href: "/billing/subscription",
+    label: "Subscription",
+    icon: CreditCard,
+    requires: Permission.BILLING_ACCESS,
+  },
+  {
+    href: "/billing/usage",
+    label: "Usage & Limits",
+    icon: Gauge,
+    requires: Permission.BILLING_ACCESS,
+  },
+  {
+    href: "/billing/invoices",
+    label: "Invoices",
+    icon: FileText,
+    requires: Permission.BILLING_ACCESS,
+  },
+  {
+    href: "/billing/payments",
+    label: "Payments",
+    icon: Wallet,
+    requires: Permission.BILLING_ACCESS,
+  },
+  {
+    href: "/billing/reports",
+    label: "Reports",
+    icon: LineChart,
+    requires: Permission.BILLING_ACCESS,
+  },
+  {
+    href: "/billing/forecast",
+    label: "Forecast",
+    icon: TrendingUp,
+    requires: Permission.BILLING_ACCESS,
+  },
+] as const;
+
 /**
  * FRD-001 Volume-1 §19 / FRD-001 Volume-3 §6 / FRD-001 Volume-4 §6 /
  * FRD-001 Volume-5 §6 —
@@ -94,13 +142,21 @@ const CRM_TABS = [
  * for that role, the only CRM read permission that's ever `NONE`).
  * Activities and Calendar have no nav-level gate — Activities has no
  * permission of its own at all (per-instance only, ADR-CRM-016), and
- * Calendar is just a presentation over Activities.
+ * Calendar is just a presentation over Activities. "Billing" (FRD-001
+ * Volume-6 §6) expands into 7 sub-items — every single one requires
+ * `BILLING_ACCESS`, the one and only Billing permission that exists
+ * (Owner=FULL, Administrator=VIEW_ONLY, everyone else=NONE) — so unlike
+ * Communication/CRM, the whole group either shows all 7 items or none;
+ * there's no per-item permission split to make. No "History" sub-item —
+ * the Billing History Timeline was dropped this volume (no tenant-facing
+ * endpoint exists, see docs/TECH-DEBT.md).
  */
 export function WorkspaceSidebar(): React.JSX.Element {
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const pathname = usePathname();
   const inCommunication = pathname.startsWith("/communication");
   const inCrm = pathname.startsWith("/crm");
+  const inBilling = pathname.startsWith("/billing");
 
   // Each permission this sidebar might need to check is called unconditionally
   // (never inside the .map() below) — React's rules of hooks require a fixed
@@ -113,6 +169,7 @@ export function WorkspaceSidebar(): React.JSX.Element {
   const canViewLeads = useHasPermission(Permission.VIEW_LEADS);
   const canViewCustomers = useHasPermission(Permission.VIEW_CUSTOMERS);
   const canViewDeals = useHasPermission(Permission.VIEW_DEALS);
+  const canAccessBilling = useHasPermission(Permission.BILLING_ACCESS);
 
   const grantedPermissions = new Set<Permission>(
     [
@@ -124,12 +181,16 @@ export function WorkspaceSidebar(): React.JSX.Element {
       canViewLeads && Permission.VIEW_LEADS,
       canViewCustomers && Permission.VIEW_CUSTOMERS,
       canViewDeals && Permission.VIEW_DEALS,
+      canAccessBilling && Permission.BILLING_ACCESS,
     ].filter((p): p is Permission => !!p),
   );
   const visibleCommunicationTabs = COMMUNICATION_TABS.filter(
     (tab) => !tab.requires || grantedPermissions.has(tab.requires),
   );
   const visibleCrmTabs = CRM_TABS.filter(
+    (tab) => !tab.requires || grantedPermissions.has(tab.requires),
+  );
+  const visibleBillingTabs = BILLING_TABS.filter(
     (tab) => !tab.requires || grantedPermissions.has(tab.requires),
   );
 
@@ -178,6 +239,23 @@ export function WorkspaceSidebar(): React.JSX.Element {
         defaultOpen={inCrm}
       >
         {visibleCrmTabs.map((tab) => (
+          <SidebarItem
+            key={tab.href}
+            href={tab.href}
+            icon={<tab.icon className="h-4 w-4" aria-hidden />}
+            active={pathname === tab.href}
+          >
+            {tab.label}
+          </SidebarItem>
+        ))}
+      </SidebarGroup>
+      <SidebarGroup
+        label="Billing"
+        icon={<CreditCard className="h-4 w-4" aria-hidden />}
+        collapsed={collapsed}
+        defaultOpen={inBilling}
+      >
+        {visibleBillingTabs.map((tab) => (
           <SidebarItem
             key={tab.href}
             href={tab.href}

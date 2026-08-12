@@ -1,0 +1,30 @@
+# Billing UI Strategy
+
+**Status:** Accepted
+**Date:** 2026-08-11
+**Scope:** FRD-001 Volume-6 — Billing UI. How `apps/web` implements Subscription, Invoices, Usage & Limits, and Payments presentation on top of the frozen Billing backend (PRD-005), without re-owning subscription lifecycle, invoice generation, payment recording, usage enforcement, or commercial calculations.
+**Implemented in:** `apps/web/src/{features/billing,services,types}`, `apps/web/src/app/(workspace)/billing`, `packages/ui/src/components/{usage-progress,feature-limit-card,plan-card,invoice-card,payment-card}.tsx`
+
+## Upgrade and Downgrade are timing choices, not price-direction choices
+
+`SubscriptionController` exposes two distinct routes with genuinely different semantics, confirmed by reading `subscription.service.ts` directly rather than assuming from the route names: Upgrade applies immediately and is the mechanism by which a `TRIAL` subscription completes into `ACTIVE` — it is used for _any_ immediate plan change, not only costlier ones. Downgrade is queued via `pendingPlanId`, applied only at the next `renewalDate` by `SubscriptionLifecycleProcessor`. `subscription-view.tsx` does not attempt to infer which button to show from `Plan.monthlyPrice` (nullable and null for every plan today, TD-009) — every non-current plan offers both actions explicitly labeled by timing ("Upgrade now" / "Downgrade at renewal"), and the backend remains the sole arbiter of whether a given transition is actually valid. A `pendingPlanId` on the current subscription renders as a persistent banner naming the scheduled plan and renewal date.
+
+## Invoices: List and Detail only — no Download, no Void/Reissue/Regenerate
+
+`InvoiceController` has exactly two routes (`list`, `get`) and no others — confirmed by reading the controller directly, not inferring from the FRD's own §4.4 language. No PDF or binary download endpoint exists anywhere in the codebase, tenant or platform side (grepped the entire `billing` and `platform` modules for `pdf`/`download`). Void exists only on the Platform side (`PATCH /platform/invoices/:id/void`, `PlatformPermission.MANAGE_PAYMENTS`, structurally unreachable from a tenant session via a separate auth guard). Reissue and Regenerate don't exist anywhere at all — already tracked as TD-022 before this volume. `invoice-list.tsx`/`invoice-detail.tsx` are therefore strictly read-only, with no Download button — dropped this volume per Architecture Review (2026-08-11), filed as new Tech Debt (see `docs/TECH-DEBT.md`) rather than approximated via the unrelated CSV/Excel Report export mechanism, which is shaped for multi-row report data, not a single document.
+
+## Usage & Limits: `locked` is a real field; threshold warnings are computed, not received
+
+`CounterUsageSummary.locked` is a genuine backend-returned boolean (`usage.service.ts`, backed by `WorkspaceUsage.{counter}Locked` schema fields) — `FeatureLimitCard` renders it directly, never inferring lock state from `count`/`limit` itself. Only 6 of 9 counters have a real creation-time event wired to increment them yet (TD-013); Campaigns/Storage/API Requests always return `locked: false` today, which the UI renders as-is rather than fabricating a locked state the backend hasn't earned. No "threshold warning" field exists in any Usage response — `usage-view.tsx` computes its own near-limit banner using `USAGE_WARNING_THRESHOLDS` (`@wapp/shared-types`, backend-owned and exported, not a frontend invention) applied to the real `percentage` field. `limit: null` (every counter, every workspace, today — TD-014, pending commercial approval) renders as "No limit set" in `UsageProgress`, never a fabricated 0% or 100% bar.
+
+## Payments stay strictly view-only, even though the tenant write routes technically work
+
+`PaymentController`'s `POST /billing/payments` and `POST /billing/refunds` are real, `TenantRole.OWNER`-reachable routes today — but the controller's own doc-comment calls this "a known, tracked interim gap" (TD-010, closed with the intended long-term model being Platform-operator-only recording, already built in parallel at `/platform/payments/*`). Per the Architect's explicit approval ("Payments remain View-only... Manual payment recording, refunds and verification remain Platform Administration responsibilities"), `payment-list.tsx` never calls either write route — this is a deliberate scope decision honoring where the backend's own documentation says this capability is headed, not an oversight of what's technically callable today.
+
+## Permission rendering: one permission, one binary split
+
+Billing has exactly one permission (`BILLING_ACCESS`) gating every route across Subscription, Usage, Invoices, Payments, Plans, and Reports — confirmed there are no granular per-area permissions (`VIEW_INVOICES`, `MANAGE_SUBSCRIPTION`, etc.) anywhere in `packages/shared-types`. Every Billing screen checks `useHasPermission(BILLING_ACCESS)` for its own read access (hidden entirely, never a restricted placeholder, matching every prior volume's pattern) — Owner and Administrator are the only two roles that ever see anything. Only Subscription has write actions (Upgrade/Downgrade/Cancel); those are additionally gated on `useHasFullPermission(BILLING_ACCESS)` (`=== FULL`), which correctly resolves `false` for Administrator (`VIEW_ONLY`) — this is the frontend's own defense-in-depth, independent of the backend gap noted below.
+
+## A backend gap worth documenting, not silently working around
+
+`PermissionsGuard`'s binary `level !== NONE` check doesn't distinguish `VIEW_ONLY` from `FULL` — so `Administrator` is not actually blocked server-side today from calling `POST /billing/subscription/{upgrade,downgrade,cancel}`. The frontend's `useHasFullPermission` convention already prevents the _UI_ from exposing these actions to an Administrator, so no frontend change was needed to stay correct — but the underlying gap is real, pre-dates this volume, and is filed as new Tech Debt rather than left undocumented (see `docs/TECH-DEBT.md`).

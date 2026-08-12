@@ -4,6 +4,8 @@ import {
   DealStage,
   ConversationStatus,
   PaymentStatus,
+  SubscriptionStatus,
+  InvoiceStatus,
 } from "@wapp/shared-types";
 
 export type StatusColorToken = "success" | "warning" | "danger" | "info" | "neutral";
@@ -31,9 +33,28 @@ export type StatusColorToken = "success" | "warning" | "danger" | "info" | "neut
  * ("ARCHIVED") already matches via `ConversationStatus.ARCHIVED`'s
  * existing entry (same string, no new line needed). Only
  * `CustomerStatus.BLOCKED` is genuinely new here.
+ *
+ * FRD-001 Volume-6 — Billing's `SubscriptionStatus.{ACTIVE,TRIAL,
+ * SUSPENDED,CANCELLED}` and `InvoiceStatus.PAID` all already match
+ * existing bucket entries via the same string values (`WorkspaceStatus`/
+ * `PaymentStatus`) — no new lines needed for those five.
+ * `SubscriptionStatus.GRACE_PERIOD`, `InvoiceStatus.{ISSUED,VOID,
+ * REFUNDED}`, and `PaymentStatus.{PARTIALLY_REFUNDED,CHARGEBACK}` are
+ * genuinely new. `InvoiceStatus.DRAFT` is deliberately left unmapped —
+ * it's never actually produced by any backend code path (forward-
+ * compatibility scaffolding only) and already falls through to the
+ * existing "info" default correctly.
  */
 export function getStatusColor(
-  status: WorkspaceStatus | LeadStatus | DealStage | ConversationStatus | PaymentStatus | string,
+  status:
+    | WorkspaceStatus
+    | LeadStatus
+    | DealStage
+    | ConversationStatus
+    | PaymentStatus
+    | SubscriptionStatus
+    | InvoiceStatus
+    | string,
 ): StatusColorToken {
   const positive: string[] = [
     WorkspaceStatus.ACTIVE,
@@ -53,6 +74,9 @@ export function getStatusColor(
     "SCHEDULED", // Broadcast
     "PAUSED", // Broadcast / Template
     "BLOCKED", // Customer
+    SubscriptionStatus.GRACE_PERIOD,
+    InvoiceStatus.ISSUED,
+    PaymentStatus.PARTIALLY_REFUNDED,
   ];
   const negative: string[] = [
     WorkspaceStatus.SUSPENDED,
@@ -63,6 +87,7 @@ export function getStatusColor(
     "SPAM", // Conversation
     "REJECTED", // Template
     "FAILED", // Broadcast
+    PaymentStatus.CHARGEBACK,
   ];
   const neutralInactive: string[] = [
     WorkspaceStatus.CANCELLED,
@@ -71,6 +96,9 @@ export function getStatusColor(
     LeadStatus.UNQUALIFIED,
     "CANCELLED", // Broadcast / Campaign
     "DISABLED", // Template
+    InvoiceStatus.VOID,
+    InvoiceStatus.REFUNDED,
+    PaymentStatus.REFUNDED,
   ];
 
   if (positive.includes(status)) return "success";
