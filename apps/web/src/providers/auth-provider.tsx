@@ -7,6 +7,7 @@ import type { ApiSuccessResponse } from "@wapp/shared-types";
 import { env } from "../lib/env";
 import { REFRESH_TOKEN_COOKIE, apiGet } from "../lib/api";
 import { refreshTokenCookieMaxAge } from "../lib/remember-me";
+import { hydrateUserPreferences } from "../lib/preference-sync";
 import { useAuthStore } from "../stores/auth-store";
 import type { IssuedTokenPair, UserProfile } from "../types/auth";
 
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
         const user = await apiGet<UserProfile>("/auth/me");
         if (!cancelled) {
           setSession(user, tokens.accessToken);
+          void hydrateUserPreferences();
         }
       } catch {
         if (!cancelled) {

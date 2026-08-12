@@ -3,24 +3,32 @@
 import { usePathname } from "next/navigation";
 import { Permission } from "@wapp/shared-types";
 import {
+  Activity,
   Bot,
   Building2,
   CalendarDays,
   Columns3,
   CreditCard,
+  Download,
   FileText,
   Gauge,
   HandCoins,
+  KeyRound,
   LayoutDashboard,
   LineChart,
   ListChecks,
   MessageSquare,
+  Plug,
   Radio,
+  ScrollText,
   Send,
+  Settings,
+  SlidersHorizontal,
   TrendingUp,
   UserPlus,
   Users,
   Wallet,
+  Webhook,
 } from "lucide-react";
 import { Sidebar, SidebarGroup, SidebarItem } from "@wapp/ui";
 import { useUiStore } from "../../stores/ui-store";
@@ -117,6 +125,47 @@ const BILLING_TABS = [
   },
 ] as const;
 
+const SETTINGS_TABS = [
+  { href: "/settings", label: "Home", icon: LayoutDashboard, requires: null },
+  { href: "/settings/preferences", label: "Preferences", icon: SlidersHorizontal, requires: null },
+  {
+    href: "/settings/integrations",
+    label: "Integrations",
+    icon: Plug,
+    requires: Permission.EDIT_WORKSPACE,
+  },
+  {
+    href: "/settings/api-keys",
+    label: "API Keys",
+    icon: KeyRound,
+    requires: Permission.EDIT_WORKSPACE,
+  },
+  {
+    href: "/settings/webhooks",
+    label: "Webhooks",
+    icon: Webhook,
+    requires: Permission.EDIT_WORKSPACE,
+  },
+  {
+    href: "/settings/audit",
+    label: "Audit Logs",
+    icon: ScrollText,
+    requires: Permission.EDIT_WORKSPACE,
+  },
+  {
+    href: "/settings/export",
+    label: "Data Export",
+    icon: Download,
+    requires: Permission.EDIT_WORKSPACE,
+  },
+  {
+    href: "/settings/diagnostics",
+    label: "Diagnostics",
+    icon: Activity,
+    requires: Permission.VIEW_REPORTS,
+  },
+] as const;
+
 /**
  * FRD-001 Volume-1 §19 / FRD-001 Volume-3 §6 / FRD-001 Volume-4 §6 /
  * FRD-001 Volume-5 §6 —
@@ -149,7 +198,17 @@ const BILLING_TABS = [
  * Communication/CRM, the whole group either shows all 7 items or none;
  * there's no per-item permission split to make. No "History" sub-item —
  * the Billing History Timeline was dropped this volume (no tenant-facing
- * endpoint exists, see docs/TECH-DEBT.md).
+ * endpoint exists, see docs/TECH-DEBT.md). "Settings" (FRD-001 Volume-7 §6)
+ * is a navigation hub, not a rebuild — Home and Preferences require no
+ * permission (self-scoped, every role manages their own), while
+ * Integrations/API Keys/Webhooks/Audit Logs/Data Export all require
+ * `EDIT_WORKSPACE` and Diagnostics deliberately uses the looser
+ * `VIEW_REPORTS` (read-only infra health, not the security-sensitive
+ * surface Audit Logs is). Workspace Settings, Branding, Notifications, and
+ * Security (Change Password/Sessions/Login History) are NOT rebuilt under
+ * `/settings/*` — they stay exactly where Volume-2/Volume-3 already shipped
+ * them (`/workspace/*`, `/profile/*`); Settings Home links to those
+ * existing pages instead (see docs/ADR-FE-013-settings-ui-strategy.md).
  */
 export function WorkspaceSidebar(): React.JSX.Element {
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
@@ -157,6 +216,7 @@ export function WorkspaceSidebar(): React.JSX.Element {
   const inCommunication = pathname.startsWith("/communication");
   const inCrm = pathname.startsWith("/crm");
   const inBilling = pathname.startsWith("/billing");
+  const inSettings = pathname.startsWith("/settings");
 
   // Each permission this sidebar might need to check is called unconditionally
   // (never inside the .map() below) — React's rules of hooks require a fixed
@@ -170,6 +230,7 @@ export function WorkspaceSidebar(): React.JSX.Element {
   const canViewCustomers = useHasPermission(Permission.VIEW_CUSTOMERS);
   const canViewDeals = useHasPermission(Permission.VIEW_DEALS);
   const canAccessBilling = useHasPermission(Permission.BILLING_ACCESS);
+  const canEditWorkspace = useHasPermission(Permission.EDIT_WORKSPACE);
 
   const grantedPermissions = new Set<Permission>(
     [
@@ -182,6 +243,7 @@ export function WorkspaceSidebar(): React.JSX.Element {
       canViewCustomers && Permission.VIEW_CUSTOMERS,
       canViewDeals && Permission.VIEW_DEALS,
       canAccessBilling && Permission.BILLING_ACCESS,
+      canEditWorkspace && Permission.EDIT_WORKSPACE,
     ].filter((p): p is Permission => !!p),
   );
   const visibleCommunicationTabs = COMMUNICATION_TABS.filter(
@@ -191,6 +253,9 @@ export function WorkspaceSidebar(): React.JSX.Element {
     (tab) => !tab.requires || grantedPermissions.has(tab.requires),
   );
   const visibleBillingTabs = BILLING_TABS.filter(
+    (tab) => !tab.requires || grantedPermissions.has(tab.requires),
+  );
+  const visibleSettingsTabs = SETTINGS_TABS.filter(
     (tab) => !tab.requires || grantedPermissions.has(tab.requires),
   );
 
@@ -256,6 +321,23 @@ export function WorkspaceSidebar(): React.JSX.Element {
         defaultOpen={inBilling}
       >
         {visibleBillingTabs.map((tab) => (
+          <SidebarItem
+            key={tab.href}
+            href={tab.href}
+            icon={<tab.icon className="h-4 w-4" aria-hidden />}
+            active={pathname === tab.href}
+          >
+            {tab.label}
+          </SidebarItem>
+        ))}
+      </SidebarGroup>
+      <SidebarGroup
+        label="Settings"
+        icon={<Settings className="h-4 w-4" aria-hidden />}
+        collapsed={collapsed}
+        defaultOpen={inSettings}
+      >
+        {visibleSettingsTabs.map((tab) => (
           <SidebarItem
             key={tab.href}
             href={tab.href}

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Theme } from "@wapp/shared-types";
 import { useThemeStore } from "../stores/theme-store";
 
 /** FRD-001 Volume-1 §6/§12 — applies `.dark` to <html> per DS-001 §2.1 ("darkMode: 'class'" in the shared Tailwind preset). Resolves "system" via `prefers-color-scheme` and keeps it live if the OS theme changes while "system" is selected. */
@@ -12,12 +13,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }): Reac
     const media = window.matchMedia("(prefers-color-scheme: dark)");
 
     const apply = (): void => {
-      const isDark = theme === "dark" || (theme === "system" && media.matches);
+      const isDark = theme === Theme.DARK || (theme === Theme.SYSTEM && media.matches);
       root.classList.toggle("dark", isDark);
     };
 
     apply();
-    if (theme === "system") {
+    if (theme === Theme.SYSTEM) {
       media.addEventListener("change", apply);
       return () => media.removeEventListener("change", apply);
     }

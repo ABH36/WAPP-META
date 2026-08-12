@@ -44,6 +44,14 @@ export type StatusColorToken = "success" | "warning" | "danger" | "info" | "neut
  * it's never actually produced by any backend code path (forward-
  * compatibility scaffolding only) and already falls through to the
  * existing "info" default correctly.
+ *
+ * FRD-001 Volume-7 — Settings' `IntegrationConnectionStatus`/
+ * `WhatsAppConnectionStatus` (local to `apps/api`'s Settings/Communication
+ * modules, no `@wapp/shared-types` equivalent, same reasoning as
+ * Communication's Volume-4 real-value strings) add `"CONNECTED"`/
+ * `"DISCONNECTED"`/`"ERROR"` as raw strings. `"EXPIRED"` already matches
+ * `WorkspaceStatus.EXPIRED`'s existing danger-bucket entry — no new line
+ * needed for it.
  */
 export function getStatusColor(
   status:
@@ -64,6 +72,7 @@ export function getStatusColor(
     "RESOLVED", // Conversation (real value)
     "APPROVED", // Template
     "COMPLETED", // Broadcast / Campaign
+    "CONNECTED", // Settings Integrations/Webhooks
   ];
   const attention: string[] = [
     WorkspaceStatus.TRIAL,
@@ -88,6 +97,7 @@ export function getStatusColor(
     "REJECTED", // Template
     "FAILED", // Broadcast
     PaymentStatus.CHARGEBACK,
+    "ERROR", // Settings Integrations/Webhooks
   ];
   const neutralInactive: string[] = [
     WorkspaceStatus.CANCELLED,
@@ -99,6 +109,7 @@ export function getStatusColor(
     InvoiceStatus.VOID,
     InvoiceStatus.REFUNDED,
     PaymentStatus.REFUNDED,
+    "DISCONNECTED", // Settings Integrations/Webhooks
   ];
 
   if (positive.includes(status)) return "success";

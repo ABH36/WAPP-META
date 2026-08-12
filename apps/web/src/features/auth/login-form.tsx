@@ -11,6 +11,7 @@ import { authService } from "../../services/auth.service";
 import { useAuthStore } from "../../stores/auth-store";
 import { ApiError, REFRESH_TOKEN_COOKIE } from "../../lib/api";
 import { setRememberMe, refreshTokenCookieMaxAge } from "../../lib/remember-me";
+import { hydrateUserPreferences } from "../../lib/preference-sync";
 
 const loginSchema = z.object({
   email: emailSchema,
@@ -52,6 +53,7 @@ export function LoginForm(): React.JSX.Element {
       setRememberMe(values.rememberMe);
       setCookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, refreshTokenCookieMaxAge());
       setSession(user, tokens.accessToken);
+      void hydrateUserPreferences();
       router.push(searchParams.get("redirectTo") ?? "/dashboard");
     } catch (error) {
       if (error instanceof ApiError) {

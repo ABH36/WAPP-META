@@ -1,7 +1,19 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from "../lib/api";
-import type { LogoUploadSignature, SettingsOverview, SettingsPreferences } from "../types/settings";
+import type {
+  ConfigHistoryEntrySummary,
+  LogoUploadSignature,
+  SettingsOverview,
+  SettingsPreferences,
+} from "../types/settings";
 
 type UpdatePreferencesPayload = Partial<SettingsPreferences>;
+
+interface ConfigHistoryPage {
+  items: ConfigHistoryEntrySummary[];
+  total: number;
+  page: number;
+  limit: number;
+}
 
 /**
  * FRD-001 Volume-3 §4.4/§4.5 — Settings module routes (`ADR-SET-001`
@@ -31,5 +43,10 @@ export const settingsService = {
 
   removeLogo(): Promise<SettingsOverview> {
     return apiDelete("/settings/branding/logo");
+  },
+
+  /** FRD-001 Volume-7 §4.1 — `EDIT_WORKSPACE`. Powers Settings Home's "Recent configuration summary." */
+  configHistory(page?: number, limit?: number): Promise<ConfigHistoryPage> {
+    return apiGet("/settings/config-history", { page, limit });
   },
 };

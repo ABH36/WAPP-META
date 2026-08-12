@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { UiDensity } from "@wapp/shared-types";
 import { useUiStore } from "./ui-store";
 
 describe("useUiStore", () => {
   beforeEach(() => {
-    useUiStore.setState({ sidebarCollapsed: false });
+    useUiStore.setState({ sidebarCollapsed: false, density: UiDensity.COMFORTABLE });
     localStorage.clear();
   });
 
@@ -21,5 +22,14 @@ describe("useUiStore", () => {
   it("setSidebarCollapsed sets an explicit value", () => {
     useUiStore.getState().setSidebarCollapsed(true);
     expect(useUiStore.getState().sidebarCollapsed).toBe(true);
+  });
+
+  it("defaults to comfortable density", () => {
+    expect(useUiStore.getState().density).toBe(UiDensity.COMFORTABLE);
+  });
+
+  it("setDensity sets an explicit value", () => {
+    useUiStore.getState().setDensity(UiDensity.COMPACT);
+    expect(useUiStore.getState().density).toBe(UiDensity.COMPACT);
   });
 });

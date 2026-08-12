@@ -2,10 +2,12 @@
 
 import * as React from "react";
 import { Menu, Moon, Sun } from "lucide-react";
+import { Theme } from "@wapp/shared-types";
 import { Header } from "@wapp/ui";
 import { useAuthStore } from "../../stores/auth-store";
 import { useUiStore } from "../../stores/ui-store";
 import { useThemeStore } from "../../stores/theme-store";
+import { syncSidebar, syncTheme } from "../../lib/preference-sync";
 
 /**
  * FRD-001 Volume-1 §5/§7 — DS-001 §5's "topbar (workspace switcher — future
@@ -18,17 +20,30 @@ import { useThemeStore } from "../../stores/theme-store";
  * the structural slot, not the final content.
  */
 export function WorkspaceHeader(): React.JSX.Element {
-  const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
+  const setSidebarCollapsed = useUiStore((s) => s.setSidebarCollapsed);
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
   const user = useAuthStore((s) => s.user);
+
+  const handleToggleSidebar = (): void => {
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    syncSidebar(next);
+  };
+
+  const handleToggleTheme = (): void => {
+    const next = theme === Theme.DARK ? Theme.LIGHT : Theme.DARK;
+    setTheme(next);
+    syncTheme(next);
+  };
 
   return (
     <Header
       left={
         <button
           type="button"
-          onClick={toggleSidebar}
+          onClick={handleToggleSidebar}
           aria-label="Toggle sidebar"
           className="duration-micro rounded-md p-2 text-neutral-500 transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
         >
@@ -39,11 +54,11 @@ export function WorkspaceHeader(): React.JSX.Element {
         <>
           <button
             type="button"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onClick={handleToggleTheme}
             aria-label="Toggle theme"
             className="duration-micro rounded-md p-2 text-neutral-500 transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
           >
-            {theme === "dark" ? (
+            {theme === Theme.DARK ? (
               <Sun className="h-5 w-5" aria-hidden />
             ) : (
               <Moon className="h-5 w-5" aria-hidden />

@@ -96,4 +96,12 @@ describe("getStatusColor", () => {
     expect(getStatusColor(PaymentStatus.PARTIALLY_REFUNDED)).toBe("warning");
     expect(getStatusColor(PaymentStatus.CHARGEBACK)).toBe("danger");
   });
+
+  it("maps Settings' real Integration/Webhook connection status values (FRD-001 Volume-7)", () => {
+    expect(getStatusColor("CONNECTED")).toBe("success");
+    expect(getStatusColor("DISCONNECTED")).toBe("neutral");
+    expect(getStatusColor("ERROR")).toBe("danger");
+    // EXPIRED is shared with WorkspaceStatus.EXPIRED's existing "danger" bucket.
+    expect(getStatusColor("EXPIRED")).toBe("danger");
+  });
 });

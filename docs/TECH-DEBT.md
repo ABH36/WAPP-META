@@ -630,4 +630,62 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 
 **Trigger to revisit:** a security review or penetration test that would otherwise catch this, or the next volume that introduces another multi-level (`VIEW_ONLY`/`FULL`) permission with write routes, making a systemic fix worth doing once rather than per-controller.
 
-**Trigger to revisit:** a real support/sales workflow need to trace a Customer back to its originating Lead (common in attribution/source-effectiveness analysis), or a future CRM cross-linking initiative.
+---
+
+## TD-042 — No Webhook delivery-history endpoint
+
+**Raised:** 2026-08-12 (FRD-001 Volume-7, Settings UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-7's Webhooks screen (§4.9) named "Recent Deliveries" as a display element, but no route exposes the real, persisted delivery-log data. `webhook-delivery-log.schema.ts`'s `webhook_delivery_logs` collection (one row per attempt: `webhookId, workspaceId, event, success, statusCode, error, createdAt`) and `WebhookDeliveryLogRepository.findRecentByWebhook(webhookId, limit)` both exist and work — confirmed by reading them directly — but `findRecentByWebhook` is grep-confirmed called nowhere except its own file. No `WebhooksController` route (or any other controller) ever exposes it.
+
+**Why accepted for now:** Resolved 2026-08-12, Architecture Review, matching the explicit instruction that Recent Delivery History is excluded. `webhooks-view.tsx`/`WebhookCard` surface only `WebhookSummary`'s existing `lastDeliveryAt`/`lastError` fields (the most-recent-attempt signal, which is real and already returned) — no client-side approximation of a delivery history was attempted, since there's no data to approximate it from beyond that one summary field.
+
+**Closing this out looks like:** a small, focused addition — `GET settings/webhooks/:id/deliveries` (paginated), `EDIT_WORKSPACE`-gated like every other Webhooks route, reading from the repository method that already exists. This should be cheap: the write side, the repository, and the natural response shape all already exist; only a new controller route is needed.
+
+**Trigger to revisit:** a real need to debug a failing webhook integration (the single most likely reason anyone would ask for this), or a future Webhooks/Integrations expansion volume.
+
+---
+
+## TD-043 — Audit Logs have no free-text search
+
+**Raised:** 2026-08-12 (FRD-001 Volume-7, Settings UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-7's Audit Logs screen (§4.10) named "Search" alongside "Filters," but `AuditLogQueryDto` (`audit-log-query.dto.ts`) only accepts `category`, `page`, and `limit` — no free-text query parameter exists anywhere in `AuditController`/`AuditLogService`.
+
+**Why accepted for now:** Resolved 2026-08-12, Architecture Review, matching the explicit instruction that Audit Logs shall expose Category Filter and Pagination only, with free-text search excluded because no backend capability exists. `audit-log-view.tsx` renders a category `<Select>` and Previous/Next pagination controls only — no search input was built against a parameter that doesn't exist.
+
+**Closing this out looks like:** either a MongoDB text index over `AuditLogEntry`'s `module`/`entity`/`action` fields plus a `search` query param on `AuditLogQueryDto`, or (if actor/IP searching is also wanted) a more general filter set. Given the security-sensitive nature of this data (`EDIT_WORKSPACE`-gated specifically because of the actor/IP/device fields it exposes, per `AuditController`'s own doc-comment), any search capability added here should get its own scoped review rather than being bundled into an unrelated feature.
+
+**Trigger to revisit:** a real investigative need (tracing a specific action across a large log) that pagination alone can't reasonably serve, or a future Audit/Compliance-focused volume.
+
+---
+
+## TD-044 — No Data Export job-list endpoint (single most-recent job only)
+
+**Raised:** 2026-08-12 (FRD-001 Volume-7, Settings UI; discovered during implementation, not part of the original Architecture Review checklist)
+**Status:** Open
+
+**What:** FRD-001 Volume-7's Data Export screen (§4.11) named "Export Jobs" (plural) as a display element, implying a history list — but `DataManagementController` has exactly two routes, `POST settings/export` (create) and `GET settings/export/:id` (status by id), with no `GET settings/export` list route anywhere. Confirmed by reading the controller directly.
+
+**Why accepted for now:** Discovered mid-implementation, 2026-08-12 — not one of the gaps the Architecture Review's own approval enumerated by name (it approved "Job List, Status, Progress, Result Link" without the underlying single-job constraint being visible yet), but it's a direct, load-bearing consequence of the already-approved "no download proxy endpoint" finding, so it's filed alongside it rather than silently worked around. `export-view.tsx` tracks only the single most-recently-created job (its id cached in `localStorage`, polled via `refetchInterval` while pending) — which is a reasonable adaptation, not a workaround, since the backend itself enforces at most one active job per workspace at any time (`DataExportService` rejects a second `POST` while one is `PENDING`/`PROCESSING`). There is currently no way to look back at a _completed_ job from a prior session once its id is no longer in `localStorage`.
+
+**Closing this out looks like:** a `GET settings/export` list route (paginated, `EDIT_WORKSPACE`-gated like the rest of Data Management) returning past `ExportJobSummary` rows for the workspace, so a real history table becomes buildable and the frontend no longer depends on `localStorage` to remember what was last requested.
+
+**Trigger to revisit:** a real need to re-download or audit a previously-completed export after the requesting browser's `localStorage` has been cleared, or a future Data Management expansion volume.
+
+---
+
+## TD-045 — WhatsApp "Connect" (Meta Embedded Signup) not built
+
+**Raised:** 2026-08-12 (FRD-001 Volume-7, Settings UI; formally tracked as a Governance Recommendation per Architecture Review)
+**Status:** Open
+
+**What:** FRD-001 Volume-7's Integrations screen (§4.7) named "Connect" alongside Disconnect/Test Connection/Refresh Metadata, but connecting a new WhatsApp Business Account requires a genuine Meta Embedded Signup flow — `POST communication/whatsapp/connect` (`ConnectWhatsAppDto`) needs a `code`/`wabaId`/`phoneNumberId` triple only obtainable via Facebook's JS SDK, an OAuth-style popup, and a `postMessage` handshake during that same browser session (the documented Embedded Signup pattern, per the DTO's own doc-comment). No Meta App ID, SDK script, or any related configuration exists anywhere in `apps/web` today — confirmed by a repo-wide search.
+
+**Why accepted for now:** Resolved 2026-08-12, Architecture Review, matching the explicit instruction to show connection status only, with no Connect action this volume. Building the full Embedded Signup integration — loading a third-party SDK, handling a cross-window OAuth handshake, and requiring real Meta App credentials just to test — was judged a substantial standalone effort, not a natural fit for a "thin presentation layer" Settings volume alongside seven other new screens. `integrations-view.tsx`'s WhatsApp card renders `connected`/`status`/`businessName` read-only and offers Disconnect/Test Connection/Refresh Metadata only when already connected.
+
+**Closing this out looks like:** a dedicated frontend effort scoped around the Meta Embedded Signup flow specifically — obtaining and configuring a Meta App ID, loading the Facebook JS SDK, implementing the popup + `postMessage` listener, and wiring the resulting `code`/`wabaId`/`phoneNumberId` into the existing (and already-working) `POST communication/whatsapp/connect` route. The backend side of this needs no further work — it's purely a frontend integration effort once Meta app credentials are provisioned.
+
+**Trigger to revisit:** a real customer onboarding need (a new workspace with no WhatsApp connection yet has no self-service path to connect one today), or a dedicated WhatsApp Onboarding initiative.

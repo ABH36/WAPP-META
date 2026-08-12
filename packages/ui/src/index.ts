@@ -112,6 +112,26 @@ export * from "./components/feature-limit-card";
 export * from "./components/plan-card";
 export * from "./components/invoice-card";
 export * from "./components/payment-card";
+export * from "./components/settings-section";
+export * from "./components/preference-card";
+export * from "./components/integration-card";
+export * from "./components/api-key-card";
+export * from "./components/webhook-card";
+export * from "./components/export-job-card";
+export * from "./components/health-status-card";
+
+// FRD-001 Volume-7 — Settings UI's presentational primitives. §7 also names
+// BrandingCard, SessionCard, and LoginHistoryTable, but none of the three
+// were built this volume — Workspace Settings/Branding/Notifications/
+// Security are NOT rebuilt (Settings Home links to the existing, already
+// shipped and frozen /workspace/* and /profile/* pages instead — see
+// docs/ADR-FE-013-settings-ui-strategy.md), and SessionCard/
+// LoginHistoryTable already exist from FRD-001 Volume-2, reused there
+// unchanged, never duplicated here. "AuditTimeline" (also named in §7) was
+// not built as a separate component either — the Audit Logs screen
+// composes the existing Timeline/TimelineItem primitives (Volume-5)
+// directly, matching the ReportCard/ForecastCard precedent of not building
+// a near-duplicate wrapper.
 
 // FRD-001 Volume-6 — Billing UI's presentational primitives. §7 names
 // "UsageCard" and "FeatureLimitCard" as separate components describing the
