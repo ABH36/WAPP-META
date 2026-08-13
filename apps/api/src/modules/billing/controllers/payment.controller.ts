@@ -1,4 +1,5 @@
 import { Body, Controller, ForbiddenException, Get, Param, Post } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { Permission, TenantRole } from "@wapp/shared-types";
 import { CurrentUser } from "../../identity/decorators/current-user.decorator.js";
 import { RequirePermission } from "../../identity/decorators/require-permission.decorator.js";
@@ -22,6 +23,11 @@ import type { PaymentSummary } from "../billing.types.js";
  * not the intended long-term access model — see TD-010 and
  * docs/ADR-BILL-004-invoice-payment-relationship.md.
  */
+// PHD-001 Volume-1 — money-moving actions, well below the app-wide 300/min
+// default (app.module.ts): a compromised/scripted Owner session should not
+// be able to hammer payment recording or refunds.
+const PAYMENT_THROTTLE = { default: { limit: 10, ttl: 60_000 } };
+
 @Controller({ path: "billing", version: "1" })
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
@@ -42,6 +48,7 @@ export class PaymentController {
   }
 
   @RequirePermission(Permission.BILLING_ACCESS)
+  @Throttle(PAYMENT_THROTTLE)
   @Post("payments")
   async record(
     @CurrentUser() user: AuthenticatedUser,
@@ -61,6 +68,7 @@ export class PaymentController {
   }
 
   @RequirePermission(Permission.BILLING_ACCESS)
+  @Throttle(PAYMENT_THROTTLE)
   @Post("refunds")
   async refund(
     @CurrentUser() user: AuthenticatedUser,

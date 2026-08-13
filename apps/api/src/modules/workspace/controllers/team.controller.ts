@@ -10,12 +10,19 @@ import {
   Patch,
   Post,
   Req,
+  Res,
 } from "@nestjs/common";
-import type { Request } from "express";
+import type { Request, Response } from "express";
 import { Permission, TenantRole } from "@wapp/shared-types";
 import { CurrentUser } from "../../identity/decorators/current-user.decorator.js";
 import { RequirePermission } from "../../identity/decorators/require-permission.decorator.js";
-import type { AuthenticatedUser, IssuedTokenPair } from "../../identity/identity.types.js";
+import { RefreshCookieService } from "../../../common/security/refresh-cookie.service.js";
+import { TENANT_REFRESH_TOKEN_COOKIE } from "../../identity/identity.constants.js";
+import type {
+  AccessTokenIssued,
+  AuthenticatedUser,
+  IssuedTokenPair,
+} from "../../identity/identity.types.js";
 import { TeamService } from "../services/team.service.js";
 import { InviteTeamMemberDto } from "../dto/invite-team-member.dto.js";
 import { AcceptInvitationDto } from "../dto/accept-invitation.dto.js";
@@ -24,7 +31,10 @@ import type { InvitationSummary, MemberSummary, WorkspaceProfile } from "../work
 
 @Controller({ path: "team", version: "1" })
 export class TeamController {
-  constructor(private readonly teamService: TeamService) {}
+  constructor(
+    private readonly teamService: TeamService,
+    private readonly refreshCookies: RefreshCookieService,
+  ) {}
 
   @RequirePermission(Permission.INVITE_USER)
   @Post("invitations")
@@ -60,8 +70,15 @@ export class TeamController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: AcceptInvitationDto,
     @Req() request: Request,
-  ): Promise<{ workspace: WorkspaceProfile; tokens: IssuedTokenPair }> {
-    return this.teamService.acceptInvitation(user, dto.token, this.extractMeta(request));
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<{ workspace: WorkspaceProfile; tokens: AccessTokenIssued }> {
+    const { workspace, tokens } = await this.teamService.acceptInvitation(
+      user,
+      dto.token,
+      this.extractMeta(request),
+    );
+    this.setRefreshCookie(response, tokens);
+    return { workspace, tokens: toAccessTokenIssued(tokens) };
   }
 
   @RequirePermission(Permission.VIEW_WORKSPACE)
@@ -124,15 +141,28 @@ export class TeamController {
     @CurrentUser() user: AuthenticatedUser,
     @Param("newOwnerId") newOwnerId: string,
     @Req() request: Request,
-  ): Promise<IssuedTokenPair> {
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AccessTokenIssued> {
     if (user.role !== TenantRole.OWNER) {
       throw new ForbiddenException("Only the current Owner can transfer ownership");
     }
-    return this.teamService.transferOwnership(
+    const tokens = await this.teamService.transferOwnership(
       user.workspaceId!,
       user.userId,
       newOwnerId,
       this.extractMeta(request),
+    );
+    this.setRefreshCookie(response, tokens);
+    return toAccessTokenIssued(tokens);
+  }
+
+  private setRefreshCookie(response: Response, tokens: IssuedTokenPair): void {
+    this.refreshCookies.set(
+      response,
+      TENANT_REFRESH_TOKEN_COOKIE,
+      tokens.refreshToken,
+      tokens.rememberMe,
+      tokens.refreshTokenExpiresAt,
     );
   }
 
@@ -142,4 +172,8 @@ export class TeamController {
       ipAddress: request.ip ?? null,
     };
   }
+}
+
+function toAccessTokenIssued(tokens: IssuedTokenPair): AccessTokenIssued {
+  return { accessToken: tokens.accessToken, expiresIn: tokens.expiresIn };
 }

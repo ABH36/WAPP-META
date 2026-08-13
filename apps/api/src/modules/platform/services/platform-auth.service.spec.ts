@@ -1,4 +1,5 @@
 import { Test } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
 import { ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import { PlatformRole } from "@wapp/shared-types";
 import { PlatformAuthService } from "./platform-auth.service.js";
@@ -60,6 +61,7 @@ describe("PlatformAuthService", () => {
             findByEmail: jest.fn(),
             findById: jest.fn(),
             recordSuccessfulLogin: jest.fn(),
+            registerFailedLogin: jest.fn(),
           },
         },
         {
@@ -80,6 +82,17 @@ describe("PlatformAuthService", () => {
             signRefreshToken: jest.fn(),
             verifyRefreshToken: jest.fn(),
             hashOpaqueToken: jest.fn(),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) => {
+              if (key === "auth") {
+                return { maxFailedLoginAttempts: 5, accountLockoutMinutes: 15 };
+              }
+              throw new Error(`Unexpected config key: ${key}`);
+            },
           },
         },
       ],
@@ -107,10 +120,12 @@ describe("PlatformAuthService", () => {
       platformUserRepository.findByEmail.mockResolvedValue(fakePlatformUser());
       passwordService.compare.mockResolvedValue(true);
 
-      const result = await service.login("priya@wapp.internal", "Passw0rd1", {
-        userAgent: "jest",
-        ipAddress: "127.0.0.1",
-      });
+      const result = await service.login(
+        "priya@wapp.internal",
+        "Passw0rd1",
+        { userAgent: "jest", ipAddress: "127.0.0.1" },
+        false,
+      );
 
       expect(result.tokens.accessToken).toBe("access-token");
       expect(result.user.email).toBe("priya@wapp.internal");
@@ -125,7 +140,7 @@ describe("PlatformAuthService", () => {
       passwordService.compare.mockResolvedValue(false);
 
       await expect(
-        service.login("nobody@wapp.internal", "x", { userAgent: null, ipAddress: null }),
+        service.login("nobody@wapp.internal", "x", { userAgent: null, ipAddress: null }, false),
       ).rejects.toThrow(UnauthorizedException);
       // Timing-attack mitigation — still runs a bcrypt compare against the dummy hash.
       expect(passwordService.compare).toHaveBeenCalled();
@@ -144,7 +159,7 @@ describe("PlatformAuthService", () => {
       passwordService.compare.mockResolvedValue(false);
 
       await expect(
-        service.login("priya@wapp.internal", "wrong", { userAgent: null, ipAddress: null }),
+        service.login("priya@wapp.internal", "wrong", { userAgent: null, ipAddress: null }, false),
       ).rejects.toThrow(UnauthorizedException);
       expect(loginHistoryRepository.record).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -160,7 +175,12 @@ describe("PlatformAuthService", () => {
       passwordService.compare.mockResolvedValue(true);
 
       await expect(
-        service.login("priya@wapp.internal", "Passw0rd1", { userAgent: null, ipAddress: null }),
+        service.login(
+          "priya@wapp.internal",
+          "Passw0rd1",
+          { userAgent: null, ipAddress: null },
+          false,
+        ),
       ).rejects.toThrow(ForbiddenException);
       expect(platformUserRepository.recordSuccessfulLogin).not.toHaveBeenCalled();
       expect(loginHistoryRepository.record).toHaveBeenCalledWith(

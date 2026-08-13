@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsString,
   IsUrl,
   Matches,
@@ -105,6 +106,13 @@ class EnvironmentVariables {
     message: "TOKEN_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)",
   })
   TOKEN_ENCRYPTION_KEY!: string;
+
+  // PHD-001 Volume-1 — optional `Domain` attribute for the httpOnly refresh-token
+  // cookie. Only required in production for apps/admin's separate subdomain; see
+  // the `cookieDomain` doc comment in configuration.ts for the full rationale.
+  @IsOptional()
+  @IsString()
+  COOKIE_DOMAIN?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
@@ -119,6 +127,25 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
         .map((e) => Object.values(e.constraints ?? {}).join(", "))
         .join("\n")}`,
     );
+  }
+
+  // PRD-007 Volume-1 / PHD-001 Volume-1 — a leaked tenant secret must never be
+  // usable to forge a Platform Administration session, and vice versa. This was
+  // previously only a code comment; enforce it structurally so a misconfigured
+  // deploy fails fast instead of silently sharing a signing key across the two
+  // trust boundaries.
+  const secretPairs: Array<[string, string]> = [
+    ["JWT_ACCESS_SECRET", "PLATFORM_JWT_ACCESS_SECRET"],
+    ["JWT_ACCESS_SECRET", "PLATFORM_JWT_REFRESH_SECRET"],
+    ["JWT_REFRESH_SECRET", "PLATFORM_JWT_ACCESS_SECRET"],
+    ["JWT_REFRESH_SECRET", "PLATFORM_JWT_REFRESH_SECRET"],
+    ["JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"],
+    ["PLATFORM_JWT_ACCESS_SECRET", "PLATFORM_JWT_REFRESH_SECRET"],
+  ];
+  for (const [a, b] of secretPairs) {
+    if (validated[a as keyof EnvironmentVariables] === validated[b as keyof EnvironmentVariables]) {
+      throw new Error(`Environment configuration is invalid: ${a} and ${b} must not be equal.`);
+    }
   }
 
   return validated;

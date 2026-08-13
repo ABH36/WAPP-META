@@ -31,6 +31,18 @@ export class PlatformUser {
   @Prop({ default: true })
   isActive!: boolean;
 
+  // PHD-001 Volume-1 (Security Hardening) — parity with the tenant `User`
+  // collection's own account-lockout fields (`registerFailedLogin`'s exact
+  // pattern, `apps/api/src/modules/identity/repositories/user.repository.ts`).
+  // Previously absent entirely — Platform Admin login relied on rate
+  // limiting alone, a real asymmetry given these are the highest-privilege
+  // accounts in the system.
+  @Prop({ default: 0 })
+  failedLoginAttempts!: number;
+
+  @Prop({ type: Date, default: null })
+  lockedUntil!: Date | null;
+
   @Prop({ type: Date, default: null })
   lastLoginAt!: Date | null;
 

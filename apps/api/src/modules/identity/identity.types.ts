@@ -31,9 +31,27 @@ export interface AuthenticatedUser {
   emailVerified: boolean;
 }
 
+/**
+ * PHD-001 Volume-1 (Security Hardening) — internal, service-to-controller
+ * shape only. `refreshToken`/`refreshTokenExpiresAt`/`rememberMe` never
+ * reach the client in a JSON response body — the controller uses them to
+ * set the httpOnly refresh-token cookie, then returns only
+ * `AccessTokenIssued` to the caller. Amends ADR-FE-001's "backend never
+ * sets cookies" clause for the refresh token specifically (the access
+ * token's transport — JSON body, memory-only on the client — is
+ * unchanged).
+ */
 export interface IssuedTokenPair {
   accessToken: string;
   refreshToken: string;
+  refreshTokenExpiresAt: Date;
+  rememberMe: boolean;
+  expiresIn: number;
+}
+
+/** The only token-related fields ever returned in a client-visible JSON response. */
+export interface AccessTokenIssued {
+  accessToken: string;
   expiresIn: number;
 }
 

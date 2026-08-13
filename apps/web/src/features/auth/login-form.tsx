@@ -6,11 +6,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { emailSchema } from "@wapp/shared-validation";
-import { Alert, Button, Input, PasswordInput, setCookie } from "@wapp/ui";
+import { Alert, Button, Input, PasswordInput } from "@wapp/ui";
 import { authService } from "../../services/auth.service";
 import { useAuthStore } from "../../stores/auth-store";
-import { ApiError, REFRESH_TOKEN_COOKIE } from "../../lib/api";
-import { setRememberMe, refreshTokenCookieMaxAge } from "../../lib/remember-me";
+import { ApiError } from "../../lib/api";
 import { hydrateUserPreferences } from "../../lib/preference-sync";
 
 const loginSchema = z.object({
@@ -49,9 +48,11 @@ export function LoginForm(): React.JSX.Element {
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
     try {
-      const { tokens, user } = await authService.login(values.email, values.password);
-      setRememberMe(values.rememberMe);
-      setCookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, refreshTokenCookieMaxAge());
+      const { tokens, user } = await authService.login(
+        values.email,
+        values.password,
+        values.rememberMe,
+      );
       setSession(user, tokens.accessToken);
       void hydrateUserPreferences();
       router.push(searchParams.get("redirectTo") ?? "/dashboard");

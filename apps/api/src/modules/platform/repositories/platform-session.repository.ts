@@ -10,6 +10,7 @@ export interface CreatePlatformSessionInput {
   userAgent: string | null;
   ipAddress: string | null;
   expiresAt: Date;
+  rememberMe: boolean;
 }
 
 @Injectable()

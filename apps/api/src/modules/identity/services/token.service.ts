@@ -49,7 +49,10 @@ export class TokenService {
     const { accessSecret, accessTtl } = this.config.get("jwt", { infer: true });
     const token = this.jwtService.sign(
       { ...payload, type: "access" } satisfies AccessTokenPayload,
-      { secret: accessSecret, expiresIn: accessTtl },
+      // PHD-001 Volume-1 — algorithm pinned explicitly rather than left to
+      // the library default, so a token crafted with `alg: "none"` or an
+      // asymmetric algorithm can never be accepted.
+      { secret: accessSecret, expiresIn: accessTtl, algorithm: "HS256" },
     );
     return { token, expiresIn: parseDurationToSeconds(accessTtl) };
   }
@@ -59,7 +62,7 @@ export class TokenService {
     const jti = randomUUID();
     const token = this.jwtService.sign(
       { sub: userId, jti, type: "refresh" } satisfies RefreshTokenPayload,
-      { secret: refreshSecret, expiresIn: refreshTtl },
+      { secret: refreshSecret, expiresIn: refreshTtl, algorithm: "HS256" },
     );
     const expiresAt = new Date(Date.now() + parseDurationToSeconds(refreshTtl) * 1000);
     return { token, jti, expiresAt };
@@ -68,7 +71,10 @@ export class TokenService {
   verifyAccessToken(token: string): AccessTokenPayload {
     const { accessSecret } = this.config.get("jwt", { infer: true });
     try {
-      const payload = this.jwtService.verify<AccessTokenPayload>(token, { secret: accessSecret });
+      const payload = this.jwtService.verify<AccessTokenPayload>(token, {
+        secret: accessSecret,
+        algorithms: ["HS256"],
+      });
       if (payload.type !== "access") {
         throw new UnauthorizedException("Invalid token type");
       }
@@ -81,7 +87,10 @@ export class TokenService {
   verifyRefreshToken(token: string): RefreshTokenPayload {
     const { refreshSecret } = this.config.get("jwt", { infer: true });
     try {
-      const payload = this.jwtService.verify<RefreshTokenPayload>(token, { secret: refreshSecret });
+      const payload = this.jwtService.verify<RefreshTokenPayload>(token, {
+        secret: refreshSecret,
+        algorithms: ["HS256"],
+      });
       if (payload.type !== "refresh") {
         throw new UnauthorizedException("Invalid token type");
       }

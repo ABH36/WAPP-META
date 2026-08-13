@@ -68,6 +68,14 @@ export interface AppConfig {
   };
   tokenEncryptionKey: string;
   corsAllowedOrigins: string[];
+  // PHD-001 Volume-1 — optional `Domain` attribute for the httpOnly refresh-token
+  // cookie. Unset in dev (host-only cookie is enough since apps/web/admin/api all
+  // share `localhost`, cookie scoping ignores port). Required in production only
+  // for apps/admin, which is served from a genuinely separate subdomain rather
+  // than proxied same-origin like apps/web (see docker/nginx/nginx.conf). Never
+  // hardcode a guessed domain — this stays env-driven and empty until Ops
+  // provides the real production value.
+  cookieDomain: string | undefined;
 }
 
 export default (): AppConfig => ({
@@ -133,4 +141,5 @@ export default (): AppConfig => ({
   corsAllowedOrigins: [process.env.WEB_APP_URL, process.env.ADMIN_APP_URL].filter(
     (origin): origin is string => Boolean(origin),
   ),
+  cookieDomain: process.env.COOKIE_DOMAIN || undefined,
 });

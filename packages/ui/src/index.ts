@@ -1,6 +1,5 @@
 export * from "./lib/cn";
 export * from "./lib/status-color";
-export * from "./lib/cookies";
 export * from "./components/button";
 export * from "./components/header";
 export * from "./components/sidebar";

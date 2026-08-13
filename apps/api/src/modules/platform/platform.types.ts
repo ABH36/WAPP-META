@@ -29,9 +29,18 @@ export interface AuthenticatedPlatformUser {
   role: PlatformRole;
 }
 
+/** PHD-001 Volume-1 (Security Hardening) — see identity.types.ts's `IssuedTokenPair` for the full rationale; identical treatment for the platform auth boundary. */
 export interface IssuedPlatformTokenPair {
   accessToken: string;
   refreshToken: string;
+  refreshTokenExpiresAt: Date;
+  rememberMe: boolean;
+  expiresIn: number;
+}
+
+/** The only token-related fields ever returned in a client-visible JSON response. */
+export interface PlatformAccessTokenIssued {
+  accessToken: string;
   expiresIn: number;
 }
 

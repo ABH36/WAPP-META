@@ -110,8 +110,9 @@ export class AuthService {
 
     // Verification is the moment LOGIN-BR-001 is satisfied — auto-issuing
     // tokens here removes an otherwise-pointless extra manual login step from
-    // the D015 30-minute activation funnel.
-    const tokens = await this.issueTokenPair(user, { userAgent: null, ipAddress: null });
+    // the D015 30-minute activation funnel. No Remember Me checkbox exists on
+    // this path — defaults to a session-only cookie (the safer default).
+    const tokens = await this.issueTokenPair(user, { userAgent: null, ipAddress: null }, false);
     return { tokens, user: toUserProfile(user) };
   }
 
@@ -232,7 +233,7 @@ export class AuthService {
 
     await this.userRepository.recordSuccessfulLogin(userId);
     await this.recordLoginAttempt(userId, true, null, meta);
-    const tokens = await this.issueTokenPair(user, meta);
+    const tokens = await this.issueTokenPair(user, meta, dto.rememberMe ?? false);
     return { tokens, user: toUserProfile(user) };
   }
 
@@ -270,7 +271,10 @@ export class AuthService {
       throw new UnauthorizedException("Invalid refresh token");
     }
 
-    const rotated = await this.createSession(user._id.toString(), meta);
+    // PHD-001 Volume-1 — the persistent-vs-session cookie character chosen at
+    // login carries forward through the whole rotation chain without the
+    // client resending it.
+    const rotated = await this.createSession(user._id.toString(), meta, session.rememberMe);
     await this.sessionRepository.revokeByJti(payload.jti, rotated.jti);
 
     const { token: accessToken, expiresIn } = this.tokenService.signAccessToken({
@@ -281,7 +285,13 @@ export class AuthService {
       emailVerified: user.isEmailVerified,
     });
 
-    return { accessToken, refreshToken: rotated.token, expiresIn };
+    return {
+      accessToken,
+      refreshToken: rotated.token,
+      refreshTokenExpiresAt: rotated.expiresAt,
+      rememberMe: session.rememberMe,
+      expiresIn,
+    };
   }
 
   /**
@@ -299,7 +309,14 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException("User not found");
     }
-    return this.issueTokenPair(user, meta);
+    // This fires mid-session (no login action, so no fresh rememberMe
+    // choice to read) and doesn't revoke/rotate the caller's existing
+    // session, so there's no prior session record to inherit from either —
+    // defaults to `true` (persistent), matching the login form's own
+    // default and the frontend's pre-existing "falls back to the more
+    // forgiving behavior" philosophy, rather than silently downgrading an
+    // active user to a session-only cookie they never asked for.
+    return this.issueTokenPair(user, meta, true);
   }
 
   /**
@@ -505,8 +522,12 @@ export class AuthService {
     });
   }
 
-  private async issueTokenPair(user: UserDocument, meta: RequestMeta): Promise<IssuedTokenPair> {
-    const session = await this.createSession(user._id.toString(), meta);
+  private async issueTokenPair(
+    user: UserDocument,
+    meta: RequestMeta,
+    rememberMe: boolean,
+  ): Promise<IssuedTokenPair> {
+    const session = await this.createSession(user._id.toString(), meta, rememberMe);
     const { token: accessToken, expiresIn } = this.tokenService.signAccessToken({
       sub: user._id.toString(),
       workspaceId: user.workspaceId,
@@ -514,7 +535,13 @@ export class AuthService {
       workspaceMemberStatus: user.workspaceMemberStatus,
       emailVerified: user.isEmailVerified,
     });
-    return { accessToken, refreshToken: session.token, expiresIn };
+    return {
+      accessToken,
+      refreshToken: session.token,
+      refreshTokenExpiresAt: session.expiresAt,
+      rememberMe,
+      expiresIn,
+    };
   }
 
   /** Not called for an unknown email — there's no userId to attribute the attempt to. */
@@ -536,7 +563,8 @@ export class AuthService {
   private async createSession(
     userId: string,
     meta: RequestMeta,
-  ): Promise<{ token: string; jti: string }> {
+    rememberMe: boolean,
+  ): Promise<{ token: string; jti: string; expiresAt: Date }> {
     const { token, jti, expiresAt } = this.tokenService.signRefreshToken(userId);
     await this.sessionRepository.create({
       userId,
@@ -545,7 +573,8 @@ export class AuthService {
       userAgent: meta.userAgent,
       ipAddress: meta.ipAddress,
       expiresAt,
+      rememberMe,
     });
-    return { token, jti };
+    return { token, jti, expiresAt };
   }
 }

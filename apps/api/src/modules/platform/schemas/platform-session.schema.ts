@@ -35,6 +35,11 @@ export class PlatformSession {
   @Prop({ type: String, default: null })
   replacedByJti!: string | null;
 
+  // PHD-001 Volume-1 (Security Hardening) — see the tenant `Session` schema's
+  // identical field for the full rationale.
+  @Prop({ default: false })
+  rememberMe!: boolean;
+
   createdAt!: Date;
 }
 

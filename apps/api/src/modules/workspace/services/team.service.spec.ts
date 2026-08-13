@@ -252,6 +252,8 @@ describe("TeamService", () => {
         accessToken: "access-token",
         refreshToken: "refresh-token",
         expiresIn: 900,
+        refreshTokenExpiresAt: new Date(),
+        rememberMe: true,
       });
 
       const result = await service.acceptInvitation(actingUser, "raw-token", {
@@ -381,6 +383,8 @@ describe("TeamService", () => {
         accessToken: "access-token",
         refreshToken: "refresh-token",
         expiresIn: 900,
+        refreshTokenExpiresAt: new Date(),
+        rememberMe: true,
       });
 
       const result = await service.transferOwnership("workspace-1", "user-1", "user-2", {

@@ -824,3 +824,35 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** a dedicated future FRD volume (or extension of this one) if a real product need for cross-tenant push notifications, background sync, or an `apps/admin` install experience emerges — none is anticipated given `apps/admin`'s internal-only, always-online operator-console nature.
 
 **Trigger to revisit:** a real product requirement for any of the above — none currently exists.
+
+---
+
+## TD-055 — `ApiKeyGuard` is fully built but wired to zero routes
+
+**Raised:** 2026-08-12 (PHD-001 Volume-1, Security Hardening)
+**Status:** Open — classified, not expanded
+
+**What:** `apps/api/src/modules/identity/guards/api-key.guard.ts` + `services/api-key.service.ts` are a complete, correctly-implemented `x-api-key` header authentication path — bcrypt-hashed key storage (`PasswordService.compare`, same one-way hashing as user passwords), prefix-indexed lookup so the raw key is never queried directly, expiry checking, and a shown-once raw key at creation (PRD-006 Volume-3 §4.4's Developer API Keys feature). It is not registered as a global guard and `@UseGuards(ApiKeyGuard)` is not applied to any controller route — grep-confirmed zero call sites. There is currently no Developer API surface (no endpoints meant to be called by anything other than the two frontend apps) for it to protect.
+
+**Classification (PHD-001 §8 framework):** the guard/service implementation itself is **Already Secure** — reviewed line-by-line this volume, no hardening gap found in what's built. The dormancy itself is **Technical Debt**, not a security gap: an unwired guard grants no access to anything (the opposite of a vulnerability), it is simply finished work with no current consumer.
+
+**Why accepted for now:** Architecture Review, this volume: reviewed and classified without expanding the approved API surface — building a Developer API surface for this guard to protect is a separate, larger product decision (a genuine external API product), not a hardening-volume task.
+
+**Closing this out looks like:** either wire it to real routes once a Developer API surface is approved and built (PRD-006 §12 territory), or, if no such surface is ever planned, remove the dormant guard/service pair entirely rather than carry unused code indefinitely.
+
+**Trigger to revisit:** a Product decision to ship a customer-facing Developer API (webhooks-out, programmatic access, etc.).
+
+---
+
+## TD-056 — No SBOM generation or container image signing anywhere in the build/deploy pipeline
+
+**Raised:** 2026-08-13 (PHD-001 Volume-1, Security Hardening)
+**Status:** Open — documented gap, deferred to Docker/CI-CD scope
+
+**What:** No Software Bill of Materials is generated for any built Docker image, and no image-signing mechanism (e.g., Sigstore/`cosign`) exists anywhere in `docker/` or the CI pipeline. Confirmed during this volume's own Docker/CI-CD/supply-chain research — a genuine, currently-unaddressed gap, not something already covered by an existing control.
+
+**Why accepted for now:** PHD-001 Volume-1's approved scope was application-layer security hardening (auth/cookies/HTTP headers/rate-limiting/JWT) — this document's own roadmap footer already names PHD-001 Volumes 2–4 as the sequence covering `apps/api`/Docker/CI-CD/Deployment Configuration specifically. Building an SBOM/signing mechanism means choosing a concrete tool and CI wiring, which is Docker/CI-CD infrastructure work, not an application-layer hardening task — see `docs/ADR-PHD-002-production-security-configuration.md` for the full reasoning.
+
+**Closing this out looks like:** a future PHD-001 volume (or dedicated CI/CD hardening pass) selecting a concrete SBOM tool (e.g., `syft`) and signing mechanism (e.g., `cosign` keyless signing via the CI provider's OIDC identity), then wiring both into the existing Docker build/publish pipeline.
+
+**Trigger to revisit:** the PHD-001 Volume-2 (or later) Docker/CI-CD/Deployment Configuration volume beginning.

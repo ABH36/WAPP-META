@@ -49,7 +49,10 @@ export class PlatformTokenService {
     const { accessSecret, accessTtl } = this.config.get("platformJwt", { infer: true });
     const token = this.jwtService.sign(
       { ...payload, type: "platform_access" } satisfies PlatformAccessTokenPayload,
-      { secret: accessSecret, expiresIn: accessTtl },
+      // PHD-001 Volume-1 — algorithm pinned explicitly rather than left to
+      // the library default, so a token crafted with `alg: "none"` or an
+      // asymmetric algorithm can never be accepted.
+      { secret: accessSecret, expiresIn: accessTtl, algorithm: "HS256" },
     );
     return { token, expiresIn: parseDurationToSeconds(accessTtl) };
   }
@@ -59,7 +62,7 @@ export class PlatformTokenService {
     const jti = randomUUID();
     const token = this.jwtService.sign(
       { sub: platformUserId, jti, type: "platform_refresh" } satisfies PlatformRefreshTokenPayload,
-      { secret: refreshSecret, expiresIn: refreshTtl },
+      { secret: refreshSecret, expiresIn: refreshTtl, algorithm: "HS256" },
     );
     const expiresAt = new Date(Date.now() + parseDurationToSeconds(refreshTtl) * 1000);
     return { token, jti, expiresAt };
@@ -70,6 +73,7 @@ export class PlatformTokenService {
     try {
       const payload = this.jwtService.verify<PlatformAccessTokenPayload>(token, {
         secret: accessSecret,
+        algorithms: ["HS256"],
       });
       if (payload.type !== "platform_access") {
         throw new UnauthorizedException("Invalid token type");
@@ -85,6 +89,7 @@ export class PlatformTokenService {
     try {
       const payload = this.jwtService.verify<PlatformRefreshTokenPayload>(token, {
         secret: refreshSecret,
+        algorithms: ["HS256"],
       });
       if (payload.type !== "platform_refresh") {
         throw new UnauthorizedException("Invalid token type");

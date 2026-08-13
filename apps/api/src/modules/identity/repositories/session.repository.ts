@@ -14,6 +14,7 @@ export class SessionRepository {
     userAgent: string | null;
     ipAddress: string | null;
     expiresAt: Date;
+    rememberMe: boolean;
   }): Promise<SessionDocument> {
     return this.sessionModel.create(input);
   }

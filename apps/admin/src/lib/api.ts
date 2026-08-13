@@ -1,13 +1,8 @@
 import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from "axios";
-import { deleteCookie, getCookie, setCookie } from "@wapp/ui";
 import type { ApiErrorResponse, ApiSuccessResponse } from "@wapp/shared-types";
 import { env } from "./env";
-import { REFRESH_TOKEN_COOKIE } from "./auth-cookie";
-import { refreshTokenCookieMaxAge } from "./remember-me";
 import { useAuthStore } from "../stores/auth-store";
-import type { IssuedPlatformTokenPair } from "../types/auth";
-
-export { REFRESH_TOKEN_COOKIE };
+import type { PlatformAccessTokenIssued } from "../types/auth";
 
 export class ApiError extends Error {
   readonly statusCode: number | null;
@@ -27,8 +22,11 @@ declare module "axios" {
   }
 }
 
-const client: AxiosInstance = axios.create({ baseURL: env.apiUrl });
-const refreshClient: AxiosInstance = axios.create({ baseURL: env.apiUrl });
+// PHD-001 Volume-1 — `withCredentials: true` on every instance: the refresh
+// token now travels as an httpOnly cookie the backend itself sets/reads
+// (amends ADR-FE-001), so the browser must be told to actually send it.
+const client: AxiosInstance = axios.create({ baseURL: env.apiUrl, withCredentials: true });
+const refreshClient: AxiosInstance = axios.create({ baseURL: env.apiUrl, withCredentials: true });
 
 client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = useAuthStore.getState().accessToken;
@@ -41,23 +39,23 @@ client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 let refreshInFlight: Promise<string> | null = null;
 
 async function refreshAccessToken(): Promise<string> {
-  const refreshToken = getCookie(REFRESH_TOKEN_COOKIE);
-  if (!refreshToken) {
-    throw new ApiError("No active session", 401);
-  }
-  const response = await refreshClient.post<ApiSuccessResponse<IssuedPlatformTokenPair>>(
-    "/platform/auth/refresh",
-    { refreshToken },
-  );
+  // No body, no manual cookie read — the browser attaches the httpOnly
+  // refresh cookie automatically (withCredentials above); the backend
+  // rotates it via a fresh Set-Cookie on the response.
+  const response =
+    await refreshClient.post<ApiSuccessResponse<PlatformAccessTokenIssued>>(
+      "/platform/auth/refresh",
+    );
   const tokens = response.data.data;
   useAuthStore.getState().setAccessToken(tokens.accessToken);
-  setCookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, refreshTokenCookieMaxAge());
   return tokens.accessToken;
 }
 
 function handleAuthFailure(): void {
   useAuthStore.getState().clear();
-  deleteCookie(REFRESH_TOKEN_COOKIE);
+  // The refresh cookie is httpOnly — this can't clear it client-side, and
+  // doesn't need to: it's simply left to fail the next refresh attempt
+  // server-side (revoked/expired) until a new login overwrites it.
   if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
     window.location.assign("/login");
   }

@@ -29,8 +29,12 @@ export interface PlatformUserProfile {
   createdAt: string;
 }
 
-export interface IssuedPlatformTokenPair {
+/**
+ * PHD-001 Volume-1 (Security Hardening) — the only token-related fields ever
+ * returned in a client-visible JSON response; the refresh token itself now
+ * travels exclusively as an httpOnly Set-Cookie header (amends ADR-FE-001).
+ */
+export interface PlatformAccessTokenIssued {
   accessToken: string;
-  refreshToken: string;
   expiresIn: number;
 }

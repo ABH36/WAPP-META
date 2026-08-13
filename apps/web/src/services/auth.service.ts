@@ -1,10 +1,14 @@
 import { apiDelete, apiGet, apiPost } from "../lib/api";
-import type { IssuedTokenPair, SessionSummary, UserProfile } from "../types/auth";
+import type { AccessTokenIssued, SessionSummary, UserProfile } from "../types/auth";
 
 /** FRD-001 Volume-1 §9 — thin, typed wrappers over `apps/api`'s `/auth/*` (mirrors `AuthController` exactly, apps/api/src/modules/identity/controllers/auth.controller.ts). No business logic here — a request/response shape mapping only. */
 export const authService = {
-  login(email: string, password: string): Promise<{ tokens: IssuedTokenPair; user: UserProfile }> {
-    return apiPost("/auth/login", { email, password });
+  login(
+    email: string,
+    password: string,
+    rememberMe: boolean,
+  ): Promise<{ tokens: AccessTokenIssued; user: UserProfile }> {
+    return apiPost("/auth/login", { email, password, rememberMe });
   },
 
   register(input: {
@@ -16,7 +20,7 @@ export const authService = {
     return apiPost("/auth/register", input);
   },
 
-  verifyEmail(token: string): Promise<{ tokens: IssuedTokenPair; user: UserProfile }> {
+  verifyEmail(token: string): Promise<{ tokens: AccessTokenIssued; user: UserProfile }> {
     return apiPost("/auth/verify-email", { token });
   },
 
@@ -32,8 +36,10 @@ export const authService = {
     return apiPost("/auth/reset-password", { token, password });
   },
 
-  logout(refreshToken: string): Promise<{ message: string }> {
-    return apiPost("/auth/logout", { refreshToken });
+  // PHD-001 Volume-1 — no refreshToken param: the backend reads/clears the
+  // httpOnly cookie itself.
+  logout(): Promise<{ message: string }> {
+    return apiPost("/auth/logout");
   },
 
   me(): Promise<UserProfile> {

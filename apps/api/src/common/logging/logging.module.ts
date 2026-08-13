@@ -46,6 +46,10 @@ const TRACE_ID_HEADER = "x-trace-id";
               paths: [
                 "req.headers.authorization",
                 "req.headers.cookie",
+                // PHD-001 Volume-1 — the httpOnly refresh-token cookie now
+                // travels in the response's Set-Cookie header; redact it
+                // symmetrically with the request-side cookie above.
+                'res.headers["set-cookie"]',
                 "req.body.password",
                 "req.body.currentPassword",
                 "req.body.newPassword",

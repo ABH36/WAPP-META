@@ -2,12 +2,13 @@ import { Test } from "@nestjs/testing";
 import { VersioningType, type INestApplication } from "@nestjs/common";
 import type { Server } from "http";
 import request from "supertest";
+import cookieParser from "cookie-parser";
 import type { ApiSuccessResponse } from "@wapp/shared-types";
 import { AppModule } from "../src/app.module.js";
 import { EmailService } from "../src/infrastructure/email/email.service.js";
 import type { SendEmailJob } from "../src/infrastructure/email/email.types.js";
 import type {
-  IssuedTokenPair,
+  AccessTokenIssued,
   LoginHistorySummary,
   SessionSummary,
 } from "../src/modules/identity/identity.types.js";
@@ -17,6 +18,25 @@ import type {
   SettingsOverview,
   UserSettingsOverview,
 } from "../src/modules/settings/settings.types.js";
+
+const REFRESH_TOKEN_COOKIE = "wapp_web_rt";
+
+// PHD-001 Volume-1 — the refresh token now travels as an httpOnly Set-Cookie
+// header, never in the JSON response body; tests must read/replay it as a
+// cookie, same as a real browser would.
+function extractRefreshCookie(response: request.Response): string {
+  const setCookieHeader = response.headers["set-cookie"] as string[] | string | undefined;
+  const cookies = Array.isArray(setCookieHeader)
+    ? setCookieHeader
+    : setCookieHeader
+      ? [setCookieHeader]
+      : [];
+  const raw = cookies.find((cookie) => cookie.startsWith(`${REFRESH_TOKEN_COOKIE}=`));
+  if (!raw) {
+    throw new Error(`No ${REFRESH_TOKEN_COOKIE} cookie in response`);
+  }
+  return raw.split(";")[0] as string;
+}
 
 // This file now covers both Volume-1 and Volume-2, each with multiple real
 // registrations (real bcrypt hashing) per beforeAll — comfortably over the
@@ -83,6 +103,7 @@ describe("Settings — Workspace Settings (e2e)", () => {
       .compile();
 
     app = moduleRef.createNestApplication();
+    app.use(cookieParser());
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
     app.setGlobalPrefix("api");
     await app.init();
@@ -97,13 +118,14 @@ describe("Settings — Workspace Settings (e2e)", () => {
     const verifyRes = await request(server())
       .post("/api/v1/auth/verify-email")
       .send({ token: verifyToken });
-    const tokens = (verifyRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data.tokens;
+    const tokens = (verifyRes.body as ApiSuccessResponse<{ tokens: AccessTokenIssued }>).data
+      .tokens;
 
     const createRes = await request(server())
       .post("/api/v1/workspaces")
       .set("Authorization", `Bearer ${tokens.accessToken}`)
       .send({ name: "Settings Test Co" });
-    const createBody = createRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>;
+    const createBody = createRes.body as ApiSuccessResponse<{ tokens: AccessTokenIssued }>;
     ownerAccessToken = createBody.data.tokens.accessToken;
 
     salesExecutiveAccessToken = await inviteAndAccept(
@@ -165,7 +187,7 @@ describe("Settings — Workspace Settings (e2e)", () => {
     const verifyRes = await request(server())
       .post("/api/v1/auth/verify-email")
       .send({ token: verifyToken });
-    const memberTokens = (verifyRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data
+    const memberTokens = (verifyRes.body as ApiSuccessResponse<{ tokens: AccessTokenIssued }>).data
       .tokens;
 
     await authed("post", "/api/v1/team/invitations").send({ email, role });
@@ -174,7 +196,7 @@ describe("Settings — Workspace Settings (e2e)", () => {
       .post("/api/v1/team/invitations/accept")
       .set("Authorization", `Bearer ${memberTokens.accessToken}`)
       .send({ token: inviteToken });
-    const acceptBody = (acceptRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data;
+    const acceptBody = (acceptRes.body as ApiSuccessResponse<{ tokens: AccessTokenIssued }>).data;
 
     return acceptBody.tokens.accessToken;
   }
@@ -337,6 +359,7 @@ describe("Settings — User Preferences & Security (e2e)", () => {
       .compile();
 
     app = moduleRef.createNestApplication();
+    app.use(cookieParser());
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
     app.setGlobalPrefix("api");
     await app.init();
@@ -351,15 +374,16 @@ describe("Settings — User Preferences & Security (e2e)", () => {
     const verifyRes = await request(server())
       .post("/api/v1/auth/verify-email")
       .send({ token: verifyToken });
-    const tokens = (verifyRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data.tokens;
+    const tokens = (verifyRes.body as ApiSuccessResponse<{ tokens: AccessTokenIssued }>).data
+      .tokens;
 
     const createRes = await request(server())
       .post("/api/v1/workspaces")
       .set("Authorization", `Bearer ${tokens.accessToken}`)
       .send({ name: "Settings User Test Co" });
-    const createBody = createRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>;
+    const createBody = createRes.body as ApiSuccessResponse<{ tokens: AccessTokenIssued }>;
     ownerAccessToken = createBody.data.tokens.accessToken;
-    ownerRefreshToken = createBody.data.tokens.refreshToken;
+    ownerRefreshToken = extractRefreshCookie(createRes);
 
     memberAccessToken = await inviteAndAccept(
       memberEmail,
@@ -414,7 +438,7 @@ describe("Settings — User Preferences & Security (e2e)", () => {
     const verifyRes = await request(server())
       .post("/api/v1/auth/verify-email")
       .send({ token: verifyToken });
-    const memberTokens = (verifyRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data
+    const memberTokens = (verifyRes.body as ApiSuccessResponse<{ tokens: AccessTokenIssued }>).data
       .tokens;
 
     await authed("post", "/api/v1/team/invitations").send({ email, role });
@@ -423,7 +447,7 @@ describe("Settings — User Preferences & Security (e2e)", () => {
       .post("/api/v1/team/invitations/accept")
       .set("Authorization", `Bearer ${memberTokens.accessToken}`)
       .send({ token: inviteToken });
-    const acceptBody = (acceptRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data;
+    const acceptBody = (acceptRes.body as ApiSuccessResponse<{ tokens: AccessTokenIssued }>).data;
 
     return acceptBody.tokens.accessToken;
   }
@@ -539,7 +563,7 @@ describe("Settings — User Preferences & Security (e2e)", () => {
     // The pre-change refresh token must now be revoked.
     const refreshRes = await request(server())
       .post("/api/v1/auth/refresh")
-      .send({ refreshToken: ownerRefreshToken });
+      .set("Cookie", ownerRefreshToken);
     expect(refreshRes.status).toBe(401);
 
     // Re-login with the new password to keep the suite going.
@@ -547,7 +571,7 @@ describe("Settings — User Preferences & Security (e2e)", () => {
       .post("/api/v1/auth/login")
       .send({ email: ownerEmail, password: "NewPassw0rd1" });
     expect(loginRes.status).toBe(201);
-    const loginBody = (loginRes.body as ApiSuccessResponse<{ tokens: IssuedTokenPair }>).data;
+    const loginBody = (loginRes.body as ApiSuccessResponse<{ tokens: AccessTokenIssued }>).data;
     ownerAccessToken = loginBody.tokens.accessToken;
 
     // Changing back to the original password must be rejected (password history).

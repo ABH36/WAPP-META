@@ -6,11 +6,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { emailSchema } from "@wapp/shared-validation";
-import { Alert, Button, Input, PasswordInput, setCookie } from "@wapp/ui";
+import { Alert, Button, Input, PasswordInput } from "@wapp/ui";
 import { authService } from "../../services/auth.service";
 import { useAuthStore } from "../../stores/auth-store";
-import { ApiError, REFRESH_TOKEN_COOKIE } from "../../lib/api";
-import { setRememberMe, refreshTokenCookieMaxAge } from "../../lib/remember-me";
+import { ApiError } from "../../lib/api";
 
 const loginSchema = z.object({
   email: emailSchema,
@@ -42,9 +41,11 @@ export function LoginForm(): React.JSX.Element {
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
     try {
-      const { tokens, user } = await authService.login(values.email, values.password);
-      setRememberMe(values.rememberMe);
-      setCookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, refreshTokenCookieMaxAge());
+      const { tokens, user } = await authService.login(
+        values.email,
+        values.password,
+        values.rememberMe,
+      );
       // Login returns the fuller `PlatformUserProfile`; the store's canonical
       // shape is the thinner `PlatformUser` (see types/auth.ts's top
       // comment) — narrowed here at the one call site that has the fuller

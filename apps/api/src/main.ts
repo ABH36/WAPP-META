@@ -5,6 +5,7 @@ import { VersioningType } from "@nestjs/common";
 import { Logger } from "nestjs-pino";
 import helmet from "helmet";
 import compression from "compression";
+import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module.js";
 import type { AppConfig } from "./config/configuration.js";
 
@@ -64,6 +65,10 @@ async function bootstrap(): Promise<void> {
   // SEC-016 — request size limit (file uploads bypass this via Cloudinary
   // direct-upload, per TAD-001 v1.2 PATCH rationale).
   app.use(compression());
+
+  // PHD-001 Volume-1 — Express does not populate `request.cookies` on its own;
+  // required for the auth controllers to read the httpOnly refresh-token cookie.
+  app.use(cookieParser());
 
   // API-005 — every incoming request validated via DTOs before reaching
   // services. Registered as an APP_PIPE provider in AppModule (not here) so

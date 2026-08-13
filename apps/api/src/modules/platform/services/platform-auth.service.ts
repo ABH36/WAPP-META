@@ -1,4 +1,6 @@
 import { ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import type { AppConfig } from "../../../config/configuration.js";
 import { PlatformUserRepository } from "../repositories/platform-user.repository.js";
 import { PlatformSessionRepository } from "../repositories/platform-session.repository.js";
 import { PlatformLoginHistoryRepository } from "../repositories/platform-login-history.repository.js";
@@ -45,12 +47,14 @@ export class PlatformAuthService {
     private readonly loginHistoryRepository: PlatformLoginHistoryRepository,
     private readonly passwordService: PlatformPasswordService,
     private readonly tokenService: PlatformTokenService,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   async login(
     email: string,
     password: string,
     meta: PlatformRequestMeta,
+    rememberMe: boolean,
   ): Promise<{ tokens: IssuedPlatformTokenPair; user: PlatformUserProfile }> {
     const user = await this.platformUserRepository.findByEmail(email, { withPassword: true });
     if (!user) {
@@ -59,9 +63,30 @@ export class PlatformAuthService {
       throw new UnauthorizedException("Invalid email or password");
     }
 
+    // PHD-001 Volume-1 (Security Hardening) — mirrors tenant AuthService.login()'s
+    // exact lockout check/response, using the same shared `auth` config values.
+    // Previously absent — Platform Admin accounts (highest privilege in the
+    // system) had only the 5-req/min rate limiter as brute-force defense.
+    const { maxFailedLoginAttempts, accountLockoutMinutes } = this.config.get("auth", {
+      infer: true,
+    });
+    const userId = user._id.toString();
+
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      await this.recordLoginAttempt(userId, email, false, "ACCOUNT_LOCKED", meta);
+      throw new ForbiddenException(
+        "This account is temporarily locked due to multiple failed login attempts. Please try again later.",
+      );
+    }
+
     const passwordMatches = await this.passwordService.compare(password, user.passwordHash);
     if (!passwordMatches) {
-      await this.recordLoginAttempt(user._id.toString(), email, false, "INVALID_CREDENTIALS", meta);
+      await this.platformUserRepository.registerFailedLogin(
+        userId,
+        maxFailedLoginAttempts,
+        accountLockoutMinutes,
+      );
+      await this.recordLoginAttempt(userId, email, false, "INVALID_CREDENTIALS", meta);
       throw new UnauthorizedException("Invalid email or password");
     }
 
@@ -72,7 +97,7 @@ export class PlatformAuthService {
 
     await this.platformUserRepository.recordSuccessfulLogin(user._id.toString());
     await this.recordLoginAttempt(user._id.toString(), email, true, null, meta);
-    const tokens = await this.issueTokenPair(user, meta);
+    const tokens = await this.issueTokenPair(user, meta, rememberMe);
     return { tokens, user: toPlatformUserProfile(user) };
   }
 
@@ -123,7 +148,7 @@ export class PlatformAuthService {
       throw new UnauthorizedException("Invalid refresh token");
     }
 
-    const rotated = await this.createSession(user._id.toString(), meta);
+    const rotated = await this.createSession(user._id.toString(), meta, session.rememberMe);
     await this.sessionRepository.revokeByJti(payload.jti, rotated.jti);
 
     const { token: accessToken, expiresIn } = this.tokenService.signAccessToken({
@@ -131,7 +156,13 @@ export class PlatformAuthService {
       role: user.role,
     });
 
-    return { accessToken, refreshToken: rotated.token, expiresIn };
+    return {
+      accessToken,
+      refreshToken: rotated.token,
+      expiresIn,
+      refreshTokenExpiresAt: rotated.expiresAt,
+      rememberMe: session.rememberMe,
+    };
   }
 
   async logout(rawRefreshToken: string): Promise<void> {
@@ -146,28 +177,37 @@ export class PlatformAuthService {
   private async issueTokenPair(
     user: PlatformUserDocument,
     meta: PlatformRequestMeta,
+    rememberMe: boolean,
   ): Promise<IssuedPlatformTokenPair> {
-    const session = await this.createSession(user._id.toString(), meta);
+    const session = await this.createSession(user._id.toString(), meta, rememberMe);
     const { token: accessToken, expiresIn } = this.tokenService.signAccessToken({
       sub: user._id.toString(),
       role: user.role,
     });
-    return { accessToken, refreshToken: session.token, expiresIn };
+    return {
+      accessToken,
+      refreshToken: session.token,
+      expiresIn,
+      refreshTokenExpiresAt: session.expiresAt,
+      rememberMe,
+    };
   }
 
   private async createSession(
     platformUserId: string,
     meta: PlatformRequestMeta,
-  ): Promise<{ token: string; jti: string }> {
+    rememberMe: boolean,
+  ): Promise<{ token: string; jti: string; expiresAt: Date }> {
     const { token, jti, expiresAt } = this.tokenService.signRefreshToken(platformUserId);
     await this.sessionRepository.create({
       platformUserId,
       jti,
+      rememberMe,
       tokenHash: this.tokenService.hashOpaqueToken(token),
       userAgent: meta.userAgent,
       ipAddress: meta.ipAddress,
       expiresAt,
     });
-    return { token, jti };
+    return { token, jti, expiresAt };
   }
 }

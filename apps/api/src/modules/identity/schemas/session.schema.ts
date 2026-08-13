@@ -45,6 +45,17 @@ export class Session {
   @Prop({ type: String, default: null })
   replacedByJti!: string | null;
 
+  // PHD-001 Volume-1 (Security Hardening) — "Remember Me" moved server-side
+  // as part of the httpOnly refresh-cookie migration (previously a purely
+  // client-side localStorage flag with no backend awareness at all). Set
+  // once at login from `LoginDto.rememberMe`; `AuthService.refresh()`
+  // reads the *previous* session's value and carries it forward onto the
+  // newly-rotated session, so the persistent-vs-session cookie character
+  // established at login survives the whole rotation chain without the
+  // client needing to resend it on every refresh.
+  @Prop({ default: false })
+  rememberMe!: boolean;
+
   // Populated automatically by { timestamps: { createdAt: true } }.
   createdAt!: Date;
 }

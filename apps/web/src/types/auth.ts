@@ -2,7 +2,7 @@ import type { TenantRole, WorkspaceMemberStatus } from "@wapp/shared-types";
 
 /**
  * FRD-001 Volume-1 §9 — mirrors `apps/api/src/modules/identity/identity.types.ts`'s
- * `UserProfile`/`IssuedTokenPair` exactly. Not itself importable from
+ * `UserProfile`/`AccessTokenIssued` exactly. Not itself importable from
  * `apps/api` (a NestJS app, not a shared package) — enums (`TenantRole`,
  * `WorkspaceMemberStatus`) come from `@wapp/shared-types` (the actual shared
  * source of truth); the response *shape* is mirrored here deliberately.
@@ -21,9 +21,13 @@ export interface UserProfile {
   createdAt: string;
 }
 
-export interface IssuedTokenPair {
+/**
+ * PHD-001 Volume-1 (Security Hardening) — the only token-related fields ever
+ * returned in a client-visible JSON response; the refresh token itself now
+ * travels exclusively as an httpOnly Set-Cookie header (amends ADR-FE-001).
+ */
+export interface AccessTokenIssued {
   accessToken: string;
-  refreshToken: string;
   expiresIn: number;
 }
 

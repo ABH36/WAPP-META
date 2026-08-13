@@ -42,8 +42,34 @@ export class PlatformUserRepository {
 
   async recordSuccessfulLogin(id: string): Promise<void> {
     await this.platformUserModel
-      .updateOne({ _id: id }, { $set: { lastLoginAt: new Date() } })
+      .updateOne(
+        { _id: id },
+        { $set: { failedLoginAttempts: 0, lockedUntil: null, lastLoginAt: new Date() } },
+      )
       .exec();
+  }
+
+  /**
+   * PHD-001 Volume-1 (Security Hardening) — mirrors `UserRepository.registerFailedLogin()`
+   * exactly (same atomic increment-then-lock pattern, same config values).
+   * Returns the post-increment attempt count so the caller can decide what
+   * to tell the user without a second round-trip.
+   */
+  async registerFailedLogin(
+    id: string,
+    maxAttempts: number,
+    lockoutMinutes: number,
+  ): Promise<number> {
+    const updated = await this.platformUserModel
+      .findOneAndUpdate({ _id: id }, { $inc: { failedLoginAttempts: 1 } }, { new: true })
+      .exec();
+
+    if (updated && updated.failedLoginAttempts >= maxAttempts) {
+      const lockedUntil = new Date(Date.now() + lockoutMinutes * 60_000);
+      await this.platformUserModel.updateOne({ _id: id }, { $set: { lockedUntil } }).exec();
+    }
+
+    return updated?.failedLoginAttempts ?? 0;
   }
 
   async setActive(id: string, isActive: boolean): Promise<PlatformUserDocument | null> {

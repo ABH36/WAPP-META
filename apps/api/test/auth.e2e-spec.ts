@@ -2,10 +2,13 @@ import { Test } from "@nestjs/testing";
 import { VersioningType, type INestApplication } from "@nestjs/common";
 import type { Server } from "http";
 import request from "supertest";
+import cookieParser from "cookie-parser";
 import type { ApiErrorResponse, ApiSuccessResponse } from "@wapp/shared-types";
 import { AppModule } from "../src/app.module.js";
 import { EmailService } from "../src/infrastructure/email/email.service.js";
 import type { SendEmailJob } from "../src/infrastructure/email/email.types.js";
+
+const REFRESH_TOKEN_COOKIE = "wapp_web_rt";
 
 /**
  * Full Identity & Authentication flow against live Docker Mongo/Redis
@@ -40,6 +43,7 @@ describe("Auth (e2e)", () => {
       .compile();
 
     app = moduleRef.createNestApplication({ rawBody: true });
+    app.use(cookieParser());
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
     app.setGlobalPrefix("api");
     await app.init();
@@ -64,6 +68,23 @@ describe("Auth (e2e)", () => {
       throw new Error(`No token found in link: ${link}`);
     }
     return token;
+  }
+
+  // PHD-001 Volume-1 — the refresh token now travels as an httpOnly Set-Cookie
+  // header, never in the JSON response body; tests must read/replay it as a
+  // cookie, same as a real browser would.
+  function extractRefreshCookie(response: request.Response): string {
+    const setCookieHeader = response.headers["set-cookie"] as string[] | string | undefined;
+    const cookies = Array.isArray(setCookieHeader)
+      ? setCookieHeader
+      : setCookieHeader
+        ? [setCookieHeader]
+        : [];
+    const raw = cookies.find((cookie) => cookie.startsWith(`${REFRESH_TOKEN_COOKIE}=`));
+    if (!raw) {
+      throw new Error(`No ${REFRESH_TOKEN_COOKIE} cookie in response`);
+    }
+    return raw.split(";")[0] as string;
   }
 
   it("rejects registration with a weak password", async () => {
@@ -134,12 +155,10 @@ describe("Auth (e2e)", () => {
     const response = await request(server()).post("/api/v1/auth/verify-email").send({ token });
     expect(response.status).toBe(201);
 
-    const body = response.body as ApiSuccessResponse<{
-      tokens: { accessToken: string; refreshToken: string };
-    }>;
+    const body = response.body as ApiSuccessResponse<{ tokens: { accessToken: string } }>;
     expect(body.data.tokens.accessToken).toBeDefined();
     accessToken = body.data.tokens.accessToken;
-    refreshToken = body.data.tokens.refreshToken;
+    refreshToken = extractRefreshCookie(response);
   });
 
   it("rejects reusing an already-used verification token", async () => {
@@ -197,25 +216,27 @@ describe("Auth (e2e)", () => {
   let rotatedRefreshToken: string;
 
   it("rotates the refresh token pair", async () => {
-    const response = await request(server()).post("/api/v1/auth/refresh").send({ refreshToken });
+    const response = await request(server())
+      .post("/api/v1/auth/refresh")
+      .set("Cookie", refreshToken);
     expect(response.status).toBe(201);
-    const body = response.body as ApiSuccessResponse<{ accessToken: string; refreshToken: string }>;
+    const body = response.body as ApiSuccessResponse<{ accessToken: string }>;
     expect(body.data.accessToken).toBeDefined();
-    expect(body.data.refreshToken).not.toBe(refreshToken);
-    rotatedRefreshToken = body.data.refreshToken;
+    rotatedRefreshToken = extractRefreshCookie(response);
+    expect(rotatedRefreshToken).not.toBe(refreshToken);
   });
 
   it("detects reuse of a rotated-out refresh token and revokes the whole chain", async () => {
     // The original token (already rotated above) is presented again.
     const reuseResponse = await request(server())
       .post("/api/v1/auth/refresh")
-      .send({ refreshToken });
+      .set("Cookie", refreshToken);
     expect(reuseResponse.status).toBe(401);
 
     // Reuse detection must have revoked the *rotated* token too.
     const rotatedResponse = await request(server())
       .post("/api/v1/auth/refresh")
-      .send({ refreshToken: rotatedRefreshToken });
+      .set("Cookie", rotatedRefreshToken);
     expect(rotatedResponse.status).toBe(401);
   });
 

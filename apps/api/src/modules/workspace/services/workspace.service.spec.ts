@@ -91,6 +91,8 @@ describe("WorkspaceService", () => {
       accessToken: "access-token",
       refreshToken: "refresh-token",
       expiresIn: 900,
+      refreshTokenExpiresAt: new Date(),
+      rememberMe: true,
     });
   });
 
