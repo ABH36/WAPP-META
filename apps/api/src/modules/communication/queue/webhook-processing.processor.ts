@@ -1,8 +1,16 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Processor, WorkerHost } from "@nestjs/bullmq";
+import { Processor } from "@nestjs/bullmq";
 import type { Job } from "bullmq";
+import { ObservableProcessor } from "../../../common/observability/observable-processor.base.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
+import type { JobContext } from "../../../common/observability/job-context.util.js";
 import { WebhookService } from "../services/webhook.service.js";
 import { WEBHOOK_PROCESSING_QUEUE } from "./webhook-processing.constants.js";
+
+export interface WebhookProcessingJobData extends Partial<JobContext> {
+  payload: unknown;
+}
 
 /**
  * Actual event processing (Contact upsert, Message persistence, status
@@ -14,16 +22,21 @@ import { WEBHOOK_PROCESSING_QUEUE } from "./webhook-processing.constants.js";
  */
 @Injectable()
 @Processor(WEBHOOK_PROCESSING_QUEUE)
-export class WebhookProcessingProcessor extends WorkerHost {
-  private readonly logger = new Logger(WebhookProcessingProcessor.name);
+export class WebhookProcessingProcessor extends ObservableProcessor<WebhookProcessingJobData> {
+  protected readonly logger = new Logger(WebhookProcessingProcessor.name);
+  protected readonly queueName = WEBHOOK_PROCESSING_QUEUE;
 
-  constructor(private readonly webhookService: WebhookService) {
-    super();
+  constructor(
+    private readonly webhookService: WebhookService,
+    correlationContext: CorrelationContextService,
+    metricsService: MetricsService,
+  ) {
+    super(correlationContext, metricsService);
   }
 
-  async process(job: Job<unknown>): Promise<void> {
+  protected async handle(job: Job<WebhookProcessingJobData>): Promise<void> {
     try {
-      await this.webhookService.processEvent(job.data);
+      await this.webhookService.processEvent(job.data.payload);
     } catch (error) {
       this.logger.error(
         `Webhook processing failed for job ${job.id}: ${error instanceof Error ? error.message : String(error)}`,

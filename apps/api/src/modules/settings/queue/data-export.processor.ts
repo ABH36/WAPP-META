@@ -1,7 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Processor, WorkerHost } from "@nestjs/bullmq";
+import { Processor } from "@nestjs/bullmq";
 import type { Job } from "bullmq";
 import ExcelJS from "exceljs";
+import { ObservableProcessor } from "../../../common/observability/observable-processor.base.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 import { ReportsService } from "../../crm/services/reports.service.js";
 import {
   ExportFormat as CrmExportFormat,
@@ -46,8 +49,9 @@ const EXPORT_FOLDER_PREFIX = "exports";
  */
 @Injectable()
 @Processor(DATA_EXPORT_QUEUE)
-export class DataExportProcessor extends WorkerHost {
-  private readonly logger = new Logger(DataExportProcessor.name);
+export class DataExportProcessor extends ObservableProcessor<DataExportJob> {
+  protected readonly logger = new Logger(DataExportProcessor.name);
+  protected readonly queueName = DATA_EXPORT_QUEUE;
 
   constructor(
     private readonly exportJobRepository: ExportJobRepository,
@@ -58,11 +62,13 @@ export class DataExportProcessor extends WorkerHost {
     private readonly featureFlagRepository: FeatureFlagRepository,
     private readonly retentionPolicyRepository: RetentionPolicyRepository,
     private readonly storageService: StorageService,
+    correlationContext: CorrelationContextService,
+    metricsService: MetricsService,
   ) {
-    super();
+    super(correlationContext, metricsService);
   }
 
-  async process(job: Job<DataExportJob>): Promise<void> {
+  protected async handle(job: Job<DataExportJob>): Promise<void> {
     const { exportJobId, workspaceId } = job.data;
     const exportJob = await this.exportJobRepository.findByIdForWorkspace(workspaceId, exportJobId);
     if (!exportJob) {

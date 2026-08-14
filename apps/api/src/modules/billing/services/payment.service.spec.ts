@@ -6,6 +6,7 @@ import { PaymentService } from "./payment.service.js";
 import { PaymentRepository } from "../repositories/payment.repository.js";
 import { InvoiceService } from "./invoice.service.js";
 import { DomainEvent } from "../../../common/events/domain-events.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 const issuedInvoice = {
   _id: { toString: () => "invoice-1" },
@@ -66,6 +67,7 @@ describe("PaymentService", () => {
           },
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        MetricsService,
       ],
     }).compile();
 

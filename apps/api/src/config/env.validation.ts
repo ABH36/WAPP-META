@@ -113,6 +113,23 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   COOKIE_DOMAIN?: string;
+
+  // PHD-001 Volume-2 — required, not optional: GET /metrics must never be
+  // reachable with an empty/missing shared secret (Architecture Review:
+  // "The endpoint must never be publicly accessible").
+  @IsString()
+  @IsNotEmpty()
+  METRICS_AUTH_TOKEN!: string;
+
+  // Baked in at Docker build time; legitimately absent in local dev, where
+  // configuration.ts's own "unknown" fallback applies.
+  @IsOptional()
+  @IsString()
+  BUILD_VERSION?: string;
+
+  @IsOptional()
+  @IsString()
+  GIT_COMMIT?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

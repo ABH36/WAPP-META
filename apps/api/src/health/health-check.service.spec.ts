@@ -4,16 +4,17 @@ import { ConfigService } from "@nestjs/config";
 import { ConnectionStates } from "mongoose";
 import { HealthCheckService } from "./health-check.service.js";
 import { REDIS_CLIENT } from "../infrastructure/redis/redis.constants.js";
+import { MetricsService } from "../common/metrics/metrics.service.js";
 
 describe("HealthCheckService", () => {
   let service: HealthCheckService;
   let mongoConnection: { readyState: ConnectionStates };
-  let redis: { ping: jest.Mock };
+  let redis: { ping: jest.Mock; info: jest.Mock };
   let config: jest.Mocked<ConfigService>;
 
   beforeEach(async () => {
     mongoConnection = { readyState: ConnectionStates.connected };
-    redis = { ping: jest.fn() };
+    redis = { ping: jest.fn(), info: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -34,6 +35,7 @@ describe("HealthCheckService", () => {
             }),
           },
         },
+        MetricsService,
       ],
     }).compile();
 
@@ -70,6 +72,24 @@ describe("HealthCheckService", () => {
       queue: true,
       storage: true,
       email: true,
+    });
+  });
+
+  it("getCacheStatus parses used_memory out of Redis INFO memory when reachable", async () => {
+    redis.info.mockResolvedValue("# Memory\r\nused_memory:1048576\r\nused_memory_human:1.00M\r\n");
+
+    await expect(service.getCacheStatus()).resolves.toEqual({
+      connected: true,
+      usedMemoryBytes: 1048576,
+    });
+  });
+
+  it("getCacheStatus reports disconnected when Redis INFO fails", async () => {
+    redis.info.mockRejectedValue(new Error("connection refused"));
+
+    await expect(service.getCacheStatus()).resolves.toEqual({
+      connected: false,
+      usedMemoryBytes: null,
     });
   });
 });

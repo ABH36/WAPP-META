@@ -18,6 +18,7 @@ import { WorkspaceMaintenanceStateRepository } from "../repositories/workspace-m
 import { PlatformMaintenanceGateRepository } from "../repositories/platform-maintenance-gate.repository.js";
 import { PasswordService } from "./password.service.js";
 import { TokenService } from "./token.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 import { AuthTokenType } from "../schemas/auth-token.schema.js";
 import type { UserDocument } from "../schemas/user.schema.js";
 import {
@@ -60,6 +61,7 @@ export class AuthService {
     private readonly tokenService: TokenService,
     private readonly emailService: EmailService,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{ email: string }> {
@@ -136,6 +138,7 @@ export class AuthService {
       // Constant-time-ish: still run a bcrypt compare so a nonexistent-email
       // response isn't measurably faster than a wrong-password one.
       await this.passwordService.compare(dto.password, DUMMY_PASSWORD_HASH);
+      this.metricsService.authLoginFailureTotal.inc({ actor: "tenant", reason: "UNKNOWN_EMAIL" });
       throw new UnauthorizedException("Invalid email or password");
     }
 
@@ -251,6 +254,10 @@ export class AuthService {
       // forcing re-authentication on every device (TAD-001 §11 session
       // management hardening).
       await this.sessionRepository.revokeAllForUser(session.userId.toString());
+      this.metricsService.authSessionRevocationTotal.inc({
+        actor: "tenant",
+        reason: "reuse_detected",
+      });
       throw new UnauthorizedException(
         "This session is no longer valid. For your security, all sessions have been signed out — please log in again.",
       );
@@ -276,6 +283,7 @@ export class AuthService {
     // client resending it.
     const rotated = await this.createSession(user._id.toString(), meta, session.rememberMe);
     await this.sessionRepository.revokeByJti(payload.jti, rotated.jti);
+    this.metricsService.authTokenRefreshTotal.inc({ actor: "tenant" });
 
     const { token: accessToken, expiresIn } = this.tokenService.signAccessToken({
       sub: user._id.toString(),
@@ -332,6 +340,7 @@ export class AuthService {
     try {
       const payload = this.tokenService.verifyRefreshToken(rawRefreshToken);
       await this.sessionRepository.revokeByJti(payload.jti);
+      this.metricsService.authSessionRevocationTotal.inc({ actor: "tenant", reason: "logout" });
     } catch {
       // Logout is idempotent — an already-invalid/expired token is not an error.
     }
@@ -339,6 +348,7 @@ export class AuthService {
 
   async logoutAllDevices(userId: string): Promise<void> {
     await this.sessionRepository.revokeAllForUser(userId);
+    this.metricsService.authSessionRevocationTotal.inc({ actor: "tenant", reason: "logout_all" });
   }
 
   async listSessions(userId: string): Promise<SessionSummary[]> {
@@ -351,6 +361,10 @@ export class AuthService {
     if (!revoked) {
       throw new BadRequestException("Session not found");
     }
+    this.metricsService.authSessionRevocationTotal.inc({
+      actor: "tenant",
+      reason: "manual_revoke",
+    });
   }
 
   /**
@@ -396,6 +410,10 @@ export class AuthService {
     );
     await this.userRepository.updatePasswordAndHistory(userId, newPasswordHash, updatedHistory);
     await this.sessionRepository.revokeAllForUser(userId);
+    this.metricsService.authSessionRevocationTotal.inc({
+      actor: "tenant",
+      reason: "password_changed",
+    });
   }
 
   /** PRD-006 Volume-2 §4.7 — read-only, immutable (BR-007). */
@@ -484,6 +502,10 @@ export class AuthService {
     // A password reset invalidates every existing session — the credential
     // that established them may have been compromised.
     await this.sessionRepository.revokeAllForUser(userId);
+    this.metricsService.authSessionRevocationTotal.inc({
+      actor: "tenant",
+      reason: "password_reset",
+    });
   }
 
   async getProfile(userId: string): Promise<UserProfile> {
@@ -551,6 +573,16 @@ export class AuthService {
     reason: string | null,
     meta: RequestMeta,
   ): Promise<void> {
+    // PHD-001 Volume-2 §4.3 "Authentication" — the single hook every
+    // success/failure branch of login() already routes through.
+    if (success) {
+      this.metricsService.authLoginSuccessTotal.inc({ actor: "tenant" });
+    } else {
+      this.metricsService.authLoginFailureTotal.inc({
+        actor: "tenant",
+        reason: reason ?? "unknown",
+      });
+    }
     await this.loginHistoryRepository.record({
       userId,
       success,

@@ -20,6 +20,7 @@ import type {
 } from "../communication.types.js";
 import type { CreateCampaignDto } from "../dto/create-campaign.dto.js";
 import { CampaignStatus } from "../schemas/campaign.schema.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 /**
  * Campaign lifecycle (PRD-003 Part 3b-ii) — a container orchestrating
@@ -43,6 +44,7 @@ export class CampaignService {
     private readonly contactRepository: ContactRepository,
     private readonly broadcastService: BroadcastService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async create(
@@ -99,6 +101,7 @@ export class CampaignService {
       );
     }
 
+    this.metricsService.communicationCampaignsTotal.inc({ status: CampaignStatus.ACTIVE });
     return toCampaignSummary(campaign);
   }
 
@@ -154,6 +157,7 @@ export class CampaignService {
     }
 
     const updated = await this.campaignRepository.updateStatus(id, CampaignStatus.CANCELLED);
+    this.metricsService.communicationCampaignsTotal.inc({ status: CampaignStatus.CANCELLED });
     this.eventEmitter.emit(DomainEvent.CAMPAIGN_CANCELLED, {
       workspaceId,
       campaignId: id,
@@ -205,6 +209,7 @@ export class CampaignService {
     await this.campaignRepository.updateStatus(payload.campaignId, CampaignStatus.COMPLETED, {
       completedAt: new Date(),
     });
+    this.metricsService.communicationCampaignsTotal.inc({ status: CampaignStatus.COMPLETED });
     this.eventEmitter.emit(DomainEvent.CAMPAIGN_COMPLETED, {
       workspaceId: payload.workspaceId,
       campaignId: payload.campaignId,

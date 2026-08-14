@@ -25,6 +25,7 @@ import type {
   SupportSessionStartedPayload,
   SupportSessionTerminatedPayload,
 } from "../../../common/events/domain-events.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 export interface ListSupportSessionsResult {
   items: SupportSessionSummary[];
@@ -45,6 +46,7 @@ export class PlatformSupportSessionsService {
     private readonly supportSessionRepository: SupportSessionRepository,
     private readonly workspaceRepository: WorkspaceRepository,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   /** §4.1/§10/BR-001 — reason required, duration capped at 4 hours. */
@@ -80,6 +82,7 @@ export class PlatformSupportSessionsService {
       occurredAt: new Date().toISOString(),
     };
     this.eventEmitter.emit(DomainEvent.BREAK_GLASS_REQUESTED, payload);
+    this.metricsService.platformBreakGlassTotal.inc({ action: "requested" });
 
     return toSupportSessionSummary(created);
   }
@@ -103,6 +106,7 @@ export class PlatformSupportSessionsService {
       occurredAt: new Date().toISOString(),
     };
     this.eventEmitter.emit(DomainEvent.BREAK_GLASS_APPROVED, payload);
+    this.metricsService.platformBreakGlassTotal.inc({ action: "approved" });
 
     return toSupportSessionSummary(updated);
   }

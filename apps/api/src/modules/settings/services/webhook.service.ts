@@ -12,6 +12,7 @@ import type { CreateWebhookDto } from "../dto/create-webhook.dto.js";
 import type { UpdateWebhookDto } from "../dto/update-webhook.dto.js";
 import type { WebhookSummary } from "../settings.types.js";
 import type { WebhookConfigDocument } from "../schemas/webhook-config.schema.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 function toWebhookSummary(webhook: WebhookConfigDocument): WebhookSummary {
   return {
@@ -40,6 +41,7 @@ export class WebhookService {
     private readonly webhookConfigRepository: WebhookConfigRepository,
     private readonly tokenEncryption: TokenEncryptionService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async list(workspaceId: string): Promise<WebhookSummary[]> {
@@ -69,6 +71,7 @@ export class WebhookService {
       actorId,
       occurredAt: new Date().toISOString(),
     } satisfies WebhookCreatedPayload);
+    this.metricsService.settingsWebhooksTotal.inc({ action: "created" });
 
     return { webhook: toWebhookSummary(created), secret };
   }
@@ -90,6 +93,7 @@ export class WebhookService {
       actorId,
       occurredAt: new Date().toISOString(),
     } satisfies WebhookUpdatedPayload);
+    this.metricsService.settingsWebhooksTotal.inc({ action: "updated" });
 
     return toWebhookSummary(updated);
   }
@@ -99,5 +103,6 @@ export class WebhookService {
     if (!deleted) {
       throw new NotFoundException("Webhook not found");
     }
+    this.metricsService.settingsWebhooksTotal.inc({ action: "deleted" });
   }
 }

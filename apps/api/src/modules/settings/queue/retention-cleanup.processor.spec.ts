@@ -7,6 +7,17 @@ import { AuditLogRepository } from "../repositories/audit-log.repository.js";
 import { WebhookDeliveryLogRepository } from "../repositories/webhook-delivery-log.repository.js";
 import { AuthService } from "../../identity/services/auth.service.js";
 import { RETENTION_CLEANUP_QUEUE } from "./retention-cleanup.constants.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
+import type { JobContext } from "../../../common/observability/job-context.util.js";
+
+// Real (unmocked) — no external I/O, no reason to fake them; ObservableProcessor
+// requires both to be resolvable now that every processor extends it.
+const observabilityProviders = [CorrelationContextService, MetricsService];
+
+function fakeJob(): Job<Partial<JobContext>> {
+  return { data: {}, attemptsMade: 0, opts: {} } as unknown as Job<Partial<JobContext>>;
+}
 
 describe("RetentionCleanupProcessor", () => {
   let processor: RetentionCleanupProcessor;
@@ -24,6 +35,7 @@ describe("RetentionCleanupProcessor", () => {
         { provide: WebhookDeliveryLogRepository, useValue: { deleteOlderThan: jest.fn() } },
         { provide: AuthService, useValue: { cleanupLoginHistory: jest.fn() } },
         { provide: getQueueToken(RETENTION_CLEANUP_QUEUE), useValue: { add: jest.fn() } },
+        ...observabilityProviders,
       ],
     }).compile();
 
@@ -48,7 +60,7 @@ describe("RetentionCleanupProcessor", () => {
     authService.cleanupLoginHistory.mockResolvedValue(1);
     webhookDeliveryLogRepository.deleteOlderThan.mockResolvedValue(0);
 
-    await processor.process({} as Job<unknown>);
+    await processor.process(fakeJob());
 
     expect(auditLogRepository.deleteOlderThan).toHaveBeenCalledWith(
       "workspace-1",
@@ -84,7 +96,7 @@ describe("RetentionCleanupProcessor", () => {
     authService.cleanupLoginHistory.mockResolvedValue(0);
     webhookDeliveryLogRepository.deleteOlderThan.mockResolvedValue(0);
 
-    await expect(processor.process({} as Job<unknown>)).resolves.toBeUndefined();
+    await expect(processor.process(fakeJob())).resolves.toBeUndefined();
 
     expect(auditLogRepository.deleteOlderThan).toHaveBeenCalledTimes(2);
     expect(authService.cleanupLoginHistory).toHaveBeenCalledWith("workspace-2", expect.any(Date));

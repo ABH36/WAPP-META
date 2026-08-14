@@ -17,6 +17,7 @@ import { PlatformMaintenanceGateRepository } from "../repositories/platform-main
 import { PasswordService } from "./password.service.js";
 import { TokenService } from "./token.service.js";
 import { EmailService } from "../../../infrastructure/email/email.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 import type { UserDocument } from "../schemas/user.schema.js";
 import type { SessionDocument } from "../schemas/session.schema.js";
 
@@ -166,6 +167,7 @@ describe("AuthService", () => {
             },
           },
         },
+        MetricsService,
       ],
     }).compile();
 

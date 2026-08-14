@@ -4,6 +4,7 @@ import { SettingsApiKeysService } from "./settings-api-keys.service.js";
 import { ApiKeyService } from "../../identity/services/api-key.service.js";
 import { ApiKeyScope, ApiKeyStatus } from "../../identity/schemas/api-key.schema.js";
 import { DomainEvent } from "../../../common/events/domain-events.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 const generated = {
   apiKey: {
@@ -39,6 +40,7 @@ describe("SettingsApiKeysService", () => {
           },
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        MetricsService,
       ],
     }).compile();
 

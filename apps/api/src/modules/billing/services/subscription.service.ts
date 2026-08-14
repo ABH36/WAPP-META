@@ -29,6 +29,7 @@ import { PlanRepository } from "../repositories/plan.repository.js";
 import { toSubscriptionSummary } from "../mappers/billing.mapper.js";
 import type { SubscriptionSummary } from "../billing.types.js";
 import type { SubscriptionDocument } from "../schemas/subscription.schema.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 const MAX_TRIAL_EXTENSION_DAYS = 90;
 
@@ -67,6 +68,7 @@ export class SubscriptionService {
     private readonly planRepository: PlanRepository,
     private readonly workspaceRepository: WorkspaceRepository,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   /** §7 — BR-002, one trial per Workspace; called exactly once, reactively, at Workspace creation. */
@@ -180,6 +182,7 @@ export class SubscriptionService {
         occurredAt: now,
       } satisfies SubscriptionActivatedPayload);
     }
+    this.metricsService.billingSubscriptionChangesTotal.inc({ type: "upgrade" });
 
     return toSubscriptionSummary(updated);
   }
@@ -212,6 +215,7 @@ export class SubscriptionService {
       actorId,
       occurredAt: new Date().toISOString(),
     } satisfies SubscriptionDowngradedPayload);
+    this.metricsService.billingSubscriptionChangesTotal.inc({ type: "downgrade" });
 
     return toSubscriptionSummary(updated);
   }
@@ -236,6 +240,7 @@ export class SubscriptionService {
       actorId,
       occurredAt: new Date().toISOString(),
     } satisfies SubscriptionCancelledPayload);
+    this.metricsService.billingSubscriptionChangesTotal.inc({ type: "cancel" });
 
     return toSubscriptionSummary(updated);
   }

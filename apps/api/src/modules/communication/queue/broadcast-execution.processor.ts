@@ -1,10 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Processor, WorkerHost } from "@nestjs/bullmq";
+import { Processor } from "@nestjs/bullmq";
 import type { Job } from "bullmq";
+import { ObservableProcessor } from "../../../common/observability/observable-processor.base.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
+import type { JobContext } from "../../../common/observability/job-context.util.js";
 import { BroadcastService } from "../services/broadcast.service.js";
 import { BROADCAST_EXECUTION_QUEUE } from "./broadcast-execution.constants.js";
 
-interface BroadcastExecutionJobData {
+interface BroadcastExecutionJobData extends Partial<JobContext> {
   workspaceId: string;
   broadcastId: string;
 }
@@ -19,14 +23,19 @@ interface BroadcastExecutionJobData {
  */
 @Injectable()
 @Processor(BROADCAST_EXECUTION_QUEUE)
-export class BroadcastExecutionProcessor extends WorkerHost {
-  private readonly logger = new Logger(BroadcastExecutionProcessor.name);
+export class BroadcastExecutionProcessor extends ObservableProcessor<BroadcastExecutionJobData> {
+  protected readonly logger = new Logger(BroadcastExecutionProcessor.name);
+  protected readonly queueName = BROADCAST_EXECUTION_QUEUE;
 
-  constructor(private readonly broadcastService: BroadcastService) {
-    super();
+  constructor(
+    private readonly broadcastService: BroadcastService,
+    correlationContext: CorrelationContextService,
+    metricsService: MetricsService,
+  ) {
+    super(correlationContext, metricsService);
   }
 
-  async process(job: Job<BroadcastExecutionJobData>): Promise<void> {
+  protected async handle(job: Job<BroadcastExecutionJobData>): Promise<void> {
     try {
       await this.broadcastService.executeRun(job.data.workspaceId, job.data.broadcastId);
     } catch (error) {

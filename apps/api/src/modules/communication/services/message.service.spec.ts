@@ -14,6 +14,7 @@ import { TokenEncryptionService } from "../../../common/security/token-encryptio
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
 import { TemplateStatus } from "../schemas/template.schema.js";
 import { MetaAuthenticationException } from "../exceptions/meta-api.exceptions.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 describe("MessageService", () => {
   let service: MessageService;
@@ -54,6 +55,7 @@ describe("MessageService", () => {
         },
         { provide: TokenEncryptionService, useValue: { decrypt: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        MetricsService,
       ],
     }).compile();
 

@@ -4,6 +4,7 @@ import {
   Post,
   Query,
   Headers,
+  Logger,
   Req,
   Res,
   HttpCode,
@@ -16,8 +17,12 @@ import { InjectQueue } from "@nestjs/bullmq";
 import type { Queue } from "bullmq";
 import type { Request, Response } from "express";
 import { Public } from "../../../common/decorators/public.decorator.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import { withCorrelationId } from "../../../common/observability/job-context.util.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 import { WebhookService, InvalidWebhookSignatureException } from "../services/webhook.service.js";
 import { WEBHOOK_PROCESSING_QUEUE } from "../queue/webhook-processing.constants.js";
+import type { WebhookProcessingJobData } from "../queue/webhook-processing.processor.js";
 
 /**
  * Meta calls this endpoint directly — no JWT, no API versioning (a webhook
@@ -29,9 +34,13 @@ import { WEBHOOK_PROCESSING_QUEUE } from "../queue/webhook-processing.constants.
  */
 @Controller("webhooks/whatsapp")
 export class WebhookController {
+  private readonly logger = new Logger(WebhookController.name);
+
   constructor(
     private readonly webhookService: WebhookService,
-    @InjectQueue(WEBHOOK_PROCESSING_QUEUE) private readonly queue: Queue,
+    @InjectQueue(WEBHOOK_PROCESSING_QUEUE) private readonly queue: Queue<WebhookProcessingJobData>,
+    private readonly correlationContext: CorrelationContextService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   @Public()
@@ -63,15 +72,28 @@ export class WebhookController {
   ): Promise<{ received: true }> {
     const rawBody = request.rawBody;
     if (!rawBody || !this.webhookService.verifySignature(rawBody, signature)) {
+      // PHD-001 Volume-2 §4.11 — Security Event Logging: this was previously
+      // silent (an HttpException, so the global filter's error-logging
+      // branch never fired for it). Both the counter and the audit-visible
+      // log line are new.
+      this.metricsService.securityWebhookSignatureFailureTotal.inc();
+      this.logger.warn(`Inbound WhatsApp webhook rejected — invalid or missing signature`);
       throw new InvalidWebhookSignatureException();
     }
 
     // Ack fast — actual processing happens off the request path (see
     // WebhookProcessingProcessor).
-    await this.queue.add("process-event", request.body as unknown, {
-      attempts: 3,
-      backoff: { type: "exponential", delay: 5_000 },
-    });
+    await this.queue.add(
+      "process-event",
+      withCorrelationId(
+        { payload: request.body as unknown },
+        this.correlationContext.getOrCreateCorrelationId(),
+      ),
+      {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 5_000 },
+      },
+    );
 
     return { received: true };
   }

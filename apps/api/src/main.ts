@@ -1,3 +1,7 @@
+// PHD-001 Volume-2 — must be the first import in the process (see tracing.ts's
+// own doc comment for why): OpenTelemetry auto-instrumentation patches
+// HTTP/Mongo(oose)/Redis at require-time, before anything else requires them.
+import "./tracing.js";
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
@@ -8,6 +12,7 @@ import compression from "compression";
 import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module.js";
 import type { AppConfig } from "./config/configuration.js";
+import { ErrorReportingService } from "./common/observability/error-reporting.service.js";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
@@ -82,10 +87,31 @@ async function bootstrap(): Promise<void> {
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
   app.setGlobalPrefix("api");
 
+  // PHD-001 Volume-2 — a genuinely uncaught exception or unawaited rejected
+  // promise means the process is in an undefined state; the correct
+  // response is to log with full detail, hand off to the error-reporting
+  // abstraction, and exit non-zero so the process manager (PM2, per
+  // docker/api.Dockerfile) restarts a clean instance — not to silently keep
+  // serving requests from a process that may have partially-corrupted state.
+  const logger = app.get(Logger);
+  const errorReporting = app.get(ErrorReportingService);
+
+  process.on("uncaughtException", (error: Error) => {
+    logger.error(`Uncaught exception — exiting: ${error.stack ?? error.message}`);
+    errorReporting.captureException(error);
+    process.exit(1);
+  });
+
+  process.on("unhandledRejection", (reason: unknown) => {
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    logger.error(`Unhandled promise rejection — exiting: ${error.stack ?? error.message}`);
+    errorReporting.captureException(error);
+    process.exit(1);
+  });
+
   const port = config.get("port", { infer: true });
   await app.listen(port);
 
-  const logger = app.get(Logger);
   logger.log(`WAPP API listening on port ${port} [${config.get("env", { infer: true })}]`);
 }
 

@@ -18,6 +18,7 @@ import { InvoiceService } from "./invoice.service.js";
 import { toPaymentSummary } from "../mappers/billing.mapper.js";
 import type { PaymentSummary } from "../billing.types.js";
 import type { PaymentDocument } from "../schemas/payment.schema.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 const SUPPORTED_CURRENCY = "INR"; // India-only Phase-1 (D002) — same as Plan/Invoice.
 
@@ -49,6 +50,7 @@ export class PaymentService {
     private readonly paymentRepository: PaymentRepository,
     private readonly invoiceService: InvoiceService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async record(
@@ -113,6 +115,7 @@ export class PaymentService {
         amount,
         occurredAt: now.toISOString(),
       } satisfies PaymentPaidPayload);
+      this.metricsService.billingPaymentsTotal.inc({ outcome: "PAID" });
       await this.invoiceService.markPaidFromPayment(invoiceId, workspaceId, created._id.toString());
 
       if (verified) {
@@ -134,6 +137,7 @@ export class PaymentService {
         invoiceId,
         occurredAt: now.toISOString(),
       } satisfies PaymentFailedPayload);
+      this.metricsService.billingPaymentsTotal.inc({ outcome: "FAILED" });
     }
 
     return toPaymentSummary(resolved);
@@ -165,6 +169,7 @@ export class PaymentService {
       reason,
       occurredAt: now.toISOString(),
     } satisfies PaymentRefundedPayload);
+    this.metricsService.billingRefundsTotal.inc();
 
     return toPaymentSummary(updated);
   }

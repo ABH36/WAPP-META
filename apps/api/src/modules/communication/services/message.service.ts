@@ -18,6 +18,7 @@ import type { SendTemplateMessageDto } from "../dto/send-template-message.dto.js
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
 import { TemplateStatus } from "../schemas/template.schema.js";
 import { MetaAuthenticationException } from "../exceptions/meta-api.exceptions.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 /**
  * Outbound message sending — free text (Part 1) and approved templates
@@ -39,6 +40,7 @@ export class MessageService {
     private readonly metaApiClient: MetaApiClient,
     private readonly tokenEncryption: TokenEncryptionService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async sendText(
@@ -123,6 +125,7 @@ export class MessageService {
       sentBy,
       occurredAt: occurredAt.toISOString(),
     } satisfies MessageSentPayload);
+    this.metricsService.communicationMessagesTotal.inc({ direction: "outbound" });
 
     return toMessageSummary(message);
   }
@@ -228,6 +231,7 @@ export class MessageService {
       sentBy,
       occurredAt: occurredAt.toISOString(),
     } satisfies MessageSentPayload);
+    this.metricsService.communicationMessagesTotal.inc({ direction: "outbound" });
 
     return toMessageSummary(message);
   }

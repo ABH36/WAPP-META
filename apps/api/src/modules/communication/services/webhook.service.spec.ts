@@ -10,6 +10,7 @@ import { ConversationRepository } from "../repositories/conversation.repository.
 import { AutomationService } from "./automation.service.js";
 import { AutoAssignmentService } from "./auto-assignment.service.js";
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 const APP_SECRET = "test-app-secret";
 const VERIFY_TOKEN = "test-verify-token";
@@ -65,6 +66,7 @@ describe("WebhookService", () => {
         { provide: AutomationService, useValue: { maybeSendAutoReply: jest.fn() } },
         { provide: AutoAssignmentService, useValue: { maybeAssign: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        MetricsService,
       ],
     }).compile();
 

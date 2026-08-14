@@ -2,9 +2,14 @@ import { Injectable } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
 import type { WebhookEventType } from "@wapp/shared-types";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import {
+  withCorrelationId,
+  type JobContext,
+} from "../../../common/observability/job-context.util.js";
 import { WEBHOOK_DELIVERY_QUEUE } from "./webhook-delivery.constants.js";
 
-export interface WebhookDeliveryJob {
+export interface WebhookDeliveryJob extends Partial<JobContext> {
   webhookId: string;
   workspaceId: string;
   event: WebhookEventType;
@@ -23,10 +28,12 @@ export interface WebhookDeliveryJob {
 export class WebhookDeliveryService {
   constructor(
     @InjectQueue(WEBHOOK_DELIVERY_QUEUE) private readonly queue: Queue<WebhookDeliveryJob>,
+    private readonly correlationContext: CorrelationContextService,
   ) {}
 
-  async enqueue(job: WebhookDeliveryJob, attempts: number): Promise<void> {
-    await this.queue.add("deliver", job, {
+  async enqueue(job: Omit<WebhookDeliveryJob, "correlationId">, attempts: number): Promise<void> {
+    const data = withCorrelationId(job, this.correlationContext.getOrCreateCorrelationId());
+    await this.queue.add("deliver", data, {
       attempts,
       backoff: { type: "exponential", delay: 5_000 },
     });

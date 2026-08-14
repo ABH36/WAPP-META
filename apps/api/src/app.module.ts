@@ -11,6 +11,8 @@ import { ResponseInterceptor } from "./common/interceptors/response.interceptor.
 import { AppLoggingModule } from "./common/logging/logging.module.js";
 import { EventsModule } from "./common/events/events.module.js";
 import { SecurityModule } from "./common/security/security.module.js";
+import { MetricsModule } from "./common/metrics/metrics.module.js";
+import { ObservabilityModule } from "./common/observability/observability.module.js";
 import { InfrastructureModule } from "./infrastructure/infrastructure.module.js";
 import { IdentityModule } from "./modules/identity/identity.module.js";
 import { WorkspaceModule } from "./modules/workspace/workspace.module.js";
@@ -55,6 +57,8 @@ import { PlatformModule } from "./modules/platform/platform.module.js";
     AppLoggingModule,
     EventsModule,
     SecurityModule,
+    ObservabilityModule,
+    MetricsModule,
     // SEC-009 — general authenticated API default. Auth-endpoint-specific
     // stricter tiers (5/min) are applied via @Throttle() on individual routes
     // once the Identity module exists.

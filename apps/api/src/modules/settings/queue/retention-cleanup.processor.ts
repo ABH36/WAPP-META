@@ -1,6 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import { InjectQueue, Processor, WorkerHost } from "@nestjs/bullmq";
+import { InjectQueue, Processor } from "@nestjs/bullmq";
 import { Queue, type Job } from "bullmq";
+import { ObservableProcessor } from "../../../common/observability/observable-processor.base.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
+import type { JobContext } from "../../../common/observability/job-context.util.js";
 import { AuthService } from "../../identity/services/auth.service.js";
 import { RetentionPolicyRepository } from "../repositories/retention-policy.repository.js";
 import { AuditLogRepository } from "../repositories/audit-log.repository.js";
@@ -24,8 +28,12 @@ const SWEEP_REPEAT_JOB_ID = "retention-cleanup-sweep";
  */
 @Injectable()
 @Processor(RETENTION_CLEANUP_QUEUE)
-export class RetentionCleanupProcessor extends WorkerHost implements OnModuleInit {
-  private readonly logger = new Logger(RetentionCleanupProcessor.name);
+export class RetentionCleanupProcessor
+  extends ObservableProcessor<Partial<JobContext>>
+  implements OnModuleInit
+{
+  protected readonly logger = new Logger(RetentionCleanupProcessor.name);
+  protected readonly queueName = RETENTION_CLEANUP_QUEUE;
 
   constructor(
     private readonly retentionPolicyRepository: RetentionPolicyRepository,
@@ -33,11 +41,18 @@ export class RetentionCleanupProcessor extends WorkerHost implements OnModuleIni
     private readonly webhookDeliveryLogRepository: WebhookDeliveryLogRepository,
     private readonly authService: AuthService,
     @InjectQueue(RETENTION_CLEANUP_QUEUE) private readonly queue: Queue,
+    correlationContext: CorrelationContextService,
+    metricsService: MetricsService,
   ) {
-    super();
+    super(correlationContext, metricsService);
   }
 
   async onModuleInit(): Promise<void> {
+    // Deliberately no `withCorrelationId()` here — this is a repeatable
+    // job's data template (reused verbatim by BullMQ on every future tick,
+    // per its own `repeat` option), not a per-run payload. Each tick gets
+    // its own fresh correlation ID from `ObservableProcessor.process()`'s
+    // `job.data.correlationId ?? randomUUID()` fallback instead.
     await this.queue.add(
       SWEEP_JOB_NAME,
       {},
@@ -48,7 +63,7 @@ export class RetentionCleanupProcessor extends WorkerHost implements OnModuleIni
     );
   }
 
-  async process(_job: Job<unknown>): Promise<void> {
+  protected async handle(_job: Job<Partial<JobContext>>): Promise<void> {
     const policies = await this.retentionPolicyRepository.findAll();
     const now = Date.now();
     let totalDeleted = 0;

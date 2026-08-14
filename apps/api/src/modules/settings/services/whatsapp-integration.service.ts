@@ -9,6 +9,7 @@ import type {
 import { DomainEvent } from "../../../common/events/domain-events.js";
 import type { IntegrationDisconnectedPayload } from "../../../common/events/domain-events.js";
 import type { WhatsAppIntegrationSummary } from "../settings.types.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 /**
  * PRD-006 Volume-3 §4.1 — thin orchestration over
@@ -24,6 +25,7 @@ export class WhatsAppIntegrationService {
   constructor(
     private readonly whatsAppConnectionService: WhatsAppConnectionService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async getSummary(workspaceId: string): Promise<WhatsAppIntegrationSummary> {
@@ -48,6 +50,7 @@ export class WhatsAppIntegrationService {
       actorId,
       occurredAt: new Date().toISOString(),
     } satisfies IntegrationDisconnectedPayload);
+    this.metricsService.settingsIntegrationsTotal.inc({ action: "disconnected" });
     return result;
   }
 

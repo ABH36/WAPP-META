@@ -24,6 +24,7 @@ allowBuilds:
   bcrypt: true
   esbuild: true
   msgpackr-extract: true
+  protobufjs: false
   sharp: true
   unrs-resolver: true
 overrides:

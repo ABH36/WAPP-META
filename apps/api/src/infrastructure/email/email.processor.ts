@@ -1,9 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Processor, WorkerHost } from "@nestjs/bullmq";
+import { Processor } from "@nestjs/bullmq";
 import type { Job } from "bullmq";
 import { ConfigService } from "@nestjs/config";
 import { Resend } from "resend";
 import type { AppConfig } from "../../config/configuration.js";
+import { ObservableProcessor } from "../../common/observability/observable-processor.base.js";
+import { CorrelationContextService } from "../../common/observability/correlation-context.service.js";
+import { MetricsService } from "../../common/metrics/metrics.service.js";
 import { EMAIL_QUEUE } from "./email.constants.js";
 import type { SendEmailJob } from "./email.types.js";
 
@@ -22,16 +25,21 @@ const RETRY_DELAYS_MS = [10_000, 60_000, 300_000];
     },
   },
 })
-export class EmailProcessor extends WorkerHost {
-  private readonly logger = new Logger(EmailProcessor.name);
+export class EmailProcessor extends ObservableProcessor<SendEmailJob> {
+  protected readonly logger = new Logger(EmailProcessor.name);
+  protected readonly queueName = EMAIL_QUEUE;
   private readonly resend: Resend;
 
-  constructor(private readonly config: ConfigService<AppConfig, true>) {
-    super();
+  constructor(
+    private readonly config: ConfigService<AppConfig, true>,
+    correlationContext: CorrelationContextService,
+    metricsService: MetricsService,
+  ) {
+    super(correlationContext, metricsService);
     this.resend = new Resend(this.config.get("resend", { infer: true }).apiKey);
   }
 
-  async process(job: Job<SendEmailJob>): Promise<void> {
+  protected async handle(job: Job<SendEmailJob>): Promise<void> {
     const { to, subject, html, text, category } = job.data;
     const resendConfig = this.config.get("resend", { infer: true });
 

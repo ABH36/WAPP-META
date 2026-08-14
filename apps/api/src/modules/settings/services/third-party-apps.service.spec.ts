@@ -4,6 +4,7 @@ import { ThirdPartyAppsService } from "./third-party-apps.service.js";
 import { ThirdPartyAppRepository } from "../repositories/third-party-app.repository.js";
 import { ThirdPartyAppKey } from "../schemas/third-party-app.schema.js";
 import { DomainEvent } from "../../../common/events/domain-events.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 describe("ThirdPartyAppsService", () => {
   let service: ThirdPartyAppsService;
@@ -19,6 +20,7 @@ describe("ThirdPartyAppsService", () => {
           useValue: { findByWorkspace: jest.fn(), setEnabled: jest.fn() },
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        MetricsService,
       ],
     }).compile();
 

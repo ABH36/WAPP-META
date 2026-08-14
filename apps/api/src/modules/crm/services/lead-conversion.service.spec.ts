@@ -9,6 +9,7 @@ import { CustomerRepository } from "../repositories/customer.repository.js";
 import { DealRepository } from "../repositories/deal.repository.js";
 import { WorkspaceRepository } from "../../workspace/repositories/workspace.repository.js";
 import { DomainEvent } from "../../../common/events/domain-events.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 const baseLead = {
   _id: { toString: () => "lead-1" },
@@ -59,6 +60,7 @@ describe("LeadConversionService", () => {
         { provide: DealRepository, useValue: { create: jest.fn() } },
         { provide: WorkspaceRepository, useValue: { findById: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        MetricsService,
       ],
     }).compile();
 

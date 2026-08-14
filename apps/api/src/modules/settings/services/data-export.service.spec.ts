@@ -4,6 +4,7 @@ import { DataExportService } from "./data-export.service.js";
 import { ExportJobRepository } from "../repositories/export-job.repository.js";
 import { DATA_EXPORT_QUEUE } from "../queue/data-export.constants.js";
 import { ExportEntityType, ExportFormat, ExportJobStatus } from "../schemas/export-job.schema.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
 
 describe("DataExportService", () => {
   let service: DataExportService;
@@ -25,6 +26,7 @@ describe("DataExportService", () => {
           },
         },
         { provide: getQueueToken(DATA_EXPORT_QUEUE), useValue: queue },
+        CorrelationContextService,
       ],
     }).compile();
 
@@ -66,7 +68,7 @@ describe("DataExportService", () => {
 
       expect(queue.add).toHaveBeenCalledWith(
         "export",
-        { exportJobId: "job-1", workspaceId: "workspace-1" },
+        expect.objectContaining({ exportJobId: "job-1", workspaceId: "workspace-1" }),
         { attempts: 1 },
       );
       expect(result.status).toBe(ExportJobStatus.PENDING);

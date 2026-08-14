@@ -6,6 +6,7 @@ import { WebhookConfigRepository } from "../repositories/webhook-config.reposito
 import { TokenEncryptionService } from "../../../common/security/token-encryption.service.js";
 import { DomainEvent } from "../../../common/events/domain-events.js";
 import { IntegrationConnectionStatus } from "../schemas/integration-status.enum.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 function fakeWebhook(overrides: Record<string, unknown> = {}) {
   return {
@@ -44,6 +45,7 @@ describe("WebhookService", () => {
         },
         { provide: TokenEncryptionService, useValue: { encrypt: jest.fn(), decrypt: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        MetricsService,
       ],
     }).compile();
 

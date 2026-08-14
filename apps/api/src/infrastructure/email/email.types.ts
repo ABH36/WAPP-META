@@ -1,3 +1,5 @@
+import type { JobContext } from "../../common/observability/job-context.util.js";
+
 /**
  * Generic email send job. Business modules (Identity's verification email,
  * Billing's invoice receipt, etc.) construct this and hand it to EmailService —
@@ -5,7 +7,7 @@
  * business module's responsibility (per TAD-001 v1.2 Email Patch — this layer
  * only owns delivery, not template authorship).
  */
-export interface SendEmailJob {
+export interface SendEmailJob extends Partial<JobContext> {
   to: string;
   subject: string;
   html: string;

@@ -6,8 +6,13 @@ import type { ExportJobDocument } from "../schemas/export-job.schema.js";
 import { DATA_EXPORT_QUEUE } from "../queue/data-export.constants.js";
 import type { CreateExportJobDto } from "../dto/create-export-job.dto.js";
 import type { ExportJobSummary } from "../settings.types.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import {
+  withCorrelationId,
+  type JobContext,
+} from "../../../common/observability/job-context.util.js";
 
-export interface DataExportJob {
+export interface DataExportJob extends Partial<JobContext> {
   exportJobId: string;
   workspaceId: string;
 }
@@ -30,6 +35,7 @@ export class DataExportService {
   constructor(
     private readonly exportJobRepository: ExportJobRepository,
     @InjectQueue(DATA_EXPORT_QUEUE) private readonly queue: Queue<DataExportJob>,
+    private readonly correlationContext: CorrelationContextService,
   ) {}
 
   async create(
@@ -53,7 +59,10 @@ export class DataExportService {
 
     await this.queue.add(
       "export",
-      { exportJobId: job._id.toString(), workspaceId },
+      withCorrelationId(
+        { exportJobId: job._id.toString(), workspaceId },
+        this.correlationContext.getOrCreateCorrelationId(),
+      ),
       { attempts: 1 },
     );
 

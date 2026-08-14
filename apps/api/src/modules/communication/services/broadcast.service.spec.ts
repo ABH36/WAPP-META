@@ -12,6 +12,8 @@ import { MessageService } from "./message.service.js";
 import { BroadcastStatus } from "../schemas/broadcast.schema.js";
 import { TemplateStatus } from "../schemas/template.schema.js";
 import { BROADCAST_EXECUTION_QUEUE } from "../queue/broadcast-execution.constants.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 describe("BroadcastService", () => {
   let service: BroadcastService;
@@ -74,6 +76,8 @@ describe("BroadcastService", () => {
         { provide: MessageService, useValue: { sendTemplate: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: getQueueToken(BROADCAST_EXECUTION_QUEUE), useValue: queue },
+        CorrelationContextService,
+        MetricsService,
       ],
     }).compile();
 
@@ -165,11 +169,13 @@ describe("BroadcastService", () => {
 
       const [jobName, jobData, jobOpts] = queue.add.mock.calls[0] as [
         string,
-        { workspaceId: string; broadcastId: string },
+        { workspaceId: string; broadcastId: string; correlationId: string },
         { delay: number },
       ];
       expect(jobName).toBe("run");
-      expect(jobData).toEqual({ workspaceId: "workspace-1", broadcastId: "broadcast-1" });
+      expect(jobData).toEqual(
+        expect.objectContaining({ workspaceId: "workspace-1", broadcastId: "broadcast-1" }),
+      );
       expect(jobOpts.delay).toBeGreaterThan(0);
       expect(jobOpts.delay).toBeLessThanOrEqual(60_000);
     });
@@ -197,10 +203,10 @@ describe("BroadcastService", () => {
       const result = await service.send("workspace-1", "broadcast-1", "user-1");
 
       expect(result.status).toBe(BroadcastStatus.RUNNING);
-      expect(queue.add).toHaveBeenCalledWith("run", {
-        workspaceId: "workspace-1",
-        broadcastId: "broadcast-1",
-      });
+      expect(queue.add).toHaveBeenCalledWith(
+        "run",
+        expect.objectContaining({ workspaceId: "workspace-1", broadcastId: "broadcast-1" }),
+      );
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         "communication.broadcast_started",
         expect.objectContaining({ broadcastId: "broadcast-1", startedBy: "user-1" }),

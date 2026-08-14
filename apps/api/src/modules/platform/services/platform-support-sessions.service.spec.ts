@@ -6,6 +6,7 @@ import { SupportSessionRepository } from "../repositories/support-session.reposi
 import { WorkspaceRepository } from "../../workspace/repositories/workspace.repository.js";
 import { DomainEvent } from "../../../common/events/domain-events.js";
 import { SupportSessionStatus } from "../schemas/support-session.schema.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 const baseSession = {
   _id: { toString: () => "session-1" },
@@ -51,6 +52,7 @@ describe("PlatformSupportSessionsService", () => {
         },
         { provide: WorkspaceRepository, useValue: { findById: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        MetricsService,
       ],
     }).compile();
 

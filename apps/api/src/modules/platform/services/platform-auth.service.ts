@@ -6,6 +6,7 @@ import { PlatformSessionRepository } from "../repositories/platform-session.repo
 import { PlatformLoginHistoryRepository } from "../repositories/platform-login-history.repository.js";
 import { PlatformPasswordService } from "./platform-password.service.js";
 import { PlatformTokenService } from "./platform-token.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 import type { PlatformUserDocument } from "../schemas/platform-user.schema.js";
 import type { IssuedPlatformTokenPair, PlatformUserProfile } from "../platform.types.js";
 
@@ -48,6 +49,7 @@ export class PlatformAuthService {
     private readonly passwordService: PlatformPasswordService,
     private readonly tokenService: PlatformTokenService,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async login(
@@ -109,6 +111,20 @@ export class PlatformAuthService {
     reason: string | null,
     meta: PlatformRequestMeta,
   ): Promise<void> {
+    // PHD-001 Volume-2 §4.3 — both "Authentication" (generic, actor-labeled)
+    // and "Platform" (Platform Login specifically) name this event; both
+    // counters increment from this one hook, matching every other
+    // success/failure branch of login() that already routes through it.
+    if (success) {
+      this.metricsService.authLoginSuccessTotal.inc({ actor: "platform" });
+      this.metricsService.platformLoginTotal.inc({ outcome: "success" });
+    } else {
+      this.metricsService.authLoginFailureTotal.inc({
+        actor: "platform",
+        reason: reason ?? "unknown",
+      });
+      this.metricsService.platformLoginTotal.inc({ outcome: "failure" });
+    }
     await this.loginHistoryRepository.record({
       platformUserId,
       email,
@@ -134,6 +150,10 @@ export class PlatformAuthService {
       // Reuse of an already-rotated/revoked refresh token — same theft
       // signal as the tenant AuthService, same response: revoke everything.
       await this.sessionRepository.revokeAllForUser(session.platformUserId.toString());
+      this.metricsService.authSessionRevocationTotal.inc({
+        actor: "platform",
+        reason: "reuse_detected",
+      });
       throw new UnauthorizedException(
         "This session is no longer valid. For your security, all sessions have been signed out — please log in again.",
       );
@@ -150,6 +170,7 @@ export class PlatformAuthService {
 
     const rotated = await this.createSession(user._id.toString(), meta, session.rememberMe);
     await this.sessionRepository.revokeByJti(payload.jti, rotated.jti);
+    this.metricsService.authTokenRefreshTotal.inc({ actor: "platform" });
 
     const { token: accessToken, expiresIn } = this.tokenService.signAccessToken({
       sub: user._id.toString(),
@@ -169,6 +190,7 @@ export class PlatformAuthService {
     try {
       const payload = this.tokenService.verifyRefreshToken(rawRefreshToken);
       await this.sessionRepository.revokeByJti(payload.jti);
+      this.metricsService.authSessionRevocationTotal.inc({ actor: "platform", reason: "logout" });
     } catch {
       // Logout is idempotent — an already-invalid/expired token is not an error.
     }

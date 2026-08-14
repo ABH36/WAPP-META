@@ -76,6 +76,21 @@ export interface AppConfig {
   // hardcode a guessed domain — this stays env-driven and empty until Ops
   // provides the real production value.
   cookieDomain: string | undefined;
+  // PHD-001 Volume-2 (Observability, Monitoring & Logging).
+  observability: {
+    // Static bearer token protecting GET /metrics (Architecture Review,
+    // Volume-2 — a Prometheus-style scraper can't do interactive JWT login,
+    // and BR-006 requires diagnostics-adjacent surfaces to stay
+    // authenticated; a config-time shared secret is the standard pattern
+    // for this class of endpoint). Never defaulted to a guessable value —
+    // see env.validation.ts for the boot-time non-empty check.
+    metricsAuthToken: string;
+    // Baked in at Docker build time (see docker/api.Dockerfile), never
+    // guessed/invented — "unknown" is the honest value when unset (e.g.
+    // local dev, where no build step stamps a real version/commit).
+    buildVersion: string;
+    gitCommit: string;
+  };
 }
 
 export default (): AppConfig => ({
@@ -142,4 +157,9 @@ export default (): AppConfig => ({
     (origin): origin is string => Boolean(origin),
   ),
   cookieDomain: process.env.COOKIE_DOMAIN || undefined,
+  observability: {
+    metricsAuthToken: process.env.METRICS_AUTH_TOKEN ?? "",
+    buildVersion: process.env.BUILD_VERSION ?? "unknown",
+    gitCommit: process.env.GIT_COMMIT ?? "unknown",
+  },
 });

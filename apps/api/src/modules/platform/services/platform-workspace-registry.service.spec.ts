@@ -6,6 +6,7 @@ import { PlatformWorkspaceRegistryService } from "./platform-workspace-registry.
 import { WorkspaceRepository } from "../../workspace/repositories/workspace.repository.js";
 import { DomainEvent } from "../../../common/events/domain-events.js";
 import type { WorkspaceDocument } from "../../workspace/schemas/workspace.schema.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 function fakeWorkspace(overrides: Partial<Record<string, unknown>> = {}): WorkspaceDocument {
   const base = {
@@ -40,6 +41,7 @@ describe("PlatformWorkspaceRegistryService", () => {
           },
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        MetricsService,
       ],
     }).compile();
 

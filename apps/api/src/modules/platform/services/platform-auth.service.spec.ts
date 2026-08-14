@@ -8,6 +8,7 @@ import { PlatformSessionRepository } from "../repositories/platform-session.repo
 import { PlatformLoginHistoryRepository } from "../repositories/platform-login-history.repository.js";
 import { PlatformPasswordService } from "./platform-password.service.js";
 import { PlatformTokenService } from "./platform-token.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 import type { PlatformUserDocument } from "../schemas/platform-user.schema.js";
 import type { PlatformSessionDocument } from "../schemas/platform-session.schema.js";
 
@@ -95,6 +96,7 @@ describe("PlatformAuthService", () => {
             },
           },
         },
+        MetricsService,
       ],
     }).compile();
 

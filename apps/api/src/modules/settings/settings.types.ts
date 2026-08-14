@@ -251,9 +251,33 @@ export interface DiagnosticCheck {
   status: "UP" | "DOWN";
 }
 
-/** §4.7 — read-only. Platform-level checks (database/redis/queue/storage/email) are the same for every workspace; whatsapp is workspace-specific, reusing Volume-3's IntegrationHealthService. */
+/** PHD-001 Volume-2 §4.14 — one entry per BullMQ queue in the system. */
+export interface DiagnosticsQueueEntry {
+  name: string;
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+  delayed: number;
+  workers: number;
+}
+
+/** PHD-001 Volume-2 §4.14. */
+export interface DiagnosticsCacheStatus {
+  connected: boolean;
+  usedMemoryBytes: number | null;
+}
+
+/** §4.7 — read-only. Platform-level checks (database/redis/queue/storage/email) are the same for every workspace; whatsapp is workspace-specific, reusing Volume-3's IntegrationHealthService. Extended by PHD-001 Volume-2 §4.14: buildVersion/gitCommit/environment/queues/cache/activeWorkers are platform-level (same for every workspace, like `checks`); featureFlags reuses Volume-4's FeatureFlagsService.list() and stays workspace-specific. */
 export interface DiagnosticsSummary {
   workspaceId: string;
   checks: DiagnosticCheck[];
   checkedAt: string;
+  buildVersion: string;
+  gitCommit: string;
+  environment: string;
+  featureFlags: FeatureFlagSummary[];
+  queues: DiagnosticsQueueEntry[];
+  cache: DiagnosticsCacheStatus;
+  activeWorkers: number;
 }

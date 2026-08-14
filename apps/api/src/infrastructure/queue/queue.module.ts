@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { BullModule } from "@nestjs/bullmq";
 import type { AppConfig } from "../../config/configuration.js";
+import { QueueStatusService } from "./queue-status.service.js";
 
 /**
  * Registers the shared BullMQ connection. Individual business modules register
@@ -27,6 +28,7 @@ import type { AppConfig } from "../../config/configuration.js";
       }),
     }),
   ],
-  exports: [BullModule],
+  providers: [QueueStatusService],
+  exports: [BullModule, QueueStatusService],
 })
 export class QueueModule {}

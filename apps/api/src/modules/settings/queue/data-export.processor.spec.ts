@@ -11,9 +11,11 @@ import { RetentionPolicyRepository } from "../repositories/retention-policy.repo
 import { StorageService } from "../../../infrastructure/storage/storage.service.js";
 import { ExportEntityType, ExportFormat } from "../schemas/export-job.schema.js";
 import type { DataExportJob } from "../services/data-export.service.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 function fakeJob(data: DataExportJob): Job<DataExportJob> {
-  return { data } as Job<DataExportJob>;
+  return { data, attemptsMade: 0, opts: {} } as unknown as Job<DataExportJob>;
 }
 
 describe("DataExportProcessor", () => {
@@ -49,6 +51,8 @@ describe("DataExportProcessor", () => {
         { provide: FeatureFlagRepository, useValue: { findByWorkspace: jest.fn() } },
         { provide: RetentionPolicyRepository, useValue: { getOrCreate: jest.fn() } },
         { provide: StorageService, useValue: { uploadBuffer: jest.fn() } },
+        CorrelationContextService,
+        MetricsService,
       ],
     }).compile();
 

@@ -12,6 +12,7 @@ import { ConversationRepository } from "../repositories/conversation.repository.
 import { AutomationService } from "./automation.service.js";
 import { AutoAssignmentService } from "./auto-assignment.service.js";
 import { MessageDirection, MessageStatus, MessageType } from "../schemas/message.schema.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 interface MetaWebhookMessage {
   from: string;
@@ -81,6 +82,7 @@ export class WebhookService {
     private readonly automationService: AutomationService,
     private readonly autoAssignmentService: AutoAssignmentService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   /** Meta's one-time subscription handshake (GET). Returns the challenge to echo back, or null if the verify token doesn't match. */
@@ -199,6 +201,7 @@ export class WebhookService {
       status: MessageStatus.VISIBLE,
       occurredAt,
     });
+    this.metricsService.communicationMessagesTotal.inc({ direction: "inbound" });
 
     this.eventEmitter.emit(DomainEvent.MESSAGE_RECEIVED, {
       workspaceId: phoneNumber.workspaceId,

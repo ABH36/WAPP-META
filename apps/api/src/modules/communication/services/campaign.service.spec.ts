@@ -9,6 +9,7 @@ import { PhoneNumberRepository } from "../repositories/phone-number.repository.j
 import { ContactRepository } from "../repositories/contact.repository.js";
 import { BroadcastService } from "./broadcast.service.js";
 import { CampaignStatus } from "../schemas/campaign.schema.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 describe("CampaignService", () => {
   let service: CampaignService;
@@ -54,6 +55,7 @@ describe("CampaignService", () => {
         { provide: ContactRepository, useValue: { findByIdsForWorkspace: jest.fn() } },
         { provide: BroadcastService, useValue: { create: jest.fn(), cancel: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        MetricsService,
       ],
     }).compile();
 

@@ -3,6 +3,10 @@ import type { Reflector } from "@nestjs/core";
 import { PlatformPermission, PlatformRole } from "@wapp/shared-types";
 import { PlatformPermissionsGuard } from "./platform-permissions.guard.js";
 import type { RequestWithPlatformUser } from "./platform-auth.guard.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
+
+// Real (unmocked) — no external I/O, just a prom-client registry.
+const metricsService = new MetricsService();
 
 function fakeContext(role: PlatformRole | undefined): ExecutionContext {
   const request = {
@@ -20,7 +24,7 @@ describe("PlatformPermissionsGuard", () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(undefined),
     } as unknown as Reflector;
-    const guard = new PlatformPermissionsGuard(reflector);
+    const guard = new PlatformPermissionsGuard(reflector, metricsService);
 
     expect(guard.canActivate(fakeContext(PlatformRole.PLATFORM_SUPPORT_EXECUTIVE))).toBe(true);
   });
@@ -29,7 +33,7 @@ describe("PlatformPermissionsGuard", () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(PlatformPermission.MANAGE_PLATFORM_USERS),
     } as unknown as Reflector;
-    const guard = new PlatformPermissionsGuard(reflector);
+    const guard = new PlatformPermissionsGuard(reflector, metricsService);
 
     expect(guard.canActivate(fakeContext(PlatformRole.PLATFORM_SUPER_ADMIN))).toBe(true);
   });
@@ -38,7 +42,7 @@ describe("PlatformPermissionsGuard", () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(PlatformPermission.MANAGE_PLATFORM_USERS),
     } as unknown as Reflector;
-    const guard = new PlatformPermissionsGuard(reflector);
+    const guard = new PlatformPermissionsGuard(reflector, metricsService);
 
     expect(() => guard.canActivate(fakeContext(PlatformRole.PLATFORM_SUPPORT_EXECUTIVE))).toThrow(
       ForbiddenException,
@@ -49,7 +53,7 @@ describe("PlatformPermissionsGuard", () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(PlatformPermission.VIEW_WORKSPACES),
     } as unknown as Reflector;
-    const guard = new PlatformPermissionsGuard(reflector);
+    const guard = new PlatformPermissionsGuard(reflector, metricsService);
 
     expect(() => guard.canActivate(fakeContext(undefined))).toThrow(ForbiddenException);
   });

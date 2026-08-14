@@ -8,6 +8,7 @@ import type {
   IntegrationDisconnectedPayload,
 } from "../../../common/events/domain-events.js";
 import type { ThirdPartyAppSummary } from "../settings.types.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 const ALL_APP_KEYS = Object.values(ThirdPartyAppKey);
 
@@ -17,6 +18,7 @@ export class ThirdPartyAppsService {
   constructor(
     private readonly thirdPartyAppRepository: ThirdPartyAppRepository,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async list(workspaceId: string): Promise<ThirdPartyAppSummary[]> {
@@ -46,6 +48,9 @@ export class ThirdPartyAppsService {
       enabled ? DomainEvent.INTEGRATION_CONNECTED : DomainEvent.INTEGRATION_DISCONNECTED,
       eventPayload,
     );
+    this.metricsService.settingsIntegrationsTotal.inc({
+      action: enabled ? "connected" : "disconnected",
+    });
 
     return { appKey: updated.appKey, enabled: updated.enabled };
   }

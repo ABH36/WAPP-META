@@ -20,6 +20,7 @@ import { DealRepository } from "../repositories/deal.repository.js";
 import { WorkspaceRepository } from "../../workspace/repositories/workspace.repository.js";
 import type { LeadConversionResult } from "../crm.types.js";
 import type { LeadDocument } from "../schemas/lead.schema.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 /**
  * PRD-004 Volume-3 (Lead Conversion). Owns only the conversion workflow
@@ -39,6 +40,7 @@ export class LeadConversionService {
     private readonly dealRepository: DealRepository,
     private readonly workspaceRepository: WorkspaceRepository,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async convert(
@@ -152,6 +154,8 @@ export class LeadConversionService {
     }
 
     this.emitEvents(workspaceId, lead, customerId!, dealId!, actorId, customerCreatedNew, now);
+    this.metricsService.crmLeadConversionsTotal.inc();
+    this.metricsService.crmDealsCreatedTotal.inc();
 
     return {
       leadId,

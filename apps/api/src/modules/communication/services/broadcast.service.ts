@@ -31,6 +31,9 @@ import {
   BROADCAST_SEND_DELAY_MS,
 } from "../queue/broadcast-execution.constants.js";
 import type { Paginated } from "../../../common/interceptors/response.interceptor.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import { withCorrelationId } from "../../../common/observability/job-context.util.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 const JOB_NAME = "run";
 
@@ -55,6 +58,8 @@ export class BroadcastService {
     private readonly messageService: MessageService,
     private readonly eventEmitter: EventEmitter2,
     @InjectQueue(BROADCAST_EXECUTION_QUEUE) private readonly queue: Queue,
+    private readonly correlationContext: CorrelationContextService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   /**
@@ -113,12 +118,16 @@ export class BroadcastService {
       broadcast._id.toString(),
       uniqueContactIds,
     );
+    this.metricsService.communicationBroadcastsTotal.inc({ status });
 
     if (dto.scheduledAt) {
       const delay = Math.max(0, dto.scheduledAt.getTime() - Date.now());
       await this.queue.add(
         JOB_NAME,
-        { workspaceId, broadcastId: broadcast._id.toString() },
+        withCorrelationId(
+          { workspaceId, broadcastId: broadcast._id.toString() },
+          this.correlationContext.getOrCreateCorrelationId(),
+        ),
         { delay },
       );
     }
@@ -179,7 +188,13 @@ export class BroadcastService {
     const updated = await this.broadcastRepository.updateStatus(id, BroadcastStatus.RUNNING, {
       startedAt: new Date(),
     });
-    await this.queue.add(JOB_NAME, { workspaceId, broadcastId: id });
+    await this.queue.add(
+      JOB_NAME,
+      withCorrelationId(
+        { workspaceId, broadcastId: id },
+        this.correlationContext.getOrCreateCorrelationId(),
+      ),
+    );
 
     this.eventEmitter.emit(DomainEvent.BROADCAST_STARTED, {
       workspaceId,
@@ -213,7 +228,13 @@ export class BroadcastService {
       );
     }
     const updated = await this.broadcastRepository.updateStatus(id, BroadcastStatus.RUNNING);
-    await this.queue.add(JOB_NAME, { workspaceId, broadcastId: id });
+    await this.queue.add(
+      JOB_NAME,
+      withCorrelationId(
+        { workspaceId, broadcastId: id },
+        this.correlationContext.getOrCreateCorrelationId(),
+      ),
+    );
     return toBroadcastSummary(updated!);
   }
 

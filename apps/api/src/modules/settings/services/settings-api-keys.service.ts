@@ -10,6 +10,7 @@ import type {
   ApiKeyRevokedPayload,
 } from "../../../common/events/domain-events.js";
 import type { CreateApiKeyDto } from "../dto/create-api-key.dto.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 /**
  * PRD-006 Volume-3 §4.4 — thin proxy over Identity's ApiKeyService
@@ -22,6 +23,7 @@ export class SettingsApiKeysService {
   constructor(
     private readonly apiKeyService: ApiKeyService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async list(workspaceId: string): Promise<ApiKeySummary[]> {
@@ -48,6 +50,7 @@ export class SettingsApiKeysService {
       actorId,
       occurredAt: new Date().toISOString(),
     } satisfies ApiKeyCreatedPayload);
+    this.metricsService.settingsApiKeysTotal.inc({ action: "created" });
 
     return result;
   }
@@ -61,6 +64,7 @@ export class SettingsApiKeysService {
       actorId,
       occurredAt: new Date().toISOString(),
     } satisfies ApiKeyRevokedPayload);
+    this.metricsService.settingsApiKeysTotal.inc({ action: "revoked" });
 
     return revoked;
   }
@@ -75,12 +79,14 @@ export class SettingsApiKeysService {
       actorId,
       occurredAt: new Date().toISOString(),
     } satisfies ApiKeyRevokedPayload);
+    this.metricsService.settingsApiKeysTotal.inc({ action: "revoked" });
     this.eventEmitter.emit(DomainEvent.API_KEY_CREATED, {
       workspaceId,
       apiKeyId: result.apiKey.id,
       actorId,
       occurredAt: new Date().toISOString(),
     } satisfies ApiKeyCreatedPayload);
+    this.metricsService.settingsApiKeysTotal.inc({ action: "created" });
 
     return result;
   }

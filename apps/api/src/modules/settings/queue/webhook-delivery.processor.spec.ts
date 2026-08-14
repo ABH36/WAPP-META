@@ -5,10 +5,12 @@ import { WebhookDeliveryProcessor } from "./webhook-delivery.processor.js";
 import { WebhookConfigRepository } from "../repositories/webhook-config.repository.js";
 import { WebhookDeliveryLogRepository } from "../repositories/webhook-delivery-log.repository.js";
 import { TokenEncryptionService } from "../../../common/security/token-encryption.service.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 import type { WebhookDeliveryJob } from "./webhook-delivery.service.js";
 
 function fakeJob(data: WebhookDeliveryJob): Job<WebhookDeliveryJob> {
-  return { data } as Job<WebhookDeliveryJob>;
+  return { data, attemptsMade: 0, opts: {} } as unknown as Job<WebhookDeliveryJob>;
 }
 
 describe("WebhookDeliveryProcessor", () => {
@@ -35,6 +37,8 @@ describe("WebhookDeliveryProcessor", () => {
         },
         { provide: WebhookDeliveryLogRepository, useValue: { record: jest.fn() } },
         { provide: TokenEncryptionService, useValue: { decrypt: jest.fn() } },
+        CorrelationContextService,
+        MetricsService,
       ],
     }).compile();
 

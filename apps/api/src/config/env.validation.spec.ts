@@ -23,6 +23,7 @@ function validConfig(): Record<string, unknown> {
     META_APP_SECRET: "meta-app-secret",
     META_WEBHOOK_VERIFY_TOKEN: "meta-webhook-token",
     TOKEN_ENCRYPTION_KEY: "0".repeat(64),
+    METRICS_AUTH_TOKEN: "metrics-token",
   };
 }
 

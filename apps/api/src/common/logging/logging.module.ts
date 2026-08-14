@@ -4,8 +4,8 @@ import { LoggerModule } from "nestjs-pino";
 import { randomUUID } from "crypto";
 import type { IncomingMessage, ServerResponse } from "http";
 import type { AppConfig } from "../../config/configuration.js";
+import { requestContextStorage } from "../observability/request-context.storage.js";
 
-const CORRELATION_HEADER = "x-correlation-id";
 const REQUEST_ID_HEADER = "x-request-id";
 const TRACE_ID_HEADER = "x-trace-id";
 
@@ -36,10 +36,37 @@ const TRACE_ID_HEADER = "x-trace-id";
               res.setHeader(REQUEST_ID_HEADER, id);
               return id;
             },
+            // `x-trace-id` only — `x-correlation-id` is covered universally
+            // by `mixin` below (reading the same value back out of
+            // `requestContextStorage`, which `CorrelationMiddleware` seeds
+            // from this exact header), so setting it here too would be a
+            // redundant, easy-to-drift-out-of-sync duplicate.
             customProps: (req: IncomingMessage) => ({
-              correlationId: req.headers[CORRELATION_HEADER] ?? undefined,
               traceId: req.headers[TRACE_ID_HEADER] ?? undefined,
             }),
+            // PHD-001 Volume-2 §4.1 — unlike `customProps` above (which only
+            // merges into pino-http's own auto-logged HTTP access-log line),
+            // `mixin` runs on *every* Pino log call, including plain
+            // `new Logger(ClassName.name)` calls made deep in the service
+            // layer — the only way "every log entry" (not just the HTTP
+            // summary line) actually carries correlation/user/workspace/
+            // platform-user context. Reads `requestContextStorage` directly
+            // (the same AsyncLocalStorage `CorrelationContextService`/
+            // `RequestContextInterceptor` write into) rather than through
+            // Nest's DI container, which `mixin` has no access to. "Service
+            // name" is the static `service` field below; "Module name" is
+            // already Nest's own per-class `context` field on every log
+            // line (from `new Logger(ClassName.name)`), not duplicated here.
+            mixin: () => {
+              const store = requestContextStorage.getStore();
+              return {
+                service: "wapp-api",
+                correlationId: store?.correlationId,
+                userId: store?.userId,
+                workspaceId: store?.workspaceId,
+                platformUserId: store?.platformUserId,
+              };
+            },
             // TAD-001 LOG-002 — sensitive fields are never logged, enforced
             // structurally rather than by convention at each call site.
             redact: {

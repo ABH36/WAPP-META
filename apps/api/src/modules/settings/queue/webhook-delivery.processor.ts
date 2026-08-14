@@ -1,12 +1,18 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Processor, WorkerHost } from "@nestjs/bullmq";
+import { Processor } from "@nestjs/bullmq";
 import type { Job } from "bullmq";
 import { createHmac } from "node:crypto";
+import { trace } from "@opentelemetry/api";
+import { ObservableProcessor } from "../../../common/observability/observable-processor.base.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 import { TokenEncryptionService } from "../../../common/security/token-encryption.service.js";
 import { WebhookConfigRepository } from "../repositories/webhook-config.repository.js";
 import { WebhookDeliveryLogRepository } from "../repositories/webhook-delivery-log.repository.js";
 import { WEBHOOK_DELIVERY_QUEUE } from "./webhook-delivery.constants.js";
 import type { WebhookDeliveryJob } from "./webhook-delivery.service.js";
+
+const tracer = trace.getTracer("wapp-api-webhook-delivery");
 
 /**
  * Off the request path, per TAD-001 Engineering Standards §Background jobs
@@ -18,18 +24,21 @@ import type { WebhookDeliveryJob } from "./webhook-delivery.service.js";
  */
 @Injectable()
 @Processor(WEBHOOK_DELIVERY_QUEUE)
-export class WebhookDeliveryProcessor extends WorkerHost {
-  private readonly logger = new Logger(WebhookDeliveryProcessor.name);
+export class WebhookDeliveryProcessor extends ObservableProcessor<WebhookDeliveryJob> {
+  protected readonly logger = new Logger(WebhookDeliveryProcessor.name);
+  protected readonly queueName = WEBHOOK_DELIVERY_QUEUE;
 
   constructor(
     private readonly webhookConfigRepository: WebhookConfigRepository,
     private readonly deliveryLogRepository: WebhookDeliveryLogRepository,
     private readonly tokenEncryption: TokenEncryptionService,
+    correlationContext: CorrelationContextService,
+    metricsService: MetricsService,
   ) {
-    super();
+    super(correlationContext, metricsService);
   }
 
-  async process(job: Job<WebhookDeliveryJob>): Promise<void> {
+  protected async handle(job: Job<WebhookDeliveryJob>): Promise<void> {
     const { webhookId, workspaceId, event, payload } = job.data;
     const webhook = await this.webhookConfigRepository.findByIdWithSecret(webhookId);
     if (!webhook || !webhook.enabled) {
@@ -48,26 +57,37 @@ export class WebhookDeliveryProcessor extends WorkerHost {
     let statusCode: number | null = null;
     let error: string | null = null;
 
-    try {
-      const response = await fetch(webhook.url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-WAPP-Signature": signature,
-          "X-WAPP-Event": event,
-        },
-        body,
-        signal: controller.signal,
-      });
-      statusCode = response.status;
-      if (!response.ok) {
-        error = `HTTP ${response.status}`;
+    // PHD-001 Volume-2 §4.4 — a dedicated child span for the outbound call
+    // itself, distinct from ObservableProcessor's own queue-level span: the
+    // Architecture Review named "Webhook Delivery" as its own trace target,
+    // separate from generic BullMQ job processing.
+    await tracer.startActiveSpan("webhook.delivery.http_request", async (span) => {
+      span.setAttribute("wapp.webhook.id", webhookId);
+      span.setAttribute("http.url", webhook.url);
+      try {
+        const response = await fetch(webhook.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-WAPP-Signature": signature,
+            "X-WAPP-Event": event,
+          },
+          body,
+          signal: controller.signal,
+        });
+        statusCode = response.status;
+        span.setAttribute("http.status_code", response.status);
+        if (!response.ok) {
+          error = `HTTP ${response.status}`;
+        }
+      } catch (caught) {
+        error = caught instanceof Error ? caught.message : "Unknown delivery error";
+        span.recordException(caught instanceof Error ? caught : new Error(error));
+      } finally {
+        clearTimeout(timer);
+        span.end();
       }
-    } catch (caught) {
-      error = caught instanceof Error ? caught.message : "Unknown delivery error";
-    } finally {
-      clearTimeout(timer);
-    }
+    });
 
     const success = error === null;
     await this.deliveryLogRepository.record({

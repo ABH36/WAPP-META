@@ -1,6 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import { InjectQueue, Processor, WorkerHost } from "@nestjs/bullmq";
+import { InjectQueue, Processor } from "@nestjs/bullmq";
 import type { Job, Queue } from "bullmq";
+import { ObservableProcessor } from "../../../common/observability/observable-processor.base.js";
+import { CorrelationContextService } from "../../../common/observability/correlation-context.service.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
+import type { JobContext } from "../../../common/observability/job-context.util.js";
 import { EscalationService } from "../services/escalation.service.js";
 import {
   SLA_ESCALATION_QUEUE,
@@ -19,14 +23,20 @@ const SWEEP_REPEAT_JOB_ID = "sla-escalation-sweep";
  */
 @Injectable()
 @Processor(SLA_ESCALATION_QUEUE)
-export class SlaEscalationProcessor extends WorkerHost implements OnModuleInit {
-  private readonly logger = new Logger(SlaEscalationProcessor.name);
+export class SlaEscalationProcessor
+  extends ObservableProcessor<Partial<JobContext>>
+  implements OnModuleInit
+{
+  protected readonly logger = new Logger(SlaEscalationProcessor.name);
+  protected readonly queueName = SLA_ESCALATION_QUEUE;
 
   constructor(
     private readonly escalationService: EscalationService,
     @InjectQueue(SLA_ESCALATION_QUEUE) private readonly queue: Queue,
+    correlationContext: CorrelationContextService,
+    metricsService: MetricsService,
   ) {
-    super();
+    super(correlationContext, metricsService);
   }
 
   async onModuleInit(): Promise<void> {
@@ -40,7 +50,7 @@ export class SlaEscalationProcessor extends WorkerHost implements OnModuleInit {
     );
   }
 
-  async process(_job: Job<unknown>): Promise<void> {
+  protected async handle(_job: Job<Partial<JobContext>>): Promise<void> {
     const cutoff = new Date(Date.now() - SLA_RESPONSE_HOURS * 60 * 60 * 1000);
     const escalatedCount = await this.escalationService.runSweep(cutoff);
     if (escalatedCount > 0) {

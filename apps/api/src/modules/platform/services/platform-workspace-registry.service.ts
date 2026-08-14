@@ -14,6 +14,7 @@ import {
   WorkspaceReactivatedPayload,
   WorkspaceSuspendedPayload,
 } from "../../../common/events/domain-events.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 export interface ListWorkspacesForPlatformResult {
   items: PlatformWorkspaceSummary[];
@@ -31,6 +32,7 @@ export class PlatformWorkspaceRegistryService {
   constructor(
     private readonly workspaceRepository: WorkspaceRepository,
     private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async list(
@@ -68,6 +70,7 @@ export class PlatformWorkspaceRegistryService {
       occurredAt: new Date().toISOString(),
     };
     this.eventEmitter.emit(DomainEvent.WORKSPACE_SUSPENDED, payload);
+    this.metricsService.platformWorkspaceSuspensionTotal.inc({ action: "suspended" });
 
     return toPlatformWorkspaceSummary(updated);
   }
@@ -94,6 +97,7 @@ export class PlatformWorkspaceRegistryService {
       occurredAt: new Date().toISOString(),
     };
     this.eventEmitter.emit(DomainEvent.WORKSPACE_REACTIVATED, payload);
+    this.metricsService.platformWorkspaceSuspensionTotal.inc({ action: "reactivated" });
 
     return toPlatformWorkspaceSummary(updated);
   }

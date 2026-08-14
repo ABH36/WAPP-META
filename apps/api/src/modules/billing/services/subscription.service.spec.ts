@@ -7,6 +7,7 @@ import { SubscriptionRepository } from "../repositories/subscription.repository.
 import { PlanRepository } from "../repositories/plan.repository.js";
 import { WorkspaceRepository } from "../../workspace/repositories/workspace.repository.js";
 import { DomainEvent } from "../../../common/events/domain-events.js";
+import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
 const starterPlan = { _id: { toString: () => "plan-starter" }, name: "Starter" };
 const growthPlan = { _id: { toString: () => "plan-growth" }, name: "Growth" };
@@ -68,6 +69,7 @@ describe("SubscriptionService", () => {
         },
         { provide: WorkspaceRepository, useValue: { updateStatus: jest.fn() } },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        MetricsService,
       ],
     }).compile();
 
