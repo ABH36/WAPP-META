@@ -174,7 +174,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        # FINAL-QA-001 — was `chromium` only, which is wrong: this suite's
+        # own `playwright.config.ts` uses devices["iPhone 13"]/["iPad Mini"]
+        # for the mobile/tablet projects, and Playwright's own device
+        # descriptors default those two specifically to WebKit, not
+        # Chromium (confirmed by reading @playwright/test's own `devices`
+        # export) — only the desktop project ("Desktop Chrome") is actually
+        # Chromium. `chromium`-only here meant every mobile/tablet test
+        # failed with "Executable doesn't exist at .../webkit.../pw_run.sh"
+        # the first time this job ever actually ran on GitHub Actions.
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Run e2e tests
         run: pnpm test:e2e
