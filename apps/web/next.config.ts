@@ -62,8 +62,8 @@ const nextConfig: NextConfig = {
     // that touches it.
     optimizePackageImports: ["lucide-react", "recharts"],
   },
-  async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+  headers() {
+    return Promise.resolve([{ source: "/(.*)", headers: securityHeaders }]);
   },
 };
 

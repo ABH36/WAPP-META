@@ -19,8 +19,16 @@ env:
   # toolchain PHD-001 Volume-3 already requires in production: root
   # package.json's `packageManager: pnpm@11.20.0` needs Node 22.13+ (the
   # built-in `node:sqlite` module) and pnpm 11's own engine requirement.
+  #
+  # FINAL-QA-001 — no PNPM_VERSION here: `pnpm/action-setup@v4` errors out
+  # ("Multiple versions of pnpm specified") if given an explicit `version:`
+  # input AND root package.json's own `packageManager` field at the same
+  # time — confirmed by an actual GitHub Actions run failing on exactly this
+  # (never caught locally, since nothing in local verification exercises
+  # `pnpm/action-setup@v4` itself). Removed the input entirely; the action
+  # auto-detects the pinned version from `packageManager` instead, which is
+  # also the more correct single-source-of-truth configuration.
   NODE_VERSION: "22"
-  PNPM_VERSION: "11"
 
 jobs:
   lint-typecheck:
@@ -30,8 +38,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -57,8 +63,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -81,8 +85,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -112,6 +114,18 @@ jobs:
           CLOUDINARY_API_SECRET: ci-placeholder
           WEB_APP_URL: http://localhost:3000
           ADMIN_APP_URL: http://localhost:3001
+          # FINAL-QA-001 — missing entirely before this fix. Next.js inlines
+          # NEXT_PUBLIC_* vars at BUILD time (not read at runtime like every
+          # other var here) — the exact same class of gap ADR-PHD-006
+          # already documents for the Dockerfiles (`next build` fails
+          # outright prerendering any page that reads one of these without
+          # it). The Docker/e2e jobs in this same workflow already correctly
+          # set these; this direct `pnpm build` job never did, only caught
+          # once it actually ran for real (this is CI's build job's first
+          # true GitHub Actions execution).
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_ADMIN_APP_URL: http://localhost:3001
 
   # PHD-001 Volume-4 §8/§28 — dependency/supply-chain check, previously only
   # ever run manually (PHD-001 Volume-1/Volume-2's own point-in-time
@@ -127,8 +141,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -153,8 +165,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -164,7 +174,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        # FINAL-QA-001 — was `chromium` only, which is wrong: this suite's
+        # own `playwright.config.ts` uses devices["iPhone 13"]/["iPad Mini"]
+        # for the mobile/tablet projects, and Playwright's own device
+        # descriptors default those two specifically to WebKit, not
+        # Chromium (confirmed by reading @playwright/test's own `devices`
+        # export) — only the desktop project ("Desktop Chrome") is actually
+        # Chromium. `chromium`-only here meant every mobile/tablet test
+        # failed with "Executable doesn't exist at .../webkit.../pw_run.sh"
+        # the first time this job ever actually ran on GitHub Actions.
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Run e2e tests
         run: pnpm test:e2e

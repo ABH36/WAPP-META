@@ -44,8 +44,8 @@ const nextConfig: NextConfig = {
     // FRD-001 Volume-9 §4.1/§4.9 — see apps/web/next.config.ts's identical note.
     optimizePackageImports: ["lucide-react", "recharts"],
   },
-  async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+  headers() {
+    return Promise.resolve([{ source: "/(.*)", headers: securityHeaders }]);
   },
 };
 

@@ -12,9 +12,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # FINAL-QA-001 — no explicit `version:` here; see ci.yml's identical
+      # note. pnpm/action-setup@v4 auto-detects the pinned version from
+      # root package.json's own `packageManager` field instead.
       - uses: pnpm/action-setup@v4
-        with:
-          version: "11"
 
       - uses: actions/setup-node@v4
         with:
