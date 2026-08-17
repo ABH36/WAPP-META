@@ -10,8 +10,8 @@ interface FakeResponse {
 
 function fakeResponse(): FakeResponse {
   return {
-    cookie: jest.fn(),
-    clearCookie: jest.fn(),
+    cookie: jest.fn<Response, [name: string, value: string, options: CookieOptions]>(),
+    clearCookie: jest.fn<Response, [name: string, options: CookieOptions]>(),
   };
 }
 

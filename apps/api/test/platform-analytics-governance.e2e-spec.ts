@@ -11,6 +11,7 @@ import type { SendEmailJob } from "../src/infrastructure/email/email.types.js";
 import { StorageService } from "../src/infrastructure/storage/storage.service.js";
 import { PlatformUser } from "../src/modules/platform/schemas/platform-user.schema.js";
 import type { PlatformUserDocument } from "../src/modules/platform/schemas/platform-user.schema.js";
+import { GovernancePolicyKey } from "../src/modules/platform/schemas/governance-policy.schema.js";
 import { PlatformPasswordService } from "../src/modules/platform/services/platform-password.service.js";
 import type {
   GovernancePolicySummary,
@@ -189,7 +190,7 @@ describe("Platform Analytics, Governance & Compliance (e2e)", () => {
     it("PLATFORM_SUPER_ADMIN updates the policy, incrementing its version by exactly 1", async () => {
       const before = await platformAuthed("get", "/api/v1/platform/policies");
       const existing = (before.body as ApiSuccessResponse<GovernancePolicySummary[]>).data.find(
-        (p) => p.key === "SESSION_TIMEOUT",
+        (p) => p.key === GovernancePolicyKey.SESSION_TIMEOUT,
       );
       versionBeforeFirstUpdate = existing?.version ?? 0;
       const historyLengthBefore = existing?.history.length ?? 0;
@@ -221,7 +222,7 @@ describe("Platform Analytics, Governance & Compliance (e2e)", () => {
       const res = await platformAuthed("get", "/api/v1/platform/policies");
       expect(res.status).toBe(200);
       const policies = (res.body as ApiSuccessResponse<GovernancePolicySummary[]>).data;
-      expect(policies.some((p) => p.key === "SESSION_TIMEOUT")).toBe(true);
+      expect(policies.some((p) => p.key === GovernancePolicyKey.SESSION_TIMEOUT)).toBe(true);
     });
 
     it("every policy update generates a Platform Audit entry (BR-004)", async () => {
@@ -311,7 +312,8 @@ describe("Platform Analytics, Governance & Compliance (e2e)", () => {
     it("returns a JSON preview for a WORKSPACE report", async () => {
       const res = await platformAuthed("get", "/api/v1/platform/reports?type=WORKSPACE");
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body.data)).toBe(true);
+      const body = res.body as ApiSuccessResponse<unknown[]>;
+      expect(Array.isArray(body.data)).toBe(true);
     });
 
     it("rejects an export whose date range exceeds 365 days", async () => {

@@ -52,9 +52,7 @@ describe("PlatformComplianceService", () => {
       .mockResolvedValueOnce({ items: [], total: 3 }) // permission changes
       .mockResolvedValueOnce({ items: [], total: 200 }); // audit coverage
     workspaceRepository.countAll.mockResolvedValue(40);
-    retentionPolicyRepository.findAll.mockResolvedValue(
-      new Array(35).fill({}) as unknown as never[],
-    );
+    retentionPolicyRepository.findAll.mockResolvedValue(new Array(35).fill({}));
     exportJobRepository.countByStatusAcrossWorkspaces.mockResolvedValue({
       [ExportJobStatus.PENDING]: 1,
       [ExportJobStatus.PROCESSING]: 0,
