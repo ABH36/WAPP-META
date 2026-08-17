@@ -135,4 +135,14 @@ Both **critical** findings this time traced to dev/build tooling, not a producti
 - Licenses: unchanged since Phase-1 — no new copyleft dependency introduced by this volume's changes (`cookie-parser`, `@types/cookie-parser` are both MIT).
 - Full verification sweep re-run clean after every dependency change this volume (typecheck across all touched packages, full test suites, production builds of both Next.js apps).
 
+---
+
+## 2026-08-17 Update — PHD-001 Volume-4 (Release Readiness, CI/CD & Deployment)
+
+**Requested by:** §4/§28 — CI must now run a real security-audit job on every PR/push, not just a point-in-time manual pass.
+
+**Re-ran `pnpm audit` before wiring CI**: `0 critical, 15 high, 20 moderate, 5 low` — byte-for-byte identical to the 2026-08-12 numbers above. No drift since Volume-1; nothing new to individually review.
+
+**CI enforcement added** (`.github/workflows/ci.yml`, `security-audit` job): `pnpm audit --audit-level=critical` on every PR/push — fails only on a **new** critical finding, matching the bar Volume-1 already established and documented above. It does not fail on the existing high/moderate/low findings, since those were already individually reviewed and accepted (non-reachable in this codebase's actual usage, or gated behind a deliberately deferred major upgrade) — failing CI on an already-reviewed, already-accepted finding would just make every future PR red for a decision that's already been made, not surface new information.
+
 Nothing here blocks PHD-001 Volume-1's commit.

@@ -77,12 +77,21 @@ async function createApp() {
       bodyParser: false,
     });
   } catch (error) {
+    // PHD-001 Volume-4 §35 — deployment failure must be as observable as
+    // deployment success (see the matching `event: "deployment.success"`
+    // log in bootstrap() below). Read directly from `process.env` rather
+    // than `ConfigService` — DI never finished initializing at this point,
+    // so no `config`/`app` object exists to read from; raw env vars are
+    // always available regardless.
     const line = JSON.stringify({
       level: "fatal",
       service: "wapp-api",
       event: "bootstrap.failed",
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
+      buildVersion: process.env.BUILD_VERSION ?? "unknown",
+      gitCommit: process.env.GIT_COMMIT ?? "unknown",
+      environment: process.env.NODE_ENV ?? "unknown",
       time: new Date().toISOString(),
     });
     await new Promise<void>((resolve) => {
@@ -213,7 +222,25 @@ async function bootstrap(): Promise<void> {
   const port = config.get("port", { infer: true });
   await app.listen(port);
 
-  logger.log(`WAPP API listening on port ${port} [${config.get("env", { infer: true })}]`);
+  // PHD-001 Volume-4 §35 — deployment success must be observable through the
+  // existing structured-logging stack, carrying version/commit/environment
+  // (never secrets). `buildVersion`/`gitCommit` already existed as optional
+  // config (wired into /settings/diagnostics and OTel's service.version
+  // since PHD-001 Volume-2) but nothing logged them at the one moment that
+  // actually matters for a deployment: the instant the process starts
+  // successfully accepting traffic. A single-object argument to
+  // nestjs-pino's `Logger.log()` is merged wholesale into the structured
+  // log line (its `msg` property becomes the line's message) — see
+  // nestjs-pino's own `Logger.js` `call()` implementation.
+  const observability = config.get("observability", { infer: true });
+  logger.log({
+    event: "deployment.success",
+    buildVersion: observability.buildVersion,
+    gitCommit: observability.gitCommit,
+    environment: config.get("env", { infer: true }),
+    port,
+    msg: `WAPP API listening on port ${port} [${config.get("env", { infer: true })}]`,
+  });
 }
 
 void bootstrap();

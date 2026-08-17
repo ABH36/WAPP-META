@@ -96,9 +96,16 @@ export interface AppConfig {
     // for this class of endpoint). Never defaulted to a guessable value —
     // see env.validation.ts for the boot-time non-empty check.
     metricsAuthToken: string;
-    // Baked in at Docker build time (see docker/api.Dockerfile), never
-    // guessed/invented — "unknown" is the honest value when unset (e.g.
-    // local dev, where no build step stamps a real version/commit).
+    // PHD-001 Volume-4 §14 — a plain runtime env var (docker-compose.prod.yml's
+    // `environment:` block, computed fresh from git state by the Release
+    // Runbook before each deploy), not baked into the image at build time —
+    // this repo never builds a registry-published immutable artifact
+    // (deliberate PHD-001 Volume-4 decision: no registry, image is rebuilt
+    // from source on the VPS at each deploy), so there's no meaningful
+    // difference between "baked at build time" and "set at container start"
+    // when both happen from the same git checkout at the same deploy
+    // moment. Never guessed/invented — "unknown" is the honest value when
+    // unset (e.g. local dev, where nothing sets a real version/commit).
     buildVersion: string;
     gitCommit: string;
   };

@@ -936,3 +936,35 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** give `RedisThrottlerStorageService` its own Redis connection, separate from the one injected into BullMQ's queue/worker registrations, configured with a finite `maxRetriesPerRequest` (or an explicit per-command timeout via `commandTimeout`) so a throttle check fails fast and lets the request proceed in a fail-open (or fail-closed, needs its own decision) manner under genuine Redis pressure, rather than hanging indefinitely. Should be validated by re-running the same 400-VU stress scenario (`k6/scenarios/stress.js`) afterward and confirming both the failure rate and the tail-latency shape improve.
 
 **Trigger to revisit:** real production traffic approaching the concurrency level where this was observed (400+ distinct simultaneous clients/second), or a dedicated Redis-infrastructure hardening pass — whichever comes first. Not a pre-launch blocker at WAPP's current expected beachhead-stage scale.
+
+---
+
+## TD-062 — No automated CD, container registry, or staging environment
+
+**Raised:** 2026-08-17 (PHD-001 Volume-4, Release Readiness, CI/CD & Deployment — Architecture Review, formally resolved decisions)
+
+**Status:** Open
+
+**What:** This volume's CI pipeline (`.github/workflows/ci.yml`) verifies every PR/push (lint, typecheck, test, build, Docker build+healthcheck, e2e, security audit) but deploys nothing — production deployment is a human executing `docs/RELEASE-RUNBOOK.md` on the Hostinger VPS. There is no container registry (every deploy rebuilds all three images from source, directly on the VPS, from whatever commit/tag is checked out) and no staging/Release-Candidate environment (Release Candidate verification uses the same local Docker build/run/smoke-test approach PHD-001 Volume-3 established, immediately before a direct production deploy — not a second, permanently-provisioned environment). A related, adjacent proposal — migrating `apps/web`/`apps/admin` to Vercel and `apps/api` to Render — was also considered and explicitly declined for this volume.
+
+**Why accepted for now:** All three were explicit, formally resolved Architecture Review decisions, not oversights. Given the single-VPS Hostinger topology (TAD-001 DEP-001/002/003), zero existing deploy-credential or registry infrastructure, and this project's repeated discipline of not introducing infrastructure without evidence it's needed (the same reasoning already applied to deferring PHD-001 Volume-3's Worker/API process split), automating deployment, adding a registry, or standing up a second environment now would each be a materially larger commitment than "harden the release process for what already exists" — which is this volume's actual, approved scope.
+
+**Closing this out looks like:** three independent, separately-approvable initiatives, not one bundled change — (1) CI gains scoped deploy credentials (SSH to the VPS, or a registry-push token) and an explicit deploy job, once the operational maturity/team size justifies removing the human-executed step; (2) a container registry (GitHub Container Registry is the natural first choice, given GitHub Actions is already in use) if/when "rebuild from source on every deploy" becomes a measured pain point (build time, deploy-window length) rather than a theoretical one; (3) a real second environment (a second, smaller VPS, or a staging profile on existing infrastructure) if/when pre-production verification against the exact production topology (not just local Docker) becomes a genuine, evidenced need. The Vercel/Render hosting question, if revisited, needs its own formal TAD-001 amendment given its ripple effects into `apps/web`'s cookie-security architecture (ADR-PHD-001) and PHD-001 Volume-3's already-frozen resource-limit/nginx-routing work — not a decision to fold into any of the three items above.
+
+**Trigger to revisit:** a real, measured operational cost from the current manual process (deploy frequency high enough that the human-executed runbook becomes a genuine bottleneck), or a dedicated infrastructure-scaling initiative — whichever comes first. Not a pre-launch blocker at WAPP's current single-operator, single-VPS scale.
+
+---
+
+## TD-063 — No MongoDB migration-runner tooling
+
+**Raised:** 2026-08-17 (PHD-001 Volume-4, Release Readiness, CI/CD & Deployment — Architecture Review, formally resolved decision)
+
+**Status:** Open
+
+**What:** No migration framework (e.g. `migrate-mongo`) exists anywhere in this codebase. Every schema/index change across the entire engagement to date has been an implicit, additive Mongoose schema change applied at boot, with no versioned migration files and no formal rollback-migration concept. PHD-001 Volume-4 formalized the existing discipline as a documented Expand → Deploy → Migrate → Contract policy (`docs/ADR-PHD-008-production-deployment-rollback-strategy.md`) and made index creation an explicit tracked release-checklist item, rather than introducing new tooling.
+
+**Why accepted for now:** Resolved via the doubt policy during Volume-4's Architecture Review — matching this project's repeated precedent of not adopting new infrastructure without evidence it's needed (the same reasoning as TD-062, above). This codebase's migration history to date has been small, additive, and manageable without a formal runner; introducing one now would mean retroactively formalizing history that was never tracked that way, for a problem (destructive, hard-to-coordinate schema changes) that hasn't actually occurred yet.
+
+**Closing this out looks like:** adopt a real migration tool (`migrate-mongo` is the natural fit given this codebase already uses Mongoose) once a genuinely destructive or multi-step schema change is actually needed — at that point, retroactively capture the current schema state as migration "zero" and require all subsequent schema changes to go through versioned migration files instead of implicit boot-time Mongoose changes.
+
+**Trigger to revisit:** the first schema change that is genuinely destructive (a field removal/type change affecting existing production documents) or that requires careful multi-step coordination with a deploy — the Expand/Deploy/Migrate/Contract discipline alone stops being sufficient once a change can't safely be expressed as "additive, then later contracted in a separate release."

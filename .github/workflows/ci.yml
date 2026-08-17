@@ -15,8 +15,12 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: "20"
-  PNPM_VERSION: "9"
+  # PHD-001 Volume-4 — was stale at Node 20/pnpm 9, inconsistent with the
+  # toolchain PHD-001 Volume-3 already requires in production: root
+  # package.json's `packageManager: pnpm@11.20.0` needs Node 22.13+ (the
+  # built-in `node:sqlite` module) and pnpm 11's own engine requirement.
+  NODE_VERSION: "22"
+  PNPM_VERSION: "11"
 
 jobs:
   lint-typecheck:
@@ -108,3 +112,210 @@ jobs:
           CLOUDINARY_API_SECRET: ci-placeholder
           WEB_APP_URL: http://localhost:3000
           ADMIN_APP_URL: http://localhost:3001
+
+  # PHD-001 Volume-4 §8/§28 — dependency/supply-chain check, previously only
+  # ever run manually (PHD-001 Volume-1/Volume-2's own point-in-time
+  # `pnpm audit` passes, see docs/DEPENDENCY-AUDIT-phase1.md). Fails only on
+  # NEW critical findings — matches the bar Volume-1 already established and
+  # documented (0 critical, 15 high/20 moderate/5 low individually reviewed
+  # and accepted as non-reachable or deliberately deferred; failing CI on
+  # those would just make every future PR red for a decision already made).
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Audit (fails only on new critical findings)
+        run: pnpm audit --audit-level=critical
+
+  # PHD-001 Volume-4 §11 — Playwright's own webServer boots apps/web and
+  # apps/admin itself (playwright.config.ts) and exercises only the
+  # public/unauthenticated surface (home, login, forgot-password, PWA
+  # offline page) — no apps/api instance, database, or Redis is needed for
+  # this suite, per its own doc comment.
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: lint-typecheck
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run e2e tests
+        run: pnpm test:e2e
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_ADMIN_APP_URL: http://localhost:3001
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # PHD-001 Volume-4 §12 — every prior volume verified these Dockerfiles by
+  # hand (PHD-001 Volume-3's own build-verification pass); this is the first
+  # time it's automated. Separate jobs (not one matrix) since apps/api
+  # genuinely needs live Mongo/Redis service containers to boot and apps/web
+  # and apps/admin need neither — a shared matrix would start unused service
+  # containers for 2 of every 3 runs.
+  docker-verify-api:
+    name: Docker Verify — API
+    runs-on: ubuntu-latest
+    needs: lint-typecheck
+    services:
+      mongo:
+        image: mongo:7
+        ports: ["27017:27017"]
+        options: >-
+          --health-cmd "echo 'db.runCommand({ping:1})' | mongosh --quiet"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -f docker/api.Dockerfile -t wapp-api:ci .
+
+      - name: Boot and verify health
+        # Same required-env-var set as apps/api/src/config/env.validation.ts
+        # (confirmed via direct inspection) — CI-only placeholder values,
+        # never real secrets (TAD-001 SEC-007), sufficient for the app to
+        # actually pass boot-time validation and connect to the real
+        # Mongo/Redis service containers above.
+        run: |
+          docker run -d --name wapp-api-ci --network host \
+            -e NODE_ENV=production \
+            -e PORT=4000 \
+            -e MONGODB_URI="mongodb://localhost:27017/ci?directConnection=true" \
+            -e REDIS_URL="redis://localhost:6379" \
+            -e JWT_ACCESS_SECRET=ci-placeholder-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            -e JWT_REFRESH_SECRET=ci-placeholder-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+            -e PLATFORM_JWT_ACCESS_SECRET=ci-placeholder-cccccccccccccccccccccccccccccccc \
+            -e PLATFORM_JWT_REFRESH_SECRET=ci-placeholder-dddddddddddddddddddddddddddddddd \
+            -e RESEND_API_KEY=ci-placeholder \
+            -e RESEND_FROM_ADDRESS=no-reply@wapp.example \
+            -e CLOUDINARY_CLOUD_NAME=ci-placeholder \
+            -e CLOUDINARY_API_KEY=ci-placeholder \
+            -e CLOUDINARY_API_SECRET=ci-placeholder \
+            -e WEB_APP_URL=http://localhost:3000 \
+            -e ADMIN_APP_URL=http://localhost:3001 \
+            -e META_APP_ID=ci-placeholder \
+            -e META_APP_SECRET=ci-placeholder \
+            -e META_WEBHOOK_VERIFY_TOKEN=ci-placeholder \
+            -e TOKEN_ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
+            -e METRICS_AUTH_TOKEN=ci-placeholder-metrics-token \
+            -e CORS_ALLOWED_ORIGINS=http://localhost:3000 \
+            wapp-api:ci
+
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/api/health | grep -q '"status":"ok"'; then
+              echo "API healthy"; exit 0
+            fi
+            sleep 2
+          done
+          echo "API did not become healthy in time"
+          docker logs wapp-api-ci
+          exit 1
+
+      - name: Verify graceful shutdown
+        run: |
+          docker stop -t 10 wapp-api-ci
+          code=$(docker inspect wapp-api-ci --format '{{.State.ExitCode}}')
+          echo "Exit code: $code"
+          test "$code" = "0"
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker logs wapp-api-ci || true
+
+  docker-verify-web:
+    name: Docker Verify — Web
+    runs-on: ubuntu-latest
+    needs: lint-typecheck
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          docker build -f docker/web.Dockerfile -t wapp-web:ci . \
+            --build-arg NEXT_PUBLIC_API_URL=http://localhost:4000 \
+            --build-arg NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+      - name: Boot and verify health
+        run: |
+          docker run -d --name wapp-web-ci -p 3000:3000 wapp-web:ci
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/ >/dev/null; then
+              echo "Web healthy"; exit 0
+            fi
+            sleep 2
+          done
+          echo "Web did not become healthy in time"
+          docker logs wapp-web-ci
+          exit 1
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker logs wapp-web-ci || true
+
+  docker-verify-admin:
+    name: Docker Verify — Admin
+    runs-on: ubuntu-latest
+    needs: lint-typecheck
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          docker build -f docker/admin.Dockerfile -t wapp-admin:ci . \
+            --build-arg NEXT_PUBLIC_API_URL=http://localhost:4000 \
+            --build-arg NEXT_PUBLIC_ADMIN_APP_URL=http://localhost:3001
+
+      - name: Boot and verify health
+        run: |
+          docker run -d --name wapp-admin-ci -p 3001:3001 wapp-admin:ci
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3001/login >/dev/null; then
+              echo "Admin healthy"; exit 0
+            fi
+            sleep 2
+          done
+          echo "Admin did not become healthy in time"
+          docker logs wapp-admin-ci
+          exit 1
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker logs wapp-admin-ci || true

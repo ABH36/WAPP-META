@@ -9,6 +9,19 @@ services:
       dockerfile: docker/api.Dockerfile
     restart: unless-stopped
     env_file: ./apps/api/.env
+    # PHD-001 Volume-4 §14 — BUILD_VERSION/GIT_COMMIT already existed as
+    # optional env vars (config/configuration.ts, wired into
+    # /settings/diagnostics and OTel's service.version since PHD-001
+    # Volume-2) but were never actually set anywhere in this compose file —
+    # every real deployment would have silently read "unknown" for both.
+    # `environment:` here overrides the static env_file above with values
+    # computed fresh from the actual git state at deploy time (the Release
+    # Runbook's own tagging step exports these before `docker compose up`),
+    # so the running container's reported version always matches the real
+    # commit/tag it was built from — never a stale, manually-typed value.
+    environment:
+      BUILD_VERSION: "${BUILD_VERSION:-unknown}"
+      GIT_COMMIT: "${GIT_COMMIT:-unknown}"
     depends_on:
       - redis
     expose:
