@@ -970,3 +970,19 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** adopt a real migration tool (`migrate-mongo` is the natural fit given this codebase already uses Mongoose) once a genuinely destructive or multi-step schema change is actually needed — at that point, retroactively capture the current schema state as migration "zero" and require all subsequent schema changes to go through versioned migration files instead of implicit boot-time Mongoose changes.
 
 **Trigger to revisit:** the first schema change that is genuinely destructive (a field removal/type change affecting existing production documents) or that requires careful multi-step coordination with a deploy — the Expand/Deploy/Migrate/Contract discipline alone stops being sufficient once a change can't safely be expressed as "additive, then later contracted in a separate release."
+
+---
+
+## TD-064 — Pre-existing `next.config.ts` lint failure in both `apps/web`/`apps/admin`, discovered and closed during FINAL-QA-001's first real CI run
+
+**Raised and closed same day:** 2026-08-17 (FINAL-QA-001, Release Validation & Production Readiness — GitHub Actions verification, doubt-policy resolution)
+
+**Status:** Closed (2026-08-17)
+
+**What:** `pnpm -r lint` (the exact command CI's `lint-typecheck` job runs) failed on `apps/web/next.config.ts:65` and `apps/admin/next.config.ts:47` — both `async headers()` methods flagged `@typescript-eslint/require-await` (an `async` function whose body never uses `await`). Both had been independently noted as "pre-existing, confirmed via `git diff` to predate the current volume's own changes" during PHD-001 Volume-3's and Volume-4's own regression sweeps, but neither volume filed a dedicated Tech Debt entry for it — a real gap in diligence, since TD-057 (the sibling case for `apps/api`) _was_ properly tracked. Like TD-057, this meant the CI lint gate could never fully pass, invisible until this volume's first real GitHub Actions execution.
+
+**Why fixed immediately rather than just documented:** Same reasoning the Architect already approved for TD-057 minutes earlier in the same verification session — small, mechanical, well-understood fix (the method doesn't need to be `async` at all; it returns a static header-config array with nothing to await), not a design question, and leaving it open would mean CI's lint gate remains permanently unsatisfiable for a second, independent reason even after TD-057's own closure.
+
+**What the fix was:** `headers()` in both `next.config.ts` files changed from `async headers() { return [...]; }` to `headers() { return Promise.resolve([...]); }` — drops the unused `async` keyword while preserving the same Promise-returning contract Next.js's `NextConfig.headers` type expects, rather than changing the return type shape. Verified: `pnpm --filter @wapp/{web,admin} typecheck` clean, full repo-wide `pnpm -r lint` (all 7 packages) clean. Production `next build` could not be verified on this Windows host specifically, due to an unrelated, well-known Windows-only limitation (Next.js standalone-output symlink tracing failing under `EPERM` with pnpm's symlinked `node_modules` — affects unrelated files like `react`/`@jridgewell/gen-mapping`, nothing to do with this change) — not a concern for the actual target environments, since PHD-001 Volume-3 already proved both apps build successfully via `docker build` (Linux), and CI itself runs on `ubuntu-latest` (also Linux).
+
+**Trigger that closed it:** discovered and fixed in the same sitting as TD-057, both blocking the same first-ever real GitHub Actions verification of PHD-001 Volume-4's CI workflows.
