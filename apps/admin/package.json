@@ -1,6 +1,6 @@
 {
   "name": "@wapp/admin",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "private": true,
   "description": "WAPP Platform Administration console — separate deployable per SDP-001 §3 (isolation from the workspace app for WAPP-internal-only access)",
   "scripts": {
