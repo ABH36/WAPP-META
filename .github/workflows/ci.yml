@@ -114,6 +114,18 @@ jobs:
           CLOUDINARY_API_SECRET: ci-placeholder
           WEB_APP_URL: http://localhost:3000
           ADMIN_APP_URL: http://localhost:3001
+          # FINAL-QA-001 — missing entirely before this fix. Next.js inlines
+          # NEXT_PUBLIC_* vars at BUILD time (not read at runtime like every
+          # other var here) — the exact same class of gap ADR-PHD-006
+          # already documents for the Dockerfiles (`next build` fails
+          # outright prerendering any page that reads one of these without
+          # it). The Docker/e2e jobs in this same workflow already correctly
+          # set these; this direct `pnpm build` job never did, only caught
+          # once it actually ran for real (this is CI's build job's first
+          # true GitHub Actions execution).
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_ADMIN_APP_URL: http://localhost:3001
 
   # PHD-001 Volume-4 §8/§28 — dependency/supply-chain check, previously only
   # ever run manually (PHD-001 Volume-1/Volume-2's own point-in-time
