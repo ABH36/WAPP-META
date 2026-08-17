@@ -53,6 +53,14 @@ describe("PlatformSubscriptionsService", () => {
     );
   });
 
+  it("clamps an oversized limit to MAX_PAGE_SIZE (100) instead of passing it through unbounded", async () => {
+    subscriptionService.listAllForPlatform.mockResolvedValue({ items: [], total: 0 });
+
+    await service.list({}, 1, 999_999);
+
+    expect(subscriptionService.listAllForPlatform).toHaveBeenCalledWith({}, 1, 100);
+  });
+
   it("extendTrial() delegates to SubscriptionService.extendTrial", async () => {
     subscriptionService.extendTrial.mockResolvedValue(baseSummary as never);
 

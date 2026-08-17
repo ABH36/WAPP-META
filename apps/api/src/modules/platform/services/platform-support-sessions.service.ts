@@ -27,6 +27,8 @@ import type {
 } from "../../../common/events/domain-events.js";
 import { MetricsService } from "../../../common/metrics/metrics.service.js";
 
+const MAX_PAGE_SIZE = 100;
+
 export interface ListSupportSessionsResult {
   items: SupportSessionSummary[];
   total: number;
@@ -165,7 +167,11 @@ export class PlatformSupportSessionsService {
     page: number,
     limit: number,
   ): Promise<ListSupportSessionsResult> {
-    const { items, total } = await this.supportSessionRepository.list(filter, page, limit);
+    const { items, total } = await this.supportSessionRepository.list(
+      filter,
+      page,
+      Math.min(limit, MAX_PAGE_SIZE),
+    );
     return { items: items.map(toSupportSessionSummary), total };
   }
 

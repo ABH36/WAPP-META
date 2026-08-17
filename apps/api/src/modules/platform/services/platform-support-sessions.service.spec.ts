@@ -257,5 +257,13 @@ describe("PlatformSupportSessionsService", () => {
       expect(result.total).toBe(1);
       expect(result.items[0]?.id).toBe("session-1");
     });
+
+    it("clamps an oversized limit to MAX_PAGE_SIZE (100) instead of passing it through unbounded", async () => {
+      supportSessionRepository.list.mockResolvedValue({ items: [], total: 0 });
+
+      await service.list({}, 1, 999_999);
+
+      expect(supportSessionRepository.list).toHaveBeenCalledWith({}, 1, 100);
+    });
   });
 });

@@ -3,6 +3,17 @@ export interface AppConfig {
   env: string;
   port: number;
   mongoUri: string;
+  // PHD-001 Volume-3 §7 — conservative, environment-driven starting values
+  // (Node MongoDB driver previously used its own unconfigured defaults).
+  // Explicitly unvalidated against real production load; adjust from
+  // measured telemetry, not invented here.
+  mongoPool: {
+    maxPoolSize: number;
+    minPoolSize: number;
+    connectTimeoutMs: number;
+    socketTimeoutMs: number;
+    serverSelectionTimeoutMs: number;
+  };
   redisUrl: string;
   jwt: {
     accessSecret: string;
@@ -97,6 +108,16 @@ export default (): AppConfig => ({
   env: process.env.NODE_ENV ?? "development",
   port: parseInt(process.env.PORT ?? "4000", 10),
   mongoUri: process.env.MONGODB_URI ?? "",
+  mongoPool: {
+    maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE ?? "10", 10),
+    minPoolSize: parseInt(process.env.MONGO_MIN_POOL_SIZE ?? "2", 10),
+    connectTimeoutMs: parseInt(process.env.MONGO_CONNECT_TIMEOUT_MS ?? "10000", 10),
+    socketTimeoutMs: parseInt(process.env.MONGO_SOCKET_TIMEOUT_MS ?? "45000", 10),
+    serverSelectionTimeoutMs: parseInt(
+      process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS ?? "10000",
+      10,
+    ),
+  },
   redisUrl: process.env.REDIS_URL ?? "",
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET ?? "",

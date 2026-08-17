@@ -6,6 +6,8 @@ import {
 import type { ListInvoicesForPlatformFilter } from "../../billing/repositories/invoice.repository.js";
 import type { InvoiceSummary } from "../../billing/billing.types.js";
 
+const MAX_PAGE_SIZE = 100;
+
 /** PRD-007 Volume-2 §4.2 — every method delegates to InvoiceService (BR-006/§11: no duplicate commercial logic). */
 @Injectable()
 export class PlatformInvoicesService {
@@ -16,7 +18,7 @@ export class PlatformInvoicesService {
     page: number,
     limit: number,
   ): Promise<ListInvoicesForPlatformResult> {
-    return this.invoiceService.listAllForPlatform(filter, page, limit);
+    return this.invoiceService.listAllForPlatform(filter, page, Math.min(limit, MAX_PAGE_SIZE));
   }
 
   async getById(invoiceId: string): Promise<InvoiceSummary> {

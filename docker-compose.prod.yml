@@ -13,30 +13,76 @@ services:
       - redis
     expose:
       - "4000"
+    # PHD-001 Volume-3 §21 — conservative, configurable starting values.
+    # Deliberately unvalidated against real production load — adjust from
+    # measured telemetry once available, not by guessing further here. Never
+    # hardcoded into application code; override per-deploy via these env vars.
+    #
+    # cpus default raised 1.0 -> 2.0 after k6 load testing under this
+    # volume's own mandate: 30 concurrent /api/v1/auth/register calls (bcrypt
+    # cost factor 12, a legitimate OWASP-range security default, not
+    # something to weaken for performance) measured p95=20.92s at 1.0 CPU vs
+    # p95=6.46s at 2.0 CPU vs p95=3.66s at 4.0 CPU — 1.0->2.0 captured the
+    # largest relative gain (3.2x) before diminishing returns set in past
+    # that point, so 2.0 is the new evidenced default. See the Performance
+    # Report for the full measurement set.
+    deploy:
+      resources:
+        limits:
+          cpus: "${API_CPU_LIMIT:-2.0}"
+          memory: ${API_MEMORY_LIMIT:-512M}
 
   web:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
+      # PHD-001 Volume-3 §20 — Next.js inlines NEXT_PUBLIC_* vars into the
+      # client bundle at build time (undiscovered gap until this volume's
+      # Docker runtime verification actually ran a build: `next build`
+      # previously failed outright prerendering any page that reads
+      # NEXT_PUBLIC_API_URL). Sourced from the shell/root .env at `docker
+      # compose build` time — env_file below is a runtime-only mechanism and
+      # cannot supply build args.
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
     restart: unless-stopped
     env_file: ./apps/web/.env
     expose:
       - "3000"
+    deploy:
+      resources:
+        limits:
+          cpus: "${WEB_CPU_LIMIT:-0.5}"
+          memory: ${WEB_MEMORY_LIMIT:-256M}
 
   admin:
     build:
       context: .
       dockerfile: docker/admin.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_ADMIN_APP_URL: ${NEXT_PUBLIC_ADMIN_APP_URL}
     restart: unless-stopped
     env_file: ./apps/admin/.env
     expose:
       - "3001"
+    deploy:
+      resources:
+        limits:
+          cpus: "${ADMIN_CPU_LIMIT:-0.5}"
+          memory: ${ADMIN_MEMORY_LIMIT:-256M}
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
     volumes:
       - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "${REDIS_CPU_LIMIT:-0.5}"
+          memory: ${REDIS_MEMORY_LIMIT:-256M}
 
   nginx:
     image: nginx:alpine
@@ -48,9 +94,22 @@ services:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       # - ./docker/nginx/certs:/etc/nginx/certs:ro   # mount real TLS certs here (SEC-001)
     depends_on:
-      - api
-      - web
-      - admin
+      # PHD-001 Volume-3 §20 — upgraded from a plain start-order dependency
+      # to a real readiness gate, now that all 3 app images carry a
+      # HEALTHCHECK (previously absent everywhere in this repo): nginx no
+      # longer starts routing to a container that's merely "started" but
+      # hasn't actually finished booting (e.g. still connecting to Mongo).
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "${NGINX_CPU_LIMIT:-0.25}"
+          memory: ${NGINX_MEMORY_LIMIT:-128M}
 
 volumes:
   redis_data:

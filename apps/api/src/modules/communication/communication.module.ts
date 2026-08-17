@@ -113,11 +113,25 @@ import { AutomationSettingsController } from "./controllers/automation-settings.
       { name: Campaign.name, schema: CampaignSchema },
       { name: AutomationSettings.name, schema: AutomationSettingsSchema },
     ]),
+    // PHD-001 Volume-3 §8/§9 — count-based cleanup retention, unvalidated
+    // starting values pending §27 load-test results.
     BullModule.registerQueue(
-      { name: WEBHOOK_PROCESSING_QUEUE },
-      { name: CONVERSATION_AUTO_CLOSE_QUEUE },
-      { name: BROADCAST_EXECUTION_QUEUE },
-      { name: SLA_ESCALATION_QUEUE },
+      {
+        name: WEBHOOK_PROCESSING_QUEUE,
+        defaultJobOptions: { removeOnComplete: { count: 1000 }, removeOnFail: { count: 5000 } },
+      },
+      {
+        name: CONVERSATION_AUTO_CLOSE_QUEUE,
+        defaultJobOptions: { removeOnComplete: { count: 48 }, removeOnFail: { count: 96 } },
+      },
+      {
+        name: BROADCAST_EXECUTION_QUEUE,
+        defaultJobOptions: { removeOnComplete: { count: 200 }, removeOnFail: { count: 500 } },
+      },
+      {
+        name: SLA_ESCALATION_QUEUE,
+        defaultJobOptions: { removeOnComplete: { count: 48 }, removeOnFail: { count: 96 } },
+      },
     ),
   ],
   controllers: [

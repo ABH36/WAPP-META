@@ -27,7 +27,10 @@ const SWEEP_REPEAT_JOB_ID = "retention-cleanup-sweep";
  * no Notification module exists yet to own that data (TD-020).
  */
 @Injectable()
-@Processor(RETENTION_CLEANUP_QUEUE)
+@Processor(RETENTION_CLEANUP_QUEUE, {
+  // PHD-001 Volume-3 §9 — sweep must stay serialized, one run at a time.
+  concurrency: 1,
+})
 export class RetentionCleanupProcessor
   extends ObservableProcessor<Partial<JobContext>>
   implements OnModuleInit
@@ -59,6 +62,13 @@ export class RetentionCleanupProcessor
       {
         repeat: { every: RETENTION_CLEANUP_SWEEP_INTERVAL_MS },
         jobId: SWEEP_REPEAT_JOB_ID,
+        // PHD-001 Volume-3 §9 — previously no retry at all; a transient
+        // failure fetching the workspace list (before the per-workspace
+        // try/catch below even begins) meant a fully silent, skipped sweep
+        // until the next scheduled tick. Unvalidated starting value pending
+        // §27 load-test results.
+        attempts: 2,
+        backoff: { type: "exponential", delay: 60_000 },
       },
     );
   }

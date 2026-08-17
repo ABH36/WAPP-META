@@ -206,6 +206,7 @@ describe("BroadcastService", () => {
       expect(queue.add).toHaveBeenCalledWith(
         "run",
         expect.objectContaining({ workspaceId: "workspace-1", broadcastId: "broadcast-1" }),
+        expect.objectContaining({ attempts: 2 }),
       );
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         "communication.broadcast_started",

@@ -65,6 +65,15 @@ describe("PlatformWorkspaceRegistryService", () => {
         limit: 10,
       });
     });
+
+    it("clamps an oversized limit to MAX_PAGE_SIZE (100) instead of passing it through unbounded", async () => {
+      workspaceRepository.listAllForPlatform.mockResolvedValue({ items: [], total: 0 });
+
+      const result = await service.list({}, 1, 999_999);
+
+      expect(workspaceRepository.listAllForPlatform).toHaveBeenCalledWith({}, 1, 100);
+      expect(result.limit).toBe(100);
+    });
   });
 
   describe("suspend", () => {

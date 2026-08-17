@@ -24,7 +24,10 @@ const SWEEP_REPEAT_JOB_ID = "conversation-auto-close-sweep";
  * does not create duplicates.
  */
 @Injectable()
-@Processor(CONVERSATION_AUTO_CLOSE_QUEUE)
+@Processor(CONVERSATION_AUTO_CLOSE_QUEUE, {
+  // PHD-001 Volume-3 §9 — sweep must stay serialized, one run at a time.
+  concurrency: 1,
+})
 export class ConversationAutoCloseProcessor
   extends ObservableProcessor<Partial<JobContext>>
   implements OnModuleInit
@@ -48,6 +51,12 @@ export class ConversationAutoCloseProcessor
       {
         repeat: { every: CONVERSATION_AUTO_CLOSE_SWEEP_INTERVAL_MS },
         jobId: SWEEP_REPEAT_JOB_ID,
+        // PHD-001 Volume-3 §9 — previously no retry; the underlying sweep is
+        // condition-scoped (matches only currently-inactive Conversations),
+        // so a retry re-running it is safe/idempotent. Unvalidated starting
+        // value pending §27 load-test results.
+        attempts: 2,
+        backoff: { type: "exponential", delay: 60_000 },
       },
     );
   }

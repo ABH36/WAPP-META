@@ -25,6 +25,7 @@ export interface ListWorkspacesForPlatformResult {
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
+const MAX_PAGE_SIZE = 100;
 
 /** PRD-007 Volume-1 §4.1 — Workspace Registry: list/search/filter + Suspend/Reactivate/Archive. */
 @Injectable()
@@ -40,8 +41,13 @@ export class PlatformWorkspaceRegistryService {
     page = DEFAULT_PAGE,
     limit = DEFAULT_LIMIT,
   ): Promise<ListWorkspacesForPlatformResult> {
-    const { items, total } = await this.workspaceRepository.listAllForPlatform(filter, page, limit);
-    return { items: items.map(toPlatformWorkspaceSummary), total, page, limit };
+    const boundedLimit = Math.min(limit, MAX_PAGE_SIZE);
+    const { items, total } = await this.workspaceRepository.listAllForPlatform(
+      filter,
+      page,
+      boundedLimit,
+    );
+    return { items: items.map(toPlatformWorkspaceSummary), total, page, limit: boundedLimit };
   }
 
   async suspend(id: string, reason: string, actorId: string): Promise<PlatformWorkspaceSummary> {

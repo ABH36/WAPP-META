@@ -13,9 +13,20 @@ import type { AppConfig } from "../config/configuration.js";
   imports: [
     MongooseModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService<AppConfig, true>) => ({
-        uri: config.get("mongoUri", { infer: true }),
-      }),
+      useFactory: (config: ConfigService<AppConfig, true>) => {
+        const pool = config.get("mongoPool", { infer: true });
+        return {
+          uri: config.get("mongoUri", { infer: true }),
+          // PHD-001 Volume-3 §7 — conservative, environment-driven starting
+          // values; see configuration.ts's own doc comment for the
+          // "unvalidated pending real production telemetry" caveat.
+          maxPoolSize: pool.maxPoolSize,
+          minPoolSize: pool.minPoolSize,
+          connectTimeoutMS: pool.connectTimeoutMs,
+          socketTimeoutMS: pool.socketTimeoutMs,
+          serverSelectionTimeoutMS: pool.serverSelectionTimeoutMs,
+        };
+      },
     }),
   ],
 })

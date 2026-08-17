@@ -130,6 +130,37 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   GIT_COMMIT?: string;
+
+  // PHD-001 Volume-3 §7 — previously unset anywhere, silently falling back to
+  // the Node MongoDB driver's own defaults (maxPoolSize 100, no explicit
+  // connect/socket/server-selection timeouts). Conservative, configurable
+  // starting values — explicitly unvalidated against real production load,
+  // per §29/Architecture Review; adjust from measured telemetry, not a
+  // second guess made here.
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  MONGO_MAX_POOL_SIZE = 10;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  MONGO_MIN_POOL_SIZE = 2;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  MONGO_CONNECT_TIMEOUT_MS = 10_000;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  MONGO_SOCKET_TIMEOUT_MS = 45_000;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  MONGO_SERVER_SELECTION_TIMEOUT_MS = 10_000;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

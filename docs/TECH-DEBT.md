@@ -872,6 +872,8 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 
 **Trigger to revisit:** the next approved maintenance/bug-fix pass touching any of these 3 files, or a dedicated lint-hygiene pass once this is flagged to the Architect.
 
+**Still open (2026-08-17, PHD-001 Volume-3, Performance, Scalability & Production Infrastructure):** confirmed still the exact same 3 files, same rules, same line counts, via `pnpm --filter @wapp/api lint` and `pnpm --filter @wapp/{web,admin} lint` as part of this volume's own full regression sweep, cross-checked again against `git log`/`git status` (all 3 files unmodified since commits `8ee2ce0`/`7a63063`, both predating this volume). No new entry filed; this is the same gap, now confirmed from two independent volumes across two different lint-tooling states.
+
 ---
 
 ## TD-058 — Broadcast completion-status metric not instrumented (PHD-001 Volume-2)
@@ -886,3 +888,51 @@ Living document. Each entry: what the shortcut is, why it was accepted, and what
 **Closing this out looks like:** add `this.metricsService.communicationBroadcastsTotal.inc({status})` to `BroadcastExecutionProcessor`'s completion/failure paths, mirroring `CampaignService.onBroadcastFinished()`'s existing pattern exactly.
 
 **Trigger to revisit:** the next maintenance pass over `apps/api/src/modules/communication/queue/broadcast-execution.processor.ts`, or when Broadcast completion-rate dashboards are actually built and this gap becomes visible in practice.
+
+---
+
+## TD-059 — Data export queue retries are structurally inert
+
+**Raised:** 2026-08-17 (PHD-001 Volume-3, Performance, Scalability & Production Infrastructure — BullMQ per-queue tuning pass)
+
+**Status:** Open
+
+**What:** Every sweep-driven BullMQ queue in this volume's approved scope (`retention-cleanup`, `subscription-lifecycle`, `invoice-lifecycle`, `support-session-lifecycle`, `conversation-auto-close`, `sla-escalation`) gained `attempts: 2, backoff: {type: "exponential", delay: 60_000}` on their `queue.add()` calls, justified by each sweep only ever operating on its own still-pending candidate set (safe to retry). `data-export`'s `queue.add()` (`apps/api/src/modules/settings/services/data-export.service.ts`) was deliberately left at its existing `{attempts: 1}` rather than receiving the same treatment: `DataExportProcessor.handle()` catches every error internally and never rethrows (it records the failure onto the `DataExport` document's own status field instead), which means any `attempts` value greater than 1 would be structurally inert — BullMQ only retries a job whose handler actually throws, and this one never does. Raising `attempts` here would look like a fix while changing nothing.
+
+**Why accepted for now:** Discovered as an incidental nuance while tuning the other 10 queues, not something this volume's approved scope named — fixing the underlying error-swallowing behavior (making `handle()` rethrow on genuinely transient failures, e.g. a Cloudinary upload timeout, while still recording a terminal status for genuinely permanent ones) is a real behavior change to already-shipped Settings module code (PRD-006), not a config tweak, and needs its own scoped review rather than a silent change bundled into a BullMQ-tuning pass.
+
+**Closing this out looks like:** `DataExportProcessor.handle()` distinguishes transient failures (network/timeout — rethrow, let BullMQ's `attempts`/`backoff` actually do something) from permanent ones (invalid export request shape — catch and record terminally, as today), then set `attempts`/`backoff` on `data-export`'s `queue.add()` to match, mirroring the other 10 queues' pattern.
+
+**Trigger to revisit:** the next approved maintenance pass over `apps/api/src/modules/settings/services/data-export.service.ts`/`data-export.processor.ts`, or a real observed case of a transient export failure that a retry would have recovered from but didn't.
+
+---
+
+## TD-060 — Webhook-processing concurrency held at BullMQ's default (1) due to a check-then-act race
+
+**Raised:** 2026-08-17 (PHD-001 Volume-3, Performance, Scalability & Production Infrastructure — BullMQ concurrency tuning pass; doubt-policy resolution)
+
+**Status:** Open
+
+**What:** All 11 BullMQ processors in this volume's approved scope received an explicit `concurrency` value except `webhook-processing.processor.ts`, which was deliberately kept unset (BullMQ's default, 1) after discovering `WebhookService.handleInboundMessage()` performs a check-then-act sequence on `waMessageId` (look up whether a message with this Meta-supplied id already exists, then insert if not) without an atomic, unique-index-backed upsert. Under concurrency > 1, two jobs processing near-simultaneous webhook deliveries for the same `waMessageId` (a real, documented possibility — Meta's own webhook delivery guarantees are at-least-once, not exactly-once) could both pass the "not found" check before either inserts, producing a duplicate message record.
+
+**Why accepted for now:** Resolved via the doubt policy mid-implementation (not a pre-scoped item) as "keep concurrency unset, log as Technical Debt" rather than either (a) shipping concurrency=10 with a latent duplicate-processing bug, or (b) redesigning the insert path's concurrency-safety inside what was meant to be a config-tuning pass, not a data-integrity fix — the mandatory verification condition ("no queue tuning may silently introduce duplicate processing") explicitly required surfacing this rather than deciding it silently either way.
+
+**Closing this out looks like:** add a unique index on `waMessageId` (scoped per workspace/connection, matching how the rest of this schema scopes uniqueness) and change the insert path to a single atomic upsert (`findOneAndUpdate` with `upsert: true`, or an insert wrapped to catch and swallow the resulting duplicate-key error) instead of separate find-then-insert calls — once that's in place, `concurrency` can be safely raised on this processor the same way it was on the other 10.
+
+**Trigger to revisit:** the next approved maintenance pass over `apps/api/src/modules/communication/services/webhook.service.ts`/`webhook-processing.processor.ts`, or real measured evidence that concurrency=1 is an actual inbound-message-processing bottleneck (not yet observed — this volume's k6 testing exercised `/api/health` and `/api/v1/auth/register`, not the webhook path, so no load data exists for this queue specifically).
+
+---
+
+## TD-061 — Redis-backed throttler shares BullMQ's unbounded-retry connection, no bounded command timeout on the request-path check
+
+**Raised:** 2026-08-17 (PHD-001 Volume-3, Performance, Scalability & Production Infrastructure — k6 stress-test finding; doubt-policy resolution)
+
+**Status:** Open
+
+**What:** The global `REDIS_CLIENT` (`apps/api/src/infrastructure/redis/redis.module.ts`) is configured with `maxRetriesPerRequest: null` — correct and, per BullMQ's own documentation, required for its Workers' blocking-command semantics — and is reused by `RedisThrottlerStorageService` (this volume's own Infra #13 work) for the synchronous `ThrottlerGuard` check that runs on every HTTP request. `maxRetriesPerRequest: null` means a Redis command that can't complete queues indefinitely rather than failing after a bounded number of attempts; on the hot HTTP request path, this means a throttle check — which should fail fast — can instead block the entire request behind it if Redis has any transient slowness. Directly implicated in a k6 stress-test finding: 400 concurrent simulated clients against `/api/health` (an endpoint with zero Mongo/Redis I/O of its own) produced a 21.25% failure rate and a max observed request latency of 43m38s, consistent with throttle-check commands queuing behind Redis contention rather than timing out.
+
+**Why accepted for now:** Resolved via the doubt policy immediately after the stress-test finding — the storage/keying logic `RedisThrottlerStorageService` implements is correct and already verified (per-client rate-limit buckets confirmed independent via direct testing); this is a distinct concern about the _connection_ it shares with BullMQ, and separating them (or adding a bounded per-command timeout) is a real architectural change to already-shipped Infra #13 work, not a same-volume patch on a single stress-test data point. It also only manifests at concurrency levels (hundreds of distinct simultaneous clients/second) far beyond WAPP's current beachhead-stage expected traffic.
+
+**Closing this out looks like:** give `RedisThrottlerStorageService` its own Redis connection, separate from the one injected into BullMQ's queue/worker registrations, configured with a finite `maxRetriesPerRequest` (or an explicit per-command timeout via `commandTimeout`) so a throttle check fails fast and lets the request proceed in a fail-open (or fail-closed, needs its own decision) manner under genuine Redis pressure, rather than hanging indefinitely. Should be validated by re-running the same 400-VU stress scenario (`k6/scenarios/stress.js`) afterward and confirming both the failure rate and the tail-latency shape improve.
+
+**Trigger to revisit:** real production traffic approaching the concurrency level where this was observed (400+ distinct simultaneous clients/second), or a dedicated Redis-infrastructure hardening pass — whichever comes first. Not a pre-launch blocker at WAPP's current expected beachhead-stage scale.

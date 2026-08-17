@@ -52,6 +52,10 @@ export function ConversationView({ conversationId }: ConversationViewProps): Rea
     queryKey: ["communication", "conversation", conversationId],
     queryFn: () => conversationService.getById(conversationId),
     refetchInterval: POLL_INTERVAL_MS,
+    // PHD-001 Volume-3 §17 — makes explicit what was previously only the
+    // TanStack Query v5 default: this poller stops while the tab is
+    // unfocused, rather than continuing to hit the API in the background.
+    refetchIntervalInBackground: false,
     enabled: canView,
   });
 
@@ -59,6 +63,10 @@ export function ConversationView({ conversationId }: ConversationViewProps): Rea
     queryKey: ["communication", "conversation", conversationId, "messages"],
     queryFn: () => conversationService.listMessages(conversationId),
     refetchInterval: POLL_INTERVAL_MS,
+    // PHD-001 Volume-3 §17 — makes explicit what was previously only the
+    // TanStack Query v5 default: this poller stops while the tab is
+    // unfocused, rather than continuing to hit the API in the background.
+    refetchIntervalInBackground: false,
     enabled: canView,
   });
 

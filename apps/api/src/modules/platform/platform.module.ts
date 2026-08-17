@@ -128,7 +128,13 @@ import { PlatformReportsController } from "./controllers/platform-reports.contro
       { name: GovernancePolicy.name, schema: GovernancePolicySchema },
       { name: PlatformLoginHistoryEntry.name, schema: PlatformLoginHistoryEntrySchema },
     ]),
-    BullModule.registerQueue({ name: SUPPORT_SESSION_LIFECYCLE_QUEUE }),
+    // PHD-001 Volume-3 §8/§9 — 5-minute sweep; count-based cleanup retains
+    // ~1 day of run history. Unvalidated starting values pending §27
+    // load-test results.
+    BullModule.registerQueue({
+      name: SUPPORT_SESSION_LIFECYCLE_QUEUE,
+      defaultJobOptions: { removeOnComplete: { count: 288 }, removeOnFail: { count: 576 } },
+    }),
     WorkspaceModule,
     IdentityModule,
     CrmModule,

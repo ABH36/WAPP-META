@@ -1,5 +1,13 @@
 import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
+import withBundleAnalyzerInit from "@next/bundle-analyzer";
+
+// PHD-001 Volume-3 §16 — no bundle-size baseline/budget tooling existed
+// before this volume. `pnpm analyze` (ANALYZE=true) generates a static
+// treemap report; a no-op wrapper otherwise, zero effect on a normal build.
+const withBundleAnalyzer = withBundleAnalyzerInit({
+  enabled: process.env.ANALYZE === "true",
+});
 
 const withSerwist = withSerwistInit({
   swSrc: "src/app/sw.ts",
@@ -59,4 +67,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSerwist(nextConfig);
+export default withBundleAnalyzer(withSerwist(nextConfig));

@@ -64,6 +64,14 @@ describe("PlatformAuditService", () => {
     expect(result.items[0]?.id).toBe("entry-1");
   });
 
+  it("list() clamps an oversized limit to MAX_PAGE_SIZE (100) instead of passing it through unbounded", async () => {
+    platformAuditRepository.list.mockResolvedValue({ items: [], total: 0 });
+
+    await service.list({}, 1, 999_999);
+
+    expect(platformAuditRepository.list).toHaveBeenCalledWith({}, 1, 100);
+  });
+
   it("listRecentForWorkspace() maps repository results to summaries", async () => {
     platformAuditRepository.findByWorkspace.mockResolvedValue([baseEntry as never]);
 

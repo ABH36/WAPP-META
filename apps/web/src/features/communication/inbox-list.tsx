@@ -60,6 +60,10 @@ export function InboxList({
     initialPageParam: 1,
     getNextPageParam: (lastPage) => (lastPage.meta.hasNext ? lastPage.meta.page + 1 : undefined),
     refetchInterval: POLL_INTERVAL_MS,
+    // PHD-001 Volume-3 §17 — makes explicit what was previously only the
+    // TanStack Query v5 default: this poller stops while the tab is
+    // unfocused, rather than continuing to hit the API in the background.
+    refetchIntervalInBackground: false,
     enabled: canView,
   });
 

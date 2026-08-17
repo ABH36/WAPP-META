@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 import type { AppConfig } from "../../config/configuration.js";
 import { REDIS_CLIENT } from "./redis.constants.js";
+import { RedisThrottlerStorageService } from "./redis-throttler-storage.service.js";
 
 /**
  * Single Redis connection for the whole application (cache, rate-limit state,
@@ -24,8 +25,12 @@ import { REDIS_CLIENT } from "./redis.constants.js";
         });
       },
     },
+    // PHD-001 Volume-3 §8/§22 — see its own doc comment; lives here (not
+    // AppModule) since it depends on REDIS_CLIENT and this module is
+    // already the shared, @Global() home for Redis-backed infrastructure.
+    RedisThrottlerStorageService,
   ],
-  exports: [REDIS_CLIENT],
+  exports: [REDIS_CLIENT, RedisThrottlerStorageService],
 })
 export class RedisModule implements OnApplicationShutdown {
   constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}

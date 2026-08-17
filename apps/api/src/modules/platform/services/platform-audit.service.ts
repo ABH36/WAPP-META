@@ -6,6 +6,8 @@ import {
 import { toPlatformAuditEntrySummary } from "../mappers/platform.mapper.js";
 import type { PlatformAuditEntrySummary } from "../platform.types.js";
 
+const MAX_PAGE_SIZE = 100;
+
 export interface ListPlatformAuditResult {
   items: PlatformAuditEntrySummary[];
   total: number;
@@ -39,7 +41,11 @@ export class PlatformAuditService {
     page: number,
     limit: number,
   ): Promise<ListPlatformAuditResult> {
-    const { items, total } = await this.platformAuditRepository.list(filter, page, limit);
+    const { items, total } = await this.platformAuditRepository.list(
+      filter,
+      page,
+      Math.min(limit, MAX_PAGE_SIZE),
+    );
     return { items: items.map(toPlatformAuditEntrySummary), total };
   }
 

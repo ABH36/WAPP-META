@@ -129,10 +129,21 @@ import { SystemAdminController } from "./controllers/system-admin.controller.js"
       { name: FeatureFlagState.name, schema: FeatureFlagStateSchema },
       { name: PlatformFeatureOverrideState.name, schema: PlatformFeatureOverrideStateSchema },
     ]),
+    // PHD-001 Volume-3 §8/§9 — count-based cleanup retention, unvalidated
+    // starting values pending §27 load-test results.
     BullModule.registerQueue(
-      { name: WEBHOOK_DELIVERY_QUEUE },
-      { name: DATA_EXPORT_QUEUE },
-      { name: RETENTION_CLEANUP_QUEUE },
+      {
+        name: WEBHOOK_DELIVERY_QUEUE,
+        defaultJobOptions: { removeOnComplete: { count: 500 }, removeOnFail: { count: 2000 } },
+      },
+      {
+        name: DATA_EXPORT_QUEUE,
+        defaultJobOptions: { removeOnComplete: { count: 100 }, removeOnFail: { count: 500 } },
+      },
+      {
+        name: RETENTION_CLEANUP_QUEUE,
+        defaultJobOptions: { removeOnComplete: { count: 24 }, removeOnFail: { count: 48 } },
+      },
     ),
   ],
   controllers: [

@@ -34,6 +34,18 @@ import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic
 const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 const isProduction = process.env.NODE_ENV === "production";
 
+/**
+ * PHD-001 Volume-3 §12 — a no-op by default (tracing may never have started,
+ * e.g. production with no OTLP endpoint configured), overwritten below only
+ * when the SDK actually starts. Deliberately NOT a `process.on("SIGTERM", ...)`
+ * handler in this file anymore (that raced/bypassed Nest's own shutdown
+ * sequence — see `common/observability/tracing-shutdown.service.ts`, which
+ * calls this from a proper `OnApplicationShutdown` hook instead, so the SDK
+ * flush happens in the same ordered sequence as every other resource's
+ * shutdown, not a second, independent one).
+ */
+export let shutdownTracing: () => Promise<void> = async () => {};
+
 if (otlpEndpoint || !isProduction) {
   const sdk = new NodeSDK({
     resource: resourceFromAttributes({
@@ -64,10 +76,9 @@ if (otlpEndpoint || !isProduction) {
 
   sdk.start();
 
-  // Flush any buffered spans before the process actually exits — otherwise
-  // the last batch before a graceful shutdown (SIGTERM, the same signal
-  // dumb-init forwards in docker/api.Dockerfile) is silently lost.
-  process.on("SIGTERM", () => {
-    void sdk.shutdown().finally(() => process.exit(0));
-  });
+  // Flush any buffered spans before the process actually exits — invoked by
+  // `TracingShutdownService.onApplicationShutdown()` as part of Nest's own
+  // graceful-shutdown sequence (`app.enableShutdownHooks()` in main.ts),
+  // not a competing signal handler of its own.
+  shutdownTracing = () => sdk.shutdown();
 }

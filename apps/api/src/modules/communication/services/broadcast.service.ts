@@ -128,7 +128,16 @@ export class BroadcastService {
           { workspaceId, broadcastId: broadcast._id.toString() },
           this.correlationContext.getOrCreateCorrelationId(),
         ),
-        { delay },
+        {
+          delay,
+          // PHD-001 Volume-3 §9 — previously no retry; safe because
+          // processRecipients() only ever operates on the still-PENDING
+          // batch, so re-entering executeRun() on retry skips
+          // already-processed recipients rather than re-sending them.
+          // Unvalidated starting value pending §27 load-test results.
+          attempts: 2,
+          backoff: { type: "exponential", delay: 60_000 },
+        },
       );
     }
 
@@ -194,6 +203,14 @@ export class BroadcastService {
         { workspaceId, broadcastId: id },
         this.correlationContext.getOrCreateCorrelationId(),
       ),
+      {
+        // PHD-001 Volume-3 §9 — see the scheduled-send call site's comment
+        // above for why this is safe (processRecipients() only touches the
+        // still-PENDING batch). Unvalidated starting value pending §27
+        // load-test results.
+        attempts: 2,
+        backoff: { type: "exponential", delay: 60_000 },
+      },
     );
 
     this.eventEmitter.emit(DomainEvent.BROADCAST_STARTED, {
@@ -234,6 +251,14 @@ export class BroadcastService {
         { workspaceId, broadcastId: id },
         this.correlationContext.getOrCreateCorrelationId(),
       ),
+      {
+        // PHD-001 Volume-3 §9 — see the scheduled-send call site's comment
+        // above for why this is safe (processRecipients() only touches the
+        // still-PENDING batch). Unvalidated starting value pending §27
+        // load-test results.
+        attempts: 2,
+        backoff: { type: "exponential", delay: 60_000 },
+      },
     );
     return toBroadcastSummary(updated!);
   }

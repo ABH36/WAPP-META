@@ -22,7 +22,15 @@ interface BroadcastExecutionJobData extends Partial<JobContext> {
  * with that choice.
  */
 @Injectable()
-@Processor(BROADCAST_EXECUTION_QUEUE)
+@Processor(BROADCAST_EXECUTION_QUEUE, {
+  // PHD-001 Volume-3 §9 — each job is scoped to one broadcastId (an
+  // independent aggregate root, no shared mutable state between broadcasts),
+  // so running different broadcasts' runs in parallel is safe. Capped below
+  // webhook-processing's throughput to avoid contending with WhatsApp API's
+  // own per-workspace rate limits. Unvalidated starting value pending §27
+  // load-test results.
+  concurrency: 3,
+})
 export class BroadcastExecutionProcessor extends ObservableProcessor<BroadcastExecutionJobData> {
   protected readonly logger = new Logger(BroadcastExecutionProcessor.name);
   protected readonly queueName = BROADCAST_EXECUTION_QUEUE;

@@ -26,7 +26,7 @@ export class AuthToken {
   @Prop({ type: String, enum: AuthTokenType, required: true })
   type!: AuthTokenType;
 
-  @Prop({ required: true })
+  @Prop({ required: true, index: true })
   tokenHash!: string;
 
   @Prop({ required: true, expires: 0 })

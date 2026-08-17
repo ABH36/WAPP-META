@@ -4,6 +4,7 @@ import { CorrelationContextService } from "./correlation-context.service.js";
 import { CorrelationMiddleware } from "./correlation.middleware.js";
 import { RequestContextInterceptor } from "./request-context.interceptor.js";
 import { ErrorReportingService, NoopErrorReportingService } from "./error-reporting.service.js";
+import { TracingShutdownService } from "./tracing-shutdown.service.js";
 
 /**
  * PHD-001 Volume-2 — `@Global()` so `CorrelationContextService`/
@@ -22,6 +23,7 @@ import { ErrorReportingService, NoopErrorReportingService } from "./error-report
     // this is the single place a future Sentry/Datadog/etc. implementation
     // gets swapped in, env-driven, with zero changes at any call site.
     { provide: ErrorReportingService, useClass: NoopErrorReportingService },
+    TracingShutdownService,
   ],
   exports: [CorrelationContextService, ErrorReportingService],
 })

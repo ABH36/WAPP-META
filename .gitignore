@@ -33,6 +33,9 @@ playwright-report/
 blob-report/
 playwright/.cache/
 
+# PHD-001 Volume-3 — k6 raw run output (regeneratable; see docs/PERF-REPORT-phd001-volume3.md for the summarized numbers)
+k6/results/
+
 # Logs
 *.log
 npm-debug.log*

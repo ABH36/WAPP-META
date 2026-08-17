@@ -23,7 +23,11 @@ const tracer = trace.getTracer("wapp-api-webhook-delivery");
  * all (§4.3).
  */
 @Injectable()
-@Processor(WEBHOOK_DELIVERY_QUEUE)
+@Processor(WEBHOOK_DELIVERY_QUEUE, {
+  // PHD-001 Volume-3 §9 — outbound HTTP calls, safe to parallelize.
+  // Unvalidated starting value pending §27 load-test results.
+  concurrency: 5,
+})
 export class WebhookDeliveryProcessor extends ObservableProcessor<WebhookDeliveryJob> {
   protected readonly logger = new Logger(WebhookDeliveryProcessor.name);
   protected readonly queueName = WEBHOOK_DELIVERY_QUEUE;

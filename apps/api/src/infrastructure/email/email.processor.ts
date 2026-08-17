@@ -19,6 +19,9 @@ const RETRY_DELAYS_MS = [10_000, 60_000, 300_000];
 
 @Injectable()
 @Processor(EMAIL_QUEUE, {
+  // PHD-001 Volume-3 §9 — I/O-bound (Resend API calls), high volume, safe to
+  // parallelize. Unvalidated starting value pending §27 load-test results.
+  concurrency: 5,
   settings: {
     backoffStrategy: (attemptsMade: number): number => {
       return RETRY_DELAYS_MS[attemptsMade - 1] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]!;

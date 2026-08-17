@@ -1,7 +1,8 @@
 import { Module, ValidationPipe } from "@nestjs/common";
 import { APP_FILTER, APP_INTERCEPTOR, APP_GUARD, APP_PIPE } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
-import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { ThrottlerModule, ThrottlerGuard, ThrottlerStorage } from "@nestjs/throttler";
+import { RedisThrottlerStorageService } from "./infrastructure/redis/redis-throttler-storage.service.js";
 import configuration from "./config/configuration.js";
 import { validateEnv } from "./config/env.validation.js";
 import { DatabaseModule } from "./database/database.module.js";
@@ -62,13 +63,27 @@ import { PlatformModule } from "./modules/platform/platform.module.js";
     // SEC-009 — general authenticated API default. Auth-endpoint-specific
     // stricter tiers (5/min) are applied via @Throttle() on individual routes
     // once the Identity module exists.
-    ThrottlerModule.forRoot([
-      {
-        name: "default",
-        ttl: 60_000,
-        limit: 300,
-      },
-    ]),
+    //
+    // PHD-001 Volume-3 §8/§22/BR-008 — Redis-backed storage (see
+    // RedisThrottlerStorageService's own doc comment), not the library's
+    // in-memory default, so rate-limit state is shared across every API
+    // instance instead of being enforced independently per process.
+    // `forRootAsync` with the object-form options (`{throttlers, storage}`)
+    // is required to pass a custom storage at all — the array-of-throttlers
+    // shorthand form (`forRoot([{...}])`) ignores `storage` unconditionally.
+    ThrottlerModule.forRootAsync({
+      inject: [RedisThrottlerStorageService],
+      useFactory: (storage: ThrottlerStorage) => ({
+        throttlers: [
+          {
+            name: "default",
+            ttl: 60_000,
+            limit: 300,
+          },
+        ],
+        storage,
+      }),
+    }),
     DatabaseModule,
     InfrastructureModule,
     HealthModule,

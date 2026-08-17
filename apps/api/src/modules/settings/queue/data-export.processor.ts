@@ -48,7 +48,12 @@ const EXPORT_FOLDER_PREFIX = "exports";
  * docs/ADR-SET-007-audit-strategy.md.
  */
 @Injectable()
-@Processor(DATA_EXPORT_QUEUE)
+@Processor(DATA_EXPORT_QUEUE, {
+  // PHD-001 Volume-3 §9 — memory/CPU-heavier per job (report generation);
+  // capped below the I/O-bound queues. Unvalidated starting value pending
+  // §27 load-test results.
+  concurrency: 2,
+})
 export class DataExportProcessor extends ObservableProcessor<DataExportJob> {
   protected readonly logger = new Logger(DataExportProcessor.name);
   protected readonly queueName = DATA_EXPORT_QUEUE;

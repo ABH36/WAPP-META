@@ -8,6 +8,8 @@ import type { SubscriptionSummary } from "../../billing/billing.types.js";
 import { DomainEvent } from "../../../common/events/domain-events.js";
 import type { PlanChangedByOperatorPayload } from "../../../common/events/domain-events.js";
 
+const MAX_PAGE_SIZE = 100;
+
 /**
  * PRD-007 Volume-2 §4.1 — every method here delegates straight into
  * SubscriptionService's own id-based entry points (BR-006/§11: no
@@ -29,7 +31,11 @@ export class PlatformSubscriptionsService {
     page: number,
     limit: number,
   ): Promise<ListSubscriptionsForPlatformResult> {
-    return this.subscriptionService.listAllForPlatform(filter, page, limit);
+    return this.subscriptionService.listAllForPlatform(
+      filter,
+      page,
+      Math.min(limit, MAX_PAGE_SIZE),
+    );
   }
 
   async getById(subscriptionId: string): Promise<SubscriptionSummary> {

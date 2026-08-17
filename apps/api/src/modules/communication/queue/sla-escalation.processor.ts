@@ -22,7 +22,10 @@ const SWEEP_REPEAT_JOB_ID = "sla-escalation-sweep";
  * treats as idempotent.
  */
 @Injectable()
-@Processor(SLA_ESCALATION_QUEUE)
+@Processor(SLA_ESCALATION_QUEUE, {
+  // PHD-001 Volume-3 §9 — sweep must stay serialized, one run at a time.
+  concurrency: 1,
+})
 export class SlaEscalationProcessor
   extends ObservableProcessor<Partial<JobContext>>
   implements OnModuleInit
@@ -46,6 +49,12 @@ export class SlaEscalationProcessor
       {
         repeat: { every: SLA_ESCALATION_SWEEP_INTERVAL_MS },
         jobId: SWEEP_REPEAT_JOB_ID,
+        // PHD-001 Volume-3 §9 — previously no retry; the underlying sweep is
+        // condition-scoped (matches only currently-breaching Conversations),
+        // so a retry re-running it is safe/idempotent. Unvalidated starting
+        // value pending §27 load-test results.
+        attempts: 2,
+        backoff: { type: "exponential", delay: 60_000 },
       },
     );
   }

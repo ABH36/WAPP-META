@@ -4,8 +4,8 @@
   "private": true,
   "description": "WAPP — Enterprise WhatsApp Customer Engagement Platform (monorepo root)",
   "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
+    "node": ">=22.13.0",
+    "pnpm": ">=11.0.0"
   },
   "packageManager": "pnpm@11.20.0",
   "scripts": {
@@ -21,8 +21,8 @@
     "test": "pnpm -r test",
     "test:e2e": "playwright test",
     "clean": "pnpm -r clean && rimraf node_modules",
-    "prepare": "husky",
-    "postinstall": "pnpm --filter @wapp/shared-types build"
+    "prepare": "husky || true",
+    "postinstall": "node -e \"process.env.WAPP_SKIP_SHARED_TYPES_BUILD==='1'||require('child_process').execSync('pnpm --filter @wapp/shared-types build',{stdio:'inherit'})\""
   },
   "devDependencies": {
     "@commitlint/cli": "^19.5.0",

@@ -105,8 +105,17 @@ import { BillingReportsController } from "./controllers/billing-reports.controll
       { name: UsageHistoryEntry.name, schema: UsageHistoryEntrySchema },
     ]),
     BullModule.registerQueue(
-      { name: SUBSCRIPTION_LIFECYCLE_QUEUE },
-      { name: INVOICE_LIFECYCLE_QUEUE },
+      // PHD-001 Volume-3 §8/§9 — hourly sweep, count-based cleanup retains
+      // ~2 days of run history; unvalidated starting values pending §27
+      // load-test results.
+      {
+        name: SUBSCRIPTION_LIFECYCLE_QUEUE,
+        defaultJobOptions: { removeOnComplete: { count: 48 }, removeOnFail: { count: 96 } },
+      },
+      {
+        name: INVOICE_LIFECYCLE_QUEUE,
+        defaultJobOptions: { removeOnComplete: { count: 48 }, removeOnFail: { count: 96 } },
+      },
     ),
   ],
   controllers: [

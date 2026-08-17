@@ -37,6 +37,14 @@ describe("PlatformInvoicesService", () => {
     );
   });
 
+  it("clamps an oversized limit to MAX_PAGE_SIZE (100) instead of passing it through unbounded", async () => {
+    invoiceService.listAllForPlatform.mockResolvedValue({ items: [], total: 0 });
+
+    await service.list({}, 1, 999_999);
+
+    expect(invoiceService.listAllForPlatform).toHaveBeenCalledWith({}, 1, 100);
+  });
+
   it("getById() delegates to InvoiceService.getById", async () => {
     invoiceService.getById.mockResolvedValue({ id: "invoice-1" } as never);
 

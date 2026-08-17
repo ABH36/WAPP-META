@@ -1,4 +1,12 @@
 import type { NextConfig } from "next";
+import withBundleAnalyzerInit from "@next/bundle-analyzer";
+
+// PHD-001 Volume-3 §16 — see apps/web/next.config.ts's identical note.
+// `pnpm analyze` (ANALYZE=true) generates a static treemap report; a no-op
+// wrapper otherwise, zero effect on a normal build.
+const withBundleAnalyzer = withBundleAnalyzerInit({
+  enabled: process.env.ANALYZE === "true",
+});
 
 // PHD-001 Volume-1 — see apps/web/next.config.ts's identical note: apps/api's
 // Helmet config only protects its own JSON responses, not this app's HTML/JS/
@@ -41,4 +49,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

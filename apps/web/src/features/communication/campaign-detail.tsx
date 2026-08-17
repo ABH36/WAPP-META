@@ -35,6 +35,10 @@ export function CampaignDetail({ campaignId }: CampaignDetailProps): React.JSX.E
     queryKey: ["communication", "campaign", campaignId, "stats"],
     queryFn: () => campaignService.getStats(campaignId),
     refetchInterval: 15_000,
+    // PHD-001 Volume-3 §17 — makes explicit what was previously only the
+    // TanStack Query v5 default: this poller stops while the tab is
+    // unfocused, rather than continuing to hit the API in the background.
+    refetchIntervalInBackground: false,
     enabled: canView,
   });
 

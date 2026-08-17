@@ -38,6 +38,14 @@ describe("PlatformPaymentsService", () => {
     );
   });
 
+  it("clamps an oversized limit to MAX_PAGE_SIZE (100) instead of passing it through unbounded", async () => {
+    paymentService.listAllForPlatform.mockResolvedValue({ items: [], total: 0 });
+
+    await service.list({}, 1, 999_999);
+
+    expect(paymentService.listAllForPlatform).toHaveBeenCalledWith({}, 1, 100);
+  });
+
   it("recordManual() passes verified/evidenceUrl through to PaymentService.record", async () => {
     paymentService.record.mockResolvedValue({ id: "payment-1" } as never);
 
