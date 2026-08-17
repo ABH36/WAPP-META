@@ -21,8 +21,19 @@ export class MetricsController {
   @UseGuards(MetricsAuthGuard)
   @Version(VERSION_NEUTRAL)
   @Get()
-  async getMetrics(@Res({ passthrough: true }) response: Response): Promise<string> {
+  // FINAL-QA-001 — `@Res()` without `passthrough: true`, and `response.send()`
+  // instead of a `return` value. The app's global `ResponseInterceptor`
+  // (`APP_INTERCEPTOR`, every route, no exemptions) wraps every controller
+  // return value in `{success, message, data}` — with `passthrough: true`,
+  // that still applied here even though the header was set to
+  // `text/plain`, so the actual response body was JSON-wrapped Prometheus
+  // text: correct Content-Type, unparseable content, meaning a real
+  // Prometheus scraper could never actually read this endpoint. Full
+  // manual response control (no `passthrough`) is Nest's own documented
+  // way to opt a single route out of the interceptor pipeline for the
+  // body, without touching the interceptor or any other route.
+  async getMetrics(@Res() response: Response): Promise<void> {
     response.setHeader("Content-Type", this.metricsService.registry.contentType);
-    return this.metricsService.registry.metrics();
+    response.send(await this.metricsService.registry.metrics());
   }
 }
