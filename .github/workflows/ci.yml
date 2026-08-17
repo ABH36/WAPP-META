@@ -19,8 +19,16 @@ env:
   # toolchain PHD-001 Volume-3 already requires in production: root
   # package.json's `packageManager: pnpm@11.20.0` needs Node 22.13+ (the
   # built-in `node:sqlite` module) and pnpm 11's own engine requirement.
+  #
+  # FINAL-QA-001 — no PNPM_VERSION here: `pnpm/action-setup@v4` errors out
+  # ("Multiple versions of pnpm specified") if given an explicit `version:`
+  # input AND root package.json's own `packageManager` field at the same
+  # time — confirmed by an actual GitHub Actions run failing on exactly this
+  # (never caught locally, since nothing in local verification exercises
+  # `pnpm/action-setup@v4` itself). Removed the input entirely; the action
+  # auto-detects the pinned version from `packageManager` instead, which is
+  # also the more correct single-source-of-truth configuration.
   NODE_VERSION: "22"
-  PNPM_VERSION: "11"
 
 jobs:
   lint-typecheck:
@@ -30,8 +38,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -57,8 +63,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -81,8 +85,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -127,8 +129,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -153,8 +153,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
