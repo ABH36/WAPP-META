@@ -1,6 +1,6 @@
 {
   "name": "@wapp/web",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "private": true,
   "description": "WAPP public website + workspace application — Next.js 15 App Router",
   "scripts": {
